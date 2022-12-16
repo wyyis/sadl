@@ -463,6 +463,7 @@ void Conv2D<T>::conv2d_1x1_s_dispatch(int nb_filters, int in_H, int in_W, int in
     break;
   case 96: CONV_MOD32<96, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
   case 128: CONV_MOD32<128, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
+  case 160: CONV_MOD32<160, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
   case 384: CONV_MOD32<384, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
   case 480: CONV_MOD32<480, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
   default: conv2d_1x1_s<s_h, s_w>(nb_filters, in_H, in_W, in_D, start_h, start_w, out_, A, kernel); break;
