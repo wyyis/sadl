@@ -79,7 +79,10 @@ public:
   std::vector<typename layers::Layer<T>::Id>        getLayersId() const;
   const LayerData &                                 getLayer(const typename layers::Layer<T>::Id &id) const;
   Version                                           version() const { return version_; }
-
+#if SPARSE_SUPPORT
+  float sparsity_threshold      = kSparsifyThreshold;
+  float sparsity_size_threshold = kSparsifySizeThreshold;
+#endif
 #if DEBUG_COUNTERS
   struct Stat
   {
@@ -365,7 +368,25 @@ template<typename T> bool Model<T>::init(std::vector<Tensor<T>> &in)
                   << data_[layer_cnt].layer->id() << std::endl;
         return false;
       }
-      data_[layer_cnt].inputs[inputs_cnt] = &(L.layer->output());
+
+      Tensor<T> *tmp = &(L.layer->output());
+#if SPARSE_SUPPORT
+      if (sparsity_threshold >= 0 && sparsity_threshold <= 1.)
+      {
+        if (data_[layer_cnt].layer->op() == layers::OperationType::MatMul
+            && L.layer->op() == layers::OperationType::Const)
+        {
+          if (isFullMatrixSparse(L.layer->output(), sparsity_threshold, sparsity_size_threshold))
+          {
+            SADL_DBG(std::cout << "[INFO] Sparsify layer " << data_[layer_cnt].layer->id() << " "
+                               << data_[layer_cnt].layer->name() << std::endl;);
+            sparsify(*tmp);
+          }
+        }
+      }
+#endif
+
+      data_[layer_cnt].inputs[inputs_cnt] = tmp;
       op_type[inputs_cnt]                 = L.layer->op();
 
       // always put data layers first when const layers
@@ -480,6 +501,9 @@ template<typename T> bool Model<T>::apply(std::vector<Tensor<T>> &in)
 
     ok &= data_[layer_cnt].layer->apply(data_[layer_cnt].inputs);
 #if DEBUG_VALUES
+#if SPARSE_SUPPORT
+    if (!data_[layer_cnt].layer->out_.isSparse())
+#endif
      {
         std::cout<<"outputs=[";
         if (std::is_same<T,float>::value) {

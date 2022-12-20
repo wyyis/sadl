@@ -57,8 +57,18 @@ protected:
 #if __AVX2__
   bool apply_dim2_simd8(std::vector<Tensor<T> *> &in) { return apply_dim2<8>(in); }
   bool apply_dim2_simd16(std::vector<Tensor<T> *> &in) { return apply_dim2_simd8(in); }
+#endif
+
+#if SPARSE_SUPPORT
+  bool                  apply_sparse_matmul(std::vector<Tensor<T> *> &in);
+#if __AVX2__
   bool apply_sparse_matmul_simd16(std::vector<Tensor<T> *> &in);
 #endif
+#if __SSE4_2__
+  bool apply_sparse_matmul_simd8(std::vector<Tensor<T> *> &in);
+#endif
+#endif
+
   int q_ = 0;
   DUMP_MODEL_EXT;
 };
@@ -73,6 +83,17 @@ template<typename T> bool MatMul<T>::apply(std::vector<Tensor<T> *> &in)
 #define MULT8_DIM2 apply_dim2<8>
 #define MULT16_DIM2 apply_dim2<16>
 #endif
+
+#if SPARSE_SUPPORT
+#if __AVX2__
+#define SPARSE_MATMULT apply_sparse_matmul_simd16
+#elif __SSE4_2__
+#define SPARSE_MATMULT apply_sparse_matmul_simd8
+#else
+#define SPARSE_MATMULT apply_sparse_matmul
+#endif
+#endif
+
   const Tensor<T> &A{ *in[0] };
   const Tensor<T> &B{ *in[1] };
   out_.quantizer = A.quantizer - q_;
@@ -91,6 +112,11 @@ template<typename T> bool MatMul<T>::apply(std::vector<Tensor<T> *> &in)
   switch (dum)
   {
   case 2:
+#if SPARSE_SUPPORT
+    if (in[1]->isSparse())
+      return SPARSE_MATMULT(in);
+    else
+#endif
     if (H % 16 == 0)
       return MULT16_DIM2(in);
     else if (H % 8 == 0)
@@ -299,6 +325,208 @@ template<typename T> template<int NN> bool MatMul<T>::apply_dim3(std::vector<Ten
   }
   return true;
 }
+
+#if SPARSE_SUPPORT
+template<typename T> bool MatMul<T>::apply_sparse_matmul(std::vector<Tensor<T> *> &in)
+{
+  const Tensor<T> &A{ *in[0] };
+  const Tensor<T> &B{ *in[1] };
+  const int        shift{ in[1]->quantizer + q_ };
+  const int        last = A.dims().size() - 1;
+  const int        N{ A.dims()[last - 1] };
+  const int        H{ A.dims()[last] };
+
+  out_.fill(0);
+
+  uint32_t offset_data = 0;
+  uint16_t i           = 0;
+
+  if (A.dims().size() == 2)
+  {
+    for (int b = 0; b < N; ++b)
+    {
+      const T *aptr = A.data() + H * b;   // A(b,i)   => A[H*b]
+
+      for (const auto &nb_nonzero: B.getNbNonzerosCol())
+      {
+        typename ComputationType<T>::type x = 0;
+
+        for (auto k = 0; k < nb_nonzero; ++k, ++offset_data)
+        {
+          uint16_t j = B.getIndices()[offset_data];
+          x += (typename ComputationType<T>::type) aptr[j] * B.getDataSparse()[offset_data];
+          COUNTERS_MAC(B.getDataSparse()[offset_data]);
+        }
+
+        ComputationType<T>::quantize(x, shift);
+        COUNTERS(x);
+        SATURATE(x);
+        out_(b, i) = (T) x;
+        i++;
+      }
+    }
+  }
+  else
+  {
+    for (int b = 0; b < N; ++b)
+    {
+      const T *aptr = A.data() + H * b;   // A(b,i)   => A[H*b]
+
+      for (const auto &nb_nonzero: B.getNbNonzerosCol())
+      {
+        typename ComputationType<T>::type x = 0;
+
+        for (uint16_t k = 0; k < nb_nonzero; ++k, ++offset_data)
+        {
+          uint16_t j = B.getIndices()[offset_data];
+          x += (typename ComputationType<T>::type) aptr[j] * B.getDataSparse()[offset_data];
+          COUNTERS_MAC(B.getDataSparse()[offset_data]);
+        }
+
+        ComputationType<T>::quantize(x, shift);
+        COUNTERS(x);
+        SATURATE(x);
+        out_(0, b, i) = (T) x;
+        i++;
+      }
+    }
+  }
+
+  return true;
+}
+
+#if __SSE4_2__
+template<> inline bool MatMul<int16_t>::apply_sparse_matmul_simd8(std::vector<Tensor<int16_t> *> &in)
+{
+  using T = int16_t;
+
+  const Tensor<int16_t> &A{ *in[0] };
+  const Tensor<int16_t> &B{ *in[1] };
+  const int              shift{ in[1]->quantizer + q_ };
+  const int              last = A.dims().size() - 1;
+  const int              N{ A.dims()[last - 1] };
+  const int              H{ A.dims()[last] };
+
+  out_.fill(0);
+
+  int t = 0;
+
+  for (int b = 0; b < N; ++b)
+  {
+    const int16_t *aptr = A.data() + H * b;   // A(b,i)   => A[H*b]
+    const int16_t *bptr = B.getDataSparse().data();
+    const auto *   idx  = B.getIndices().data();
+
+    for (const auto &nb_nonzero: B.getNbNonzerosCol())
+    {
+      __m128i s = _mm_setzero_si128();
+
+      for (int j = 0; j < nb_nonzero; j += 8)
+      {
+        int16_t eA[8];
+
+        for (int k = 0; k < 8; ++k)
+        {
+          eA[k] = *(aptr + *idx);
+          idx++;
+        }
+
+        __m128i a  = _mm_loadu_si128((__m128i *) eA);
+        __m128i b  = _mm_loadu_si128((const __m128i *) bptr);
+        __m128i ab = _mm_madd_epi16(a, b);   // res in si32
+
+        s = _mm_add_epi32(s, ab);
+
+        bptr += 8;
+      }
+
+      __m128i hi64 =
+        _mm_unpackhi_epi64(s, s);   // 3-operand non-destructive AVX lets us save a byte without needing a movdqa
+      __m128i sum64 = _mm_add_epi32(hi64, s);
+      __m128i hi32  = _mm_shuffle_epi32(sum64, _MM_SHUFFLE(2, 3, 0, 1));   // Swap the low two elements
+      __m128i sum32 = _mm_add_epi32(sum64, hi32);
+
+      typename ComputationType<int16_t>::type z = _mm_cvtsi128_si32(sum32);
+
+      ComputationType<int16_t>::quantize(z, shift);
+      SATURATE(z);
+      out_[t] = z;
+
+      t++;
+    }
+  }
+  return true;
+}
+
+template<typename T> bool MatMul<T>::apply_sparse_matmul_simd8(std::vector<Tensor<T> *> &in)
+{
+  return apply_sparse_matmul(in);
+}
+#endif
+
+#if __AVX2__
+template<> inline bool MatMul<int16_t>::apply_sparse_matmul_simd16(std::vector<Tensor<int16_t> *> &in)
+{
+  using T = int16_t;
+
+  const Tensor<int16_t> &A{ *in[0] };
+  const Tensor<int16_t> &B{ *in[1] };
+  const int              shift{ in[1]->quantizer + q_ };
+  const int              last = A.dims().size() - 1;
+  const int              N{ A.dims()[last - 1] };
+  const int              H{ A.dims()[last] };
+
+  out_.fill(0);
+
+  int t = 0;
+
+  for (int b = 0; b < N; ++b)
+  {
+    const int16_t *aptr = A.data() + H * b;   // A(b,i)   => A[H*b]
+    const int16_t *bptr = B.getDataSparse().data();
+    const auto *   idx  = B.getIndices().data();
+
+    for (auto nb_nonzero: B.getNbNonzerosCol())
+    {
+      __m256i s = _mm256_setzero_si256();
+
+      for (int j = 0; j < nb_nonzero; j += 16)
+      {
+        int16_t eA[16];
+
+        for (int k = 0; k < 16; ++k)
+        {
+          eA[k] = *(aptr + *idx);
+          idx++;
+        }
+
+        __m256i a  = _mm256_loadu_si256((__m256i *) eA);
+        __m256i b  = _mm256_loadu_si256((const __m256i *) bptr);
+        __m256i ab = _mm256_madd_epi16(a, b);
+
+        s = _mm256_add_epi32(s, ab);
+
+        bptr += 16;
+      }
+
+      typename ComputationType<int16_t>::type z = sum32_int16(s);
+      ComputationType<int16_t>::quantize(z, shift);
+      SATURATE(z);
+      out_[t] = z;
+
+      t++;
+    }
+  }
+
+  return true;
+}
+
+template<typename T> bool MatMul<T>::apply_sparse_matmul_simd16(std::vector<Tensor<T> *> &in)
+{
+  return apply_sparse_matmul(in);
+}
+#endif
+#endif
 
 template<typename T> bool MatMul<T>::init(const std::vector<Tensor<T> *> &in)
 {
