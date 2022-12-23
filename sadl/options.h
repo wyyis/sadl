@@ -37,12 +37,22 @@
 #ifndef SATURATE_RESULT
 #define SATURATE_RESULT     1 // avoid overflow in int NN
 #endif
+
+#if SPARSE_SUPPORT
+// Sparse matmul threshold
+static constexpr float kSparsifyThreshold     = 0.8f;    // need at least 80% of sparsity
+static constexpr float kSparsifySizeThreshold = 1000.0f; // need at least 1000 elements
+#endif
+
 // optimization
 // nothing/-msse42: no simd
 // -mavx2:  avx2
 // -mavx2 -mfma: avx2 + fuse multiply/add
 // -mavx512bw -mavx512f: avx512
 // #define NDEBUG        1 // remove sanity tests
+
+
+
 
 // debug
 // #define DEBUG_VALUES        1 // show values

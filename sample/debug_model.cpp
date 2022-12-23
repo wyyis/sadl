@@ -50,6 +50,11 @@ namespace
 template<typename T> void infer(const string &filename)
 {
   sadl::Model<T> model;
+#if SPARSE_SUPPORT
+  // for debug only
+  model.sparsity_size_threshold=3;
+  model.sparsity_threshold=0.5f;
+#endif    
   ifstream       file(filename, ios::binary);
   cout << "[INFO] Model loading" << endl;
   if (!model.load(file))

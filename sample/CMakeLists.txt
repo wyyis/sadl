@@ -2,10 +2,16 @@ cmake_minimum_required(VERSION 3.5)
 
 project(sample LANGUAGES CXX)
 
+set(SPARSE_MATMULT_SUPPORT OFF CACHE BOOL "add support for sparse matrix multiplication" )
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "-std=c++14 -ffast-math -Wall -fstrict-aliasing") 
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
+if (SPARSE_MATMULT_SUPPORT)
+ add_definitions(-DSPARSE_SUPPORT=1) 
+ message("Build with sparse matrix multiplication support")
+endif()
 
 include_directories(..)
 file(GLOB HEADER_FILES helper.h ../sadl/*.h )

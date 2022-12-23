@@ -15,7 +15,7 @@
 \lstdefinestyle{codec}{%
   frame=l, language=c++, numbers=left, numbersep=1em, xleftmargin=2em
 }
-\title{Small Ad-hoc Deep-Learning Library\\{ \normalsize v0.3}}
+\title{Small Ad-hoc Deep-Learning Library\\{ \normalsize v4.0rc1}}
 
 \date{}
 \author{Contact: franck.galpin@interdigital.com}
@@ -54,14 +54,16 @@ The table below summarize the framework characteristics.
 \hline
 Language & Pure C++, header only \\
 \hline
-Footprint & ~3700 LOC, library ~200kB, no dependency\\
+Footprint & $\sim 5500$ LOC, library ~200kB, no dependency\\
 \hline
-Optimization & some SIMD at hot spots (best effort)\\
+Optimization & some SIMD at hot spots (best effort), \\
+& sparse matrix multiplication support (CSR variant)\\
 \hline
 Compatibility & ONNX file\\
 \hline
-Layer Supports & constants, add, maxPool, matMul, reshape, ReLU,conv2D, \\
-& mul, concat, max, leakyReLU, shape, expand, tranpose, flatten \\
+Layer Supports & constants, add, maxPool, matMul, reshape, ReLU, \\
+& conv2D, conv2DTranspose, mul, concat, max, leakyReLU, PRelu, \\
+& shape, expand, tranpose, flatten \\
 \hline
 Type support & float, int32, int16, int8\\
 \hline
@@ -74,6 +76,11 @@ License & BSD 3-Clause \\
 
 
 \section{Quick start}
+
+\subsection{Overview}
+For more details, please see the script \texttt{sample/sample\_test.sh} demonstrates the use of the library: conversion of models, inference, quantization, complexity assessment etc.
+
+
 \subsection{Conversion from ONNX file}
 Conversion to the SADL format is done using the script in converter.
 \begin{lstlisting}[caption={SADL format conversion},style=code]
@@ -139,7 +146,7 @@ The following control options are available:
 \item \textrm{DEBUG\_KEEP\_OUTPUT}: keep a copy of each layer output for debugging purpose.
 \end{itemize}
 
-\paragraph{Counters}
+\subsubsection{Counters}
 The following counters are available:
 \begin{itemize}
 \item overflow: count the number of overflow for quantized network
@@ -148,6 +155,9 @@ The following counters are available:
 \item mac\_nz: count the number of MAC for non null weights
 \end{itemize}
 The counters are availbale by calling \texttt{resetCounters} before an inference, and the calling \texttt{printOverflow(true)} after the inference.
+
+\subsubsection{Sparse matrix multiplication}
+The sparse matrix multiplication can be activated by adding the option \texttt{SPARSE\_MATRIX} at compile time. In this case, matrices for which the sparsity and size constraints are fulfilled will automatically use the sparse matrix multiplication. These constraints can be tune by model using the fields \texttt{sparsity\_threshold} and \texttt{sparsity\_size\_threshold}.
 
 \section{Advanced}
 \subsection{Integration inside a program}
