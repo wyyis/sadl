@@ -245,7 +245,9 @@ bool isFullMatrixSparse(const Tensor<T> &weights, float sparsity_threshold, floa
         cnt_zeros++;
     }
   }
-std::cout<<weights<<' '<<cnt_zeros<<' '<<M<<' '<<N<<std::endl;
+#if DEBUG_PRINT
+  std::cout<<weights<<' '<<cnt_zeros<<' '<<M<<' '<<N<<std::endl;
+#endif
   auto sparsity_level = cnt_zeros / (float) (N * M);
   return (sparsity_level >= sparsity_threshold);
 }
