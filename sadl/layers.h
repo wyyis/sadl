@@ -52,6 +52,7 @@
 #include "layer_flatten.h"
 #include "layer_shape.h"
 #include "layer_expand.h"
+#include "layer_slice.h"
 
 namespace sadl
 {
@@ -85,6 +86,7 @@ inline std::string opName(const OperationType::Type op)
     DIRTYCASEPRINT(Flatten);
     DIRTYCASEPRINT(Shape);
     DIRTYCASEPRINT(Expand);
+    DIRTYCASEPRINT(Slice);
   default: oss << "??"; break;
   }
   return oss.str();

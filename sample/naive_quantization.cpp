@@ -78,6 +78,7 @@ bool toQuantize(sadl::layers::OperationType::Type type) {
             type !=  sadl::layers::OperationType::Relu &&
             type !=  sadl::layers::OperationType::Reshape &&
             type !=  sadl::layers::OperationType::Shape &&
+            type !=  sadl::layers::OperationType::Slice &&
             type !=  sadl::layers::OperationType::Transpose;
 }
 

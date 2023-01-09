@@ -27,6 +27,15 @@ template<typename T> bool sadl::layers::Conv2DTranspose<T>::dump(std::ostream &f
   return true;
 }
 
+
+template <typename T>
+bool sadl::layers::Slice<T>::dump(std::ostream &file){
+  file.write((const char *)&start_d, sizeof(start_d));
+  file.write((const char *)&end_d, sizeof(end_d));
+  return true;
+}
+
+
 template <typename T>
 bool sadl::layers::MatMul<T>::dump(std::ostream &file) {
   file.write((const char *)&q_, sizeof(q_));

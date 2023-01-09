@@ -115,6 +115,7 @@ class OPTYPE(IntEnum):
     Shape = (17,)
     Expand = (18,)
     Conv2DTranspose = (19,)
+    Slice = (20,)  # Currently slicing across depth is supported with default step size of 1
     # In "tf2cpp", the same layer performs the matrix multiplication
     # and the matrix multiplication by batches.
     BatchMatMul = (6,)
@@ -850,6 +851,31 @@ def parse_graph_node(
         ]
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
+    elif node.op_type == "Slice":
+        # Slice
+        if len(node.input) != 4:
+          quit("[ERROR] currently pytorch slicing not supported")        
+        # Currently slicing support only across width is added
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.Slice
+        myGraph[node.output[0]]["inputs"]   = [map_onnx_to_myGraph[n0name]]
+        # assume depth is the last one, assume axes are always 0, 1, 2, etc.
+        start = getDims(getInitializer(node.input[1], model_onnx))
+        for i in range(len(start)-1):
+          if start[i] != 0:
+            quit("[ERROR] currently slicing only supported for last channel")
+        end = getDims(getInitializer(node.input[2], model_onnx))
+        for i in range(len(end)-1):
+          if end[i] != 2147483647:
+            quit("[ERROR] currently slicing only supported for last channel")            
+        start_d = getDims(getInitializer(node.input[1], model_onnx))[-1]
+        end_d   = getDims(getInitializer(node.input[2], model_onnx))[-1]
+        additional = {}
+        additional["start_d"] = start_d
+        additional["end_d"] = end_d
+        myGraph[node.output[0]]["additional"] = additional
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+
     else:
         raise Exception("[ERROR] node not supported:\n{})".format(node))
 
@@ -998,6 +1024,15 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
                 f.write(node["additional"]["raw_data"])
             # ???    if "alpha" in layer['additional']:
             #        f.write(struct.pack('f', float(layer['additional']['alpha'])))
+
+            elif node["op_type"] == OPTYPE.Slice:
+                if verbose:
+                    print("#\t start_depth index for slicing", node["additional"]["start_d"])
+                f.write(struct.pack("i", int(node["additional"]["start_d"])))
+
+                if verbose:
+                    print("#\t end_depth index for slicing", node["additional"]["end_d"])
+                f.write(struct.pack("i", int(node["additional"]["end_d"])))
 
             elif node["op_type"] == OPTYPE.Conv2D:
                 if verbose:

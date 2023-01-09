@@ -49,6 +49,10 @@ bool copy(const sadl::layers::Layer<float> &layer, sadl::layers::Layer<T> &layer
       break;
     case sadl::layers::OperationType::Shape: break;
     case sadl::layers::OperationType::Expand: break;
+    case sadl::layers::OperationType::Slice:
+      dynamic_cast<sadl::layers::Slice<T> &>(layerQ).start_d=dynamic_cast<const sadl::layers::Slice<float> &>(layer).start_d;
+      dynamic_cast<sadl::layers::Slice<T> &>(layerQ).end_d=dynamic_cast<const sadl::layers::Slice<float> &>(layer).end_d;
+      break;
       // no default to get warning
   }
 
