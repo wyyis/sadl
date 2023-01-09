@@ -141,6 +141,7 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
     break;
   case layers::OperationType::Shape: return std::unique_ptr<layers::Layer<T>>(new layers::Shape<T>{ id, op }); break;
   case layers::OperationType::Expand: return std::unique_ptr<layers::Layer<T>>(new layers::Expand<T>{ id, op }); break;
+  case layers::OperationType::Slice: return std::unique_ptr<layers::Layer<T>>(new layers::Slice<T>{ id, op}); break;
   case layers::OperationType::OperationTypeCount: break;   // no default on purpose
   }
   std::cerr << "[ERROR] unknown layer " << op << std::endl;
