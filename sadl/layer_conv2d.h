@@ -57,6 +57,7 @@ protected:
   Dimensions   strides_;
   Dimensions   pads_;
   int          q_ = 0;
+  int          groups_ = 1;
 
   template<int s_h, int s_w> bool apply_s(const Tensor<T> &A, const Tensor<T> &kernel);
 
@@ -147,26 +148,47 @@ template<typename T> bool Conv2D<T>::apply(std::vector<Tensor<T> *> &in)
 
   assert(out_.quantizer >= 0);
   assert(kernel.quantizer + q_ >= 0);
-  if (strides_[1] == 1 && strides_[2] == 1)
+#define DEBUG_CONV 0
+#if !DEBUG_CONV
+  if (strides_[1] == 1 && strides_[2] == 1 && groups_ == 1)
   {
     return apply_s<1, 1>(A, kernel);
   }
-  else if (strides_[1] == 1 && strides_[2] == 2)
+  else if (strides_[1] == 1 && strides_[2] == 2  && groups_ == 1)
   {
     return apply_s<1, 2>(A, kernel);
   }
-  else if ((strides_[1] == 2 && strides_[2] == 1))
+  else if ((strides_[1] == 2 && strides_[2] == 1)  && groups_ == 1)
   {
     return apply_s<2, 1>(A, kernel);
   }
-  else if (strides_[1] == 2 && strides_[2] == 2 && kernel.dims()[0] == 5 && kernel.dims()[1] == 5 )
+  else if (strides_[1] == 2 && strides_[2] == 2 && kernel.dims()[0] == 5 && kernel.dims()[1] == 5  && groups_ == 1)
   {
       conv2d_5x5_s<2,2>(A,kernel);
       return true;
   }
-  else if (strides_[1] == 2 && strides_[2] == 2)
+  else if (strides_[1] == 2 && strides_[2] == 2  && groups_ == 1)
   {
     return apply_s<2, 2>(A, kernel);
+  }
+  else if ( groups_ != 1)
+#else
+  if (true)
+#endif
+  {
+      const int in_H{ A.dims()[1] };
+      const int in_W{ A.dims()[2] };
+      const int in_D{ A.dims()[3] };
+      const int nb_filters{ kernel.dims()[2] };
+      const int half_size{ kernel.dims()[0] / 2 };
+      const int top{ pads_[0] };
+      const int left{ pads_[1] };
+      const int       start_h{ half_size - top };
+      const int       start_w{ half_size - left };
+      const int s_h =strides_[1];
+      const int s_w=strides_[2];
+      conv2d(nb_filters,in_H,in_W,in_D,start_h,start_w,s_h,s_w,out_,A,kernel);
+      return true;
   }
   else
   {
@@ -191,11 +213,11 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
   assert(in_H > 1);
   assert(in_W > 1);
 
-  if (half_size == 0)
+  if (half_size == 0 && groups_ == 1)
   {
     conv2d_1x1_s_dispatch<s_h, s_w>(nb_filters, in_H, in_W, in_D, start_h, start_w, out_, A, kernel);
   }
-  else if (half_size == 1)
+  else if (half_size == 1 && groups_ == 1)
   {
     if (!Tensor<T>::skip_border)
     {
@@ -252,12 +274,17 @@ template<typename T> bool Conv2D<T>::init(const std::vector<Tensor<T> *> &in)
   dim[2] = (int) ceil(in[0]->dims()[2] / (float) strides_[2]);
   dim[3] = in[1]->dims()[2];
   out_.resize(dim);
+  if (groups_ !=1 ) {
+      static bool once=true;
+      if (once) std::cout<<"[WARNING] generic support for groups !=1 only for debug, do not use"<<std::endl;
+      once=false;
+  }
   SADL_DBG(std::cout << "  - output Conv2D: " << out_.dims() << std::endl);
   initDone_ = true;
   return true;
 }
 
-template<typename T> bool Conv2D<T>::loadInternal(std::istream &file, Version /*v*/)
+template<typename T> bool Conv2D<T>::loadInternal(std::istream &file, Version v)
 {
   int32_t x = 0;
   file.read((char *) &x, sizeof(x));
@@ -315,6 +342,12 @@ template<typename T> bool Conv2D<T>::loadInternal(std::istream &file, Version /*
     pads_[k] = x;
   }
   SADL_DBG(std::cout << "  - pads: " << pads_ << std::endl);
+
+  if ((int)v>2) {
+    file.read((char *) &groups_, sizeof(groups_));
+    SADL_DBG(std::cout << "  - groups: " << groups_ << std::endl);
+  }
+
   {
     file.read((char *) &q_, sizeof(q_));
     SADL_DBG(std::cout << "  - q: " << q_ << std::endl);
@@ -329,17 +362,20 @@ void Conv2D<T>::conv2d(int nb_filters, int in_H, int in_W, int in_D, int start_h
                        const Tensor<T> &kernel)
 {
 #if DEBUG_SIMD && __AVX2__
-  std::cout << "\n[WARN] debug generic version conv inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "] " << in_H << 'x' << in_W << " "
+  std::cout << "\n[WARN] debug generic version conv inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "] " << in_H << 'x' << in_W << " groups="<<groups_<<" "
             << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
 #endif
   constexpr int im_nb = 0;
   const int     half_size{ kernel.dims()[0] / 2 };
   const int     shift = kernel.quantizer + q_;
+  const int     cout_by_g = nb_filters / groups_;
+  const int     cin_by_g  = in_D / groups_;
   for (int filter = 0; filter < nb_filters; ++filter)
   {
-    for (int im_i = start_h + s_h; im_i < in_H - s_h; im_i += s_h)
+    int offset = (filter / cout_by_g) * cin_by_g;
+    for (int im_i = start_h ; im_i < in_H ; im_i += s_h)
     {
-      for (int im_j = start_w + s_w; im_j < in_W - s_w; im_j += s_w)
+      for (int im_j = start_w ; im_j < in_W ; im_j += s_w)
       {
         typename ComputationType<T>::type x = 0;
         for (int filter_i = -half_size; filter_i <= half_size; ++filter_i)
@@ -348,15 +384,15 @@ void Conv2D<T>::conv2d(int nb_filters, int in_H, int in_W, int in_D, int start_h
           for (int filter_j = -half_size; filter_j <= half_size; ++filter_j)
           {
             // fixed
-            for (int filter_d = 0; filter_d < in_D; ++filter_d)
+            for (int filter_d = 0; filter_d < in_D/groups_; ++filter_d)
             {
               int ii = im_i + filter_i;
               int jj = im_j + filter_j;
               int ki = half_size + filter_i;
               int kj = half_size + filter_j;
-              if (A.in(im_nb, ii, jj, filter_d))
+              if (A.in(im_nb, ii, jj, offset+filter_d))
               {
-                x += (typename ComputationType<T>::type) A(im_nb, ii, jj, filter_d) * kernel(ki, kj, filter, filter_d);
+                x += (typename ComputationType<T>::type) A(im_nb, ii, jj, offset + filter_d) * kernel(ki, kj, filter, filter_d);
                 COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
               }
             }

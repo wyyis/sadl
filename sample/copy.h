@@ -19,6 +19,7 @@ bool copy(const sadl::layers::Layer<float> &layer, sadl::layers::Layer<T> &layer
     case sadl::layers::OperationType::Conv2D:
       dynamic_cast<sadl::layers::Conv2D<T> &>(layerQ).strides_=dynamic_cast<const sadl::layers::Conv2D<float> &>(layer).strides_;
       dynamic_cast<sadl::layers::Conv2D<T> &>(layerQ).pads_=dynamic_cast<const sadl::layers::Conv2D<float> &>(layer).pads_;
+      dynamic_cast<sadl::layers::Conv2D<T> &>(layerQ).groups_=dynamic_cast<const sadl::layers::Conv2D<float> &>(layer).groups_;
       break;
     case sadl::layers::OperationType::Conv2DTranspose:
       dynamic_cast<sadl::layers::Conv2DTranspose<T> &>(layerQ).strides_=dynamic_cast<const sadl::layers::Conv2DTranspose<float> &>(layer).strides_;
@@ -61,7 +62,7 @@ bool copy(const sadl::layers::Layer<float> &layer, sadl::layers::Layer<T> &layer
 
 template <typename T>
 bool copy(const sadl::Model<float> &model, sadl::Model<T> &modelQ) {
-  modelQ.version_ = model.version_;
+  modelQ.version_ = sadl::Version::sadl03;
   modelQ.data_.clear();
   modelQ.data_.resize(model.data_.size());
   modelQ.ids_input = model.ids_input;
