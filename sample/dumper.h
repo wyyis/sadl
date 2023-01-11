@@ -8,6 +8,7 @@ bool sadl::layers::Conv2D<T>::dump(std::ostream &file) {
   x=pads_.size();
   file.write((const char *)&x, sizeof(int32_t));
   file.write((const char *)pads_.begin(), pads_.size() * sizeof(int32_t));
+  file.write((const char *)&groups_, sizeof(groups_));
   file.write((const char *)&q_, sizeof(q_));
   return true;
 }
@@ -111,7 +112,7 @@ bool sadl::layers::Layer<T>::dump(std::ostream &file) {
 
 template <typename T>
 bool sadl::Model<T>::dump(std::ostream &file) {
-  char magic[9] = "SADL0002";
+  char magic[9] = "SADL0003";
   file.write(magic, 8);
   int32_t x = 0;
   if (std::is_same<T, float>::value)

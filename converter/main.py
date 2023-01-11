@@ -44,7 +44,7 @@ import numpy as np
 import onnx
 
 # file format:
-# MAGIC: SADL0001 [char[8]]
+# MAGIC: SADL0003 [char[8]]
 # type_model [int32_t] 0:int32, 1:float, 2:int16
 # nb_layers [int32_t]
 # nb_inputs [int32_t]
@@ -481,9 +481,15 @@ def parse_graph_node(
         if node.op_type == "Conv" or node.op_type == "ConvTranspose":
             a = getAttribute(node, "strides")
             additional["strides"] = a.ints
+            if node.op_type == "Conv":
+              a = getAttribute(node, "group")
+              additional["group"] = a.i
             a = getAttribute(node, "pads")
-            additional["pads"] = a.ints
-
+            # if pads is unavailable then no padding
+            if a:
+              additional["pads"] = a.ints
+            else:
+              additional["pads"] = [0,0,0,0]
         if node.op_type == "ConvTranspose":
             a = getAttribute(node, "output_padding")
             additional["output_padding"] = a.ints
@@ -941,7 +947,7 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
 
     # dbg print(map_name_to_idx)
     with open(output_filename, "wb") as f:
-        f.write(str.encode("SADL0002"))
+        f.write(str.encode("SADL0003"))
         # output of the network type 0: int32 | 1: float | 2: int16 | default: float(1)
         f.write(struct.pack("i", int(DTYPE_SADL.FLOAT)))
 
@@ -1052,6 +1058,10 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
                     if verbose:
                         print(f"#\t\t {p}")
                     f.write(struct.pack("i", int(p)))
+                
+                if verbose:
+                    print("#\t  nb_group", node["additional"]["group"])
+                f.write(struct.pack("i", int(node["additional"]["group"])))
 
             elif node["op_type"] == OPTYPE.Conv2DTranspose:
                 if verbose:
@@ -1360,7 +1370,7 @@ def dumpModel(model_onnx, output_filename, data_layout, verbose, user_annotation
     model : onnx model
     output_filename : either str or None
         Path to the binary file to which the neural network model
-        is written. 
+        is written.
     data_type: None, 'ncwh' or 'nwhc'
     verbose : bool
         Is additional information printed?

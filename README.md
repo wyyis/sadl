@@ -129,7 +129,7 @@ This part shows the model load issues and information on all layers parameters.
 ```shell
 [INFO] == start model loading ==
 [INFO] start model loading
-[INFO] read magic SADL0001
+[INFO] read magic SADL0003
 [INFO] Model type: 1
 [INFO] Num layers: 38
 [INFO] input id: 0 

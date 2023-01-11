@@ -86,6 +86,7 @@ enum class Version
 {
   unknown = -1,
   sadl01  = 1,
-  sadl02  = 2
+  sadl02  = 2,
+  sadl03  = 3,
 };
 }
