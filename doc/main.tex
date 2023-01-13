@@ -54,7 +54,7 @@ The table below summarize the framework characteristics.
 \hline
 Language & Pure C++, header only \\
 \hline
-Footprint & $\sim 5500$ LOC, library ~200kB, no dependency\\
+Footprint & $\sim 6000$ LOC, library ~200kB, no dependency\\
 \hline
 Optimization & some SIMD at hot spots (best effort), \\
 & sparse matrix multiplication support (CSR variant)\\
@@ -63,7 +63,7 @@ Compatibility & ONNX file\\
 \hline
 Layer Supports & constants, add, maxPool, matMul, reshape, ReLU, \\
 & conv2D, conv2DTranspose, mul, concat, max, leakyReLU, PRelu, \\
-& shape, expand, tranpose, flatten, slice, grouped conv2d  \\
+& shape, expand, tranpose, flatten, slice, separated conv2d, grouped conv2d  \\
 \hline
 Type support & float, int32, int16, int8\\
 \hline
