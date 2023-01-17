@@ -265,7 +265,7 @@ void Conv2D<int16_t>::simd8_conv2d_1x1_s_d(int nb_filters, int in_H, int in_W, i
           const __m128i mad0 = _mm_madd_epi16(k0, v0);   // res in si32
           s                  = _mm_add_epi32(s, mad0);
         }
-        typename ComputationType<int32_t>::type z = (sum32_int16(s) >> shift);
+        typename ComputationType<T>::type z = (sum32_int16(s) >> shift);
         SATURATE(z);
         out_(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<int16_t>(z);
       }
@@ -308,7 +308,7 @@ void Conv2D<int16_t>::simd16_conv2d_1x1_s_d(int nb_filters, int in_H, int in_W, 
           const __m256i mad0 = _mm256_madd_epi16(k0, v0);   // res in si32
           s                  = _mm256_add_epi32(s, mad0);
         }
-        typename ComputationType<int32_t>::type z = (sum32_int16(s) >> shift);
+        typename ComputationType<T>::type z = (sum32_int16(s) >> shift);
         SATURATE(z);
         out_(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<int16_t>(z);
       }

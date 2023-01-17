@@ -51,8 +51,8 @@ void Conv2D<T>::conv2d_5x5_s(const Tensor<T> &A,const Tensor<T> &kernel)
   constexpr int half_size{ 5 / 2 };
   const int top{ pads_[0] };
   const int left{ pads_[1] };
-  int       start_h{ half_size - top -2};
-  int       start_w{ half_size - left -2};
+  int       start_h{ top };
+  int       start_w{ left};
   constexpr int im_nb = 0;
   const int     shift = kernel.quantizer + q_;
 #if DEBUG_SIMD && __AVX2__
