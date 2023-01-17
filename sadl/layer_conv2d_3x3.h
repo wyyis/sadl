@@ -521,7 +521,7 @@ void Conv2D<int32_t>::simd8_conv2d_3x3_s_d(int nb_filters, int in_H, int in_W, i
             }
           }
         }
-        typename ComputationType<int32_t>::type z = (sum64_int32(s) >> shift);
+        typename ComputationType<T>::type z = (sum64_int32(s) >> shift);
         SATURATE(z);
         out_(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<int32_t>(z);
       }
@@ -577,7 +577,7 @@ void Conv2D<int16_t>::simd8_conv2d_3x3_s_d(int nb_filters, int in_H, int in_W, i
             }
           }
         }
-        typename ComputationType<int32_t>::type z = (sum32_int16(s) >> shift);
+        typename ComputationType<T>::type z = (sum32_int16(s) >> shift);
         SATURATE(z);
         out_(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<int16_t>(z);
       }
@@ -631,7 +631,7 @@ void Conv2D<int16_t>::simd16_conv2d_3x3_s_d(int nb_filters, int in_H, int in_W, 
             }
           }
         }
-        typename ComputationType<int32_t>::type z = (sum32_int16(s) >> shift);
+        typename ComputationType<T>::type z = (sum32_int16(s) >> shift);
         SATURATE(z);
         out_(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<int16_t>(z);
       }
@@ -677,7 +677,7 @@ void Conv2D<int16_t>::simd32_conv2d_3x3_s_d(int nb_filters, int in_H, int in_W, 
             }
           }
         }
-        typename ComputationType<int32_t>::type z = (_mm512_reduce_add_epi32(s) >> shift);
+        typename ComputationType<T>::type z = (_mm512_reduce_add_epi32(s) >> shift);
         COUNTERS(z);
         SATURATE(z);
         out_(im_nb, im_i / s_h, im_j / s_w, filter) = z;
