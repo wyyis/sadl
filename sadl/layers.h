@@ -58,7 +58,6 @@ namespace sadl
 {
 namespace layers
 {
-
 inline std::string opName(const OperationType::Type op)
 {
 #define DIRTYCASEPRINT(X)                                                                                                                                      \
@@ -92,7 +91,6 @@ inline std::string opName(const OperationType::Type op)
   return oss.str();
 #undef DIRTYCASEPRINT
 }
-
 
 }   // namespace layers
 

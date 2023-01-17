@@ -12,11 +12,18 @@ cd ..;
 mkdir -p results;
 cd results;
 
-../utest.sh ../models/conv2d_grouped.onnx --no_transpose
-../utest.sh ../models/slice.onnx --no_transpose
-../utest.sh ../models/conv2d_3x3s1_10x10x3.onnx 
-../utest.sh ../models/conv2d_3x1s1_2x2x1.onnx
-../utest.sh ../models/conv2d_1x3s1_2x2x1.onnx
+# no transpose
+L="EE1-1.10_model0 slice";
+for F in $L; do
+  ../utest.sh ../models/${F}.onnx --no_transpose;
+done
+  
+L="conv2d_4_8x8x4_k1x1s1,1_g1_p0,0 conv2d_4_8x8x4_k1x1s1,1_g4_p0,0 conv2d_4_8x8x4_k1x1s2,1_g1_p0,0 conv2d_4_8x8x4_k3x1s1,1_g1_p1,0 conv2d_4_8x8x4_k3x1s1,1_g4_p1,0 conv2d_4_8x8x4_k3x3s1,1_g1_p1,1 conv2d_4_8x8x4_k3x3s2,1_g1_p1,1 conv2d_4_8x8x4_k5x5s1,1_g1_p2,2 conv2d_4_8x8x4_k5x5s1,1_g4_p2,2 conv2d_4_8x8x4_k5x5s2,1_g1_p2,2 conv2d_4_8x9x4_k1x1s2,1_g1_p0,0 conv2d_4_8x9x4_k3x1s1,1_g4_p1,0 conv2d_4_8x9x4_k3x3s1,1_g4_p1,1 conv2d_4_8x9x4_k3x3s2,1_g1_p1,1 conv2d_4_9x8x4_k1x1s1,1_g1_p0,0 conv2d_4_9x8x4_k1x1s2,1_g1_p0,0 conv2d_4_9x8x4_k3x1s1,1_g1_p1,0 conv2d_4_9x8x4_k3x3s1,1_g1_p1,1
+conv2d_4_9x8x4_k3x3s2,1_g1_p1,1 conv2d_4_9x8x4_k5x5s1,1_g1_p2,2 conv2d_4_9x8x4_k5x5s2,1_g1_p2,2";
+for F in $L; do
+  ../utest.sh ../models/${F}.onnx;
+done
+
 
 
 

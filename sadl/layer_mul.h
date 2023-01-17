@@ -170,7 +170,7 @@ template<typename T> template<int NN> bool Mul<T>::apply_same_dim(std::vector<Te
 #endif   // SIMD
   // for (auto it0 = out_.begin(), it1 = in[1]->begin(); it0 != out_.end(); ++it0, ++it1) {
   const auto &B = *in[1];
-  const auto N = (out_.size() / NN) * NN;
+  const auto  N = (out_.size() / NN) * NN;
   for (int k = 0; k < N; ++k)
   {
     typename ComputationType<T>::type x = out_[k];
@@ -191,7 +191,7 @@ template<typename T> template<int NN> bool Mul<T>::apply_singleton(std::vector<T
 #if __AVX2__ && DEBUG_SIMD
   std::cout << "[WARN] generic version mul singleton (but likely vectorized) " << in[0]->dims() << ' ' << in[1]->dims() << std::endl;
 #endif   // SIMD
-  const T   value{ B[0] };
+  const T    value{ B[0] };
   const auto N = (out_.size() / NN) * NN;
   //  for (auto it0 = out_.begin(); it0 != out_.end(); ++it0) {
   for (int k = 0; k < N; ++k)
@@ -310,8 +310,6 @@ template<> inline bool Mul<float>::apply_singleton_simd16(std::vector<Tensor<flo
   return apply_singleton_simd8(in);
 }
 
-
-
 template<typename T> bool Mul<T>::apply_singleton_simd8(std::vector<Tensor<T> *> &in)
 {
   return apply_singleton<8>(in);
@@ -351,8 +349,8 @@ template<typename T> bool Mul<T>::init(const std::vector<Tensor<T> *> &in)
     if (in[0]->dims().back() != in[1]->dims().back())
       return false;
   }
-  else if (in[0]->dims().size()>=2 && in[1]->size() == in[0]->dims().back()) {
-
+  else if (in[0]->dims().size() >= 2 && in[1]->size() == in[0]->dims().back())
+  {
   }
   else
   {

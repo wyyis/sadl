@@ -41,10 +41,8 @@ using namespace std;
 
 namespace
 {
-
 template<typename T> void infer(const string &filename)
 {
-
   sadl::Model<T> model;
   ifstream       file(filename, ios::binary);
   cout << "[INFO] Model loading" << endl;
@@ -53,7 +51,6 @@ template<typename T> void infer(const string &filename)
     cerr << "[ERROR] Unable to read model " << filename << endl;
     exit(-1);
   }
-
 
   //  sadl::Tensor<T>::skip_border = true;
   vector<sadl::Tensor<T>> inputs = model.getInputsTemplate();

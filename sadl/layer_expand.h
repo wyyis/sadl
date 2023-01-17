@@ -57,7 +57,7 @@ template<typename T> bool Expand<T>::apply(std::vector<Tensor<T> *> &in)
   assert(in.size() == 2);
   // second layer is reshape prms, already process in init
   out_.border_skip = in[0]->border_skip;   // adapt output width to bias
-  out_.quantizer=in[0]->quantizer;
+  out_.quantizer   = in[0]->quantizer;
 
   if (in[0]->size() == 1)
   {   // broadcast
@@ -107,10 +107,11 @@ template<typename T> bool Expand<T>::init(const std::vector<Tensor<T> *> &in)
   if (in[1]->dims().size() != 1)
     return false;
   Dimensions dim;
-  dim.resize((int)in[1]->size());
-  if (!std::is_same<float,T>::value&&in[1]->quantizer!=0) {
-      std::cerr << "[ERROR] quantizer on reshape dimensions data layer" << std::endl;
-      return false;
+  dim.resize((int) in[1]->size());
+  if (!std::is_same<float, T>::value && in[1]->quantizer != 0)
+  {
+    std::cerr << "[ERROR] quantizer on reshape dimensions data layer" << std::endl;
+    return false;
   }
   copy(in[1]->begin(), in[1]->end(), dim.begin());
   // current restriction: broadcast only scalar to shape or expand last channel =1 of a tensor of dim 4

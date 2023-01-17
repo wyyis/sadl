@@ -105,43 +105,25 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
   {
   case layers::OperationType::Copy: return std::unique_ptr<layers::Layer<T>>(new layers::Copy<T>{ id, op }); break;
   case layers::OperationType::Const: return std::unique_ptr<layers::Layer<T>>(new layers::Const<T>{ id, op }); break;
-  case layers::OperationType::Placeholder:
-    return std::unique_ptr<layers::Layer<T>>(new layers::Placeholder<T>{ id, op });
-    break;
-  case layers::OperationType::Reshape:
-    return std::unique_ptr<layers::Layer<T>>(new layers::Reshape<T>{ id, op });
-    break;
-  case layers::OperationType::Identity:
-    return std::unique_ptr<layers::Layer<T>>(new layers::Identity<T>{ id, op });
-    break;
+  case layers::OperationType::Placeholder: return std::unique_ptr<layers::Layer<T>>(new layers::Placeholder<T>{ id, op }); break;
+  case layers::OperationType::Reshape: return std::unique_ptr<layers::Layer<T>>(new layers::Reshape<T>{ id, op }); break;
+  case layers::OperationType::Identity: return std::unique_ptr<layers::Layer<T>>(new layers::Identity<T>{ id, op }); break;
   case layers::OperationType::MatMul: return std::unique_ptr<layers::Layer<T>>(new layers::MatMul<T>{ id, op }); break;
-  case layers::OperationType::BiasAdd:
-    return std::unique_ptr<layers::Layer<T>>(new layers::BiasAdd<T>{ id, op });
-    break;
+  case layers::OperationType::BiasAdd: return std::unique_ptr<layers::Layer<T>>(new layers::BiasAdd<T>{ id, op }); break;
   case layers::OperationType::Conv2D: return std::unique_ptr<layers::Layer<T>>(new layers::Conv2D<T>{ id, op }); break;
   case layers::OperationType::Conv2DTranspose: return std::unique_ptr<layers::Layer<T>>(new layers::Conv2DTranspose<T>{ id, op }); break;
   case layers::OperationType::Add: return std::unique_ptr<layers::Layer<T>>(new layers::Add<T>{ id, op }); break;
   case layers::OperationType::Relu: return std::unique_ptr<layers::Layer<T>>(new layers::Relu<T>{ id, op }); break;
-  case layers::OperationType::MaxPool:
-    return std::unique_ptr<layers::Layer<T>>(new layers::MaxPool<T>{ id, op });
-    break;
+  case layers::OperationType::MaxPool: return std::unique_ptr<layers::Layer<T>>(new layers::MaxPool<T>{ id, op }); break;
   case layers::OperationType::Mul: return std::unique_ptr<layers::Layer<T>>(new layers::Mul<T>{ id, op }); break;
   case layers::OperationType::Concat: return std::unique_ptr<layers::Layer<T>>(new layers::Concat<T>{ id, op }); break;
-  case layers::OperationType::Maximum:
-    return std::unique_ptr<layers::Layer<T>>(new layers::Maximum<T>{ id, op });
-    break;
-  case layers::OperationType::LeakyRelu:
-    return std::unique_ptr<layers::Layer<T>>(new layers::LeakyRelu<T>{ id, op });
-    break;
-  case layers::OperationType::Transpose:
-    return std::unique_ptr<layers::Layer<T>>(new layers::Transpose<T>{ id, op });
-    break;
-  case layers::OperationType::Flatten:
-    return std::unique_ptr<layers::Layer<T>>(new layers::Flatten<T>{ id, op });
-    break;
+  case layers::OperationType::Maximum: return std::unique_ptr<layers::Layer<T>>(new layers::Maximum<T>{ id, op }); break;
+  case layers::OperationType::LeakyRelu: return std::unique_ptr<layers::Layer<T>>(new layers::LeakyRelu<T>{ id, op }); break;
+  case layers::OperationType::Transpose: return std::unique_ptr<layers::Layer<T>>(new layers::Transpose<T>{ id, op }); break;
+  case layers::OperationType::Flatten: return std::unique_ptr<layers::Layer<T>>(new layers::Flatten<T>{ id, op }); break;
   case layers::OperationType::Shape: return std::unique_ptr<layers::Layer<T>>(new layers::Shape<T>{ id, op }); break;
   case layers::OperationType::Expand: return std::unique_ptr<layers::Layer<T>>(new layers::Expand<T>{ id, op }); break;
-  case layers::OperationType::Slice: return std::unique_ptr<layers::Layer<T>>(new layers::Slice<T>{ id, op}); break;
+  case layers::OperationType::Slice: return std::unique_ptr<layers::Layer<T>>(new layers::Slice<T>{ id, op }); break;
   case layers::OperationType::OperationTypeCount: break;   // no default on purpose
   }
   std::cerr << "[ERROR] unknown layer " << op << std::endl;
@@ -171,7 +153,7 @@ template<typename T> bool Model<T>::load(std::istream &file)
   {
     version_ = Version::sadl02;
 #if DEBUG_PRINT
-    std::cout<<"[WARNING] SADL02 version model, please upgrade to SADL03"<<std::endl;
+    std::cout << "[WARNING] SADL02 version model, please upgrade to SADL03" << std::endl;
 #endif
   }
   else if (magic_s == "SADL0003")
@@ -192,8 +174,7 @@ template<typename T> bool Model<T>::load(std::istream &file)
   {
     int32_t x = 0;
     file.read((char *) &x, sizeof(int32_t));
-    if ((std::is_same<T, float>::value && x != layers::TensorInternalType::Float)
-        || (std::is_same<T, int32_t>::value && x != layers::TensorInternalType::Int32)
+    if ((std::is_same<T, float>::value && x != layers::TensorInternalType::Float) || (std::is_same<T, int32_t>::value && x != layers::TensorInternalType::Int32)
         || (std::is_same<T, int16_t>::value && x != layers::TensorInternalType::Int16))
     {
       std::cerr << "[ERROR] wrong model type and Model<T>" << std::endl;
@@ -312,12 +293,16 @@ template<typename T> bool Model<T>::init(std::vector<Tensor<T>> &in)
     std::cerr << "[ERROR] inconsistent input dimension" << std::endl;
     return false;
   }
-  if (initDone_) {
+  if (initDone_)
+  {
     // reset initdone of layers
-    for(auto &L: data_) {
+    for (auto &L: data_)
+    {
       L.layer->initDone_ = false;
     }
-  } else {
+  }
+  else
+  {
     insertCopyLayers();
     reshapeConv2DFilters();
     reshapeMatrix();
@@ -345,8 +330,8 @@ template<typename T> bool Model<T>::init(std::vector<Tensor<T>> &in)
       ++placeholders_cnt;
       data_[layer_cnt].layer->init(v);
       SADL_DBG(std::cout << "[INFO] init layer " << data_[layer_cnt].layer->id() << ' '
-                         << layers::opName((layers::OperationType::Type) (data_[layer_cnt].layer->op())) << ' '
-                         << data_[layer_cnt].layer->name() << " out="<<data_[layer_cnt].layer->out_.dims()<<std::endl);
+                         << layers::opName((layers::OperationType::Type) (data_[layer_cnt].layer->op())) << ' ' << data_[layer_cnt].layer->name()
+                         << " out=" << data_[layer_cnt].layer->out_.dims() << std::endl);
     }
   }
   if (!ok)
@@ -356,9 +341,8 @@ template<typename T> bool Model<T>::init(std::vector<Tensor<T>> &in)
     std::cerr << "[ERROR] less placeholders than inputs" << std::endl;
     return false;
   }
-  // then solve inputs of other layers: make the link between id of inputs and
-  // tensor ptr then solve inputs of other layers: make the link between id of
-  // inputs and tensor ptr
+
+  // then solve inputs of other layers: make the link between id of inputs and tensor ptr
   for (int layer_cnt = 0; layer_cnt < (int) data_.size() && ok; ++layer_cnt)
   {
     if (data_[layer_cnt].layer->op() == layers::OperationType::Placeholder)
@@ -372,8 +356,7 @@ template<typename T> bool Model<T>::init(std::vector<Tensor<T>> &in)
       auto &                        L        = getLayer(id_input);
       if (!L.layer->initDone())
       {
-        std::cerr << "[ERROR] init not done yet on " << L.layer->id() << " while init of "
-                  << data_[layer_cnt].layer->id() << std::endl;
+        std::cerr << "[ERROR] init not done yet on " << L.layer->id() << " while init of " << data_[layer_cnt].layer->id() << std::endl;
         return false;
       }
 
@@ -381,13 +364,11 @@ template<typename T> bool Model<T>::init(std::vector<Tensor<T>> &in)
 #if SPARSE_SUPPORT
       if (sparsity_threshold >= 0 && sparsity_threshold <= 1.)
       {
-        if (data_[layer_cnt].layer->op() == layers::OperationType::MatMul
-            && L.layer->op() == layers::OperationType::Const)
+        if (data_[layer_cnt].layer->op() == layers::OperationType::MatMul && L.layer->op() == layers::OperationType::Const)
         {
           if (isFullMatrixSparse(L.layer->output(), sparsity_threshold, sparsity_size_threshold))
           {
-            SADL_DBG(std::cout << "[INFO] Sparsify layer " << data_[layer_cnt].layer->id() << " "
-                               << data_[layer_cnt].layer->name() << std::endl;);
+            SADL_DBG(std::cout << "[INFO] Sparsify layer " << data_[layer_cnt].layer->id() << " " << data_[layer_cnt].layer->name() << std::endl;);
             sparsify(*tmp);
           }
         }
@@ -398,8 +379,7 @@ template<typename T> bool Model<T>::init(std::vector<Tensor<T>> &in)
       op_type[inputs_cnt]                 = L.layer->op();
 
       // always put data layers first when const layers
-      if (inputs_cnt > 0 && op_type[inputs_cnt - 1] == layers::OperationType::Const
-          && op_type[inputs_cnt] != layers::OperationType::Const)
+      if (inputs_cnt > 0 && op_type[inputs_cnt - 1] == layers::OperationType::Const && op_type[inputs_cnt] != layers::OperationType::Const)
       {
         std::cerr << "[ERROR] data layers should be first" << std::endl;
         return false;
@@ -407,15 +387,13 @@ template<typename T> bool Model<T>::init(std::vector<Tensor<T>> &in)
     }
     ok &= data_[layer_cnt].layer->init(data_[layer_cnt].inputs);
     SADL_DBG(std::cout << "[INFO] init layer " << data_[layer_cnt].layer->id() << ' '
-                       << layers::opName((layers::OperationType::Type) (data_[layer_cnt].layer->op())) << ' '
-                       << data_[layer_cnt].layer->name()<< " in=[");
-    SADL_DBG(for(auto ii: data_[layer_cnt].layer->inputsId()) std::cout<<ii<<' ');
-    SADL_DBG(std::cout << "] out="<<data_[layer_cnt].layer->out_.dims()<<std::endl);
+                       << layers::opName((layers::OperationType::Type) (data_[layer_cnt].layer->op())) << ' ' << data_[layer_cnt].layer->name() << " in=[");
+    SADL_DBG(for (auto ii : data_[layer_cnt].layer->inputsId()) std::cout << ii << ' ');
+    SADL_DBG(std::cout << "] out=" << data_[layer_cnt].layer->out_.dims() << std::endl);
 
     if (!ok)
     {
-      std::cerr << "[ERROR] init layer " << data_[layer_cnt].layer->id() << " " << data_[layer_cnt].layer->name()
-                << std::endl;
+      std::cerr << "[ERROR] init layer " << data_[layer_cnt].layer->id() << " " << data_[layer_cnt].layer->name() << std::endl;
       break;
     }
   }
@@ -444,22 +422,26 @@ template<typename T> bool Model<T>::apply(std::vector<Tensor<T>> &in)
       std::vector<Tensor<T> *> v = { &in[placeholders_cnt] };
       ++placeholders_cnt;
       ok &= data_[layer_cnt].layer->apply(v);
-#if DEBUG_VALUES  || DEBUG_MODEL
+#if DEBUG_VALUES || DEBUG_MODEL
       std::cout << "[INFO] " << data_[layer_cnt].layer->id() << " Placeholder (" << data_[layer_cnt].layer->name() << "): ";
-       if (!std::is_same<T,float>::value) {
-           std::cout << "q=" << data_[layer_cnt].layer->out_.quantizer<< " ";
-       }
+      if (!std::is_same<T, float>::value)
+      {
+        std::cout << "q=" << data_[layer_cnt].layer->out_.quantizer << " ";
+      }
 #endif
 #if DEBUG_VALUES
-      if (std::is_same<T,float>::value) {
-          for (int k = 0; k < 8 && k < (int) data_[layer_cnt].layer->out_.size(); ++k)
-            std::cout << data_[layer_cnt].layer->out_[k]  << ' ';
-          std::cout << "]\t" ;
-      } else {
-      float Q = (1 << data_[layer_cnt].layer->out_.quantizer);
-      for (int k = 0; k < 8 && k < (int) data_[layer_cnt].layer->out_.size(); ++k)
-        std::cout << data_[layer_cnt].layer->out_[k] / Q << ' ';
-          std::cout << "]\t" ;
+      if (std::is_same<T, float>::value)
+      {
+        for (int k = 0; k < 8 && k < (int) data_[layer_cnt].layer->out_.size(); ++k)
+          std::cout << data_[layer_cnt].layer->out_[k] << ' ';
+        std::cout << "]\t";
+      }
+      else
+      {
+        float Q = (1 << data_[layer_cnt].layer->out_.quantizer);
+        for (int k = 0; k < 8 && k < (int) data_[layer_cnt].layer->out_.size(); ++k)
+          std::cout << data_[layer_cnt].layer->out_[k] / Q << ' ';
+        std::cout << "]\t";
       }
 #endif
 #if DEBUG_MODEL
@@ -486,24 +468,27 @@ template<typename T> bool Model<T>::apply(std::vector<Tensor<T>> &in)
     }
 #endif
 #if DEBUG_VALUES || DEBUG_MODEL
-    std::cout << "[INFO] " << data_[layer_cnt].layer->id() << " " <<  opName(data_[layer_cnt].layer->op()) << " ("
-              << data_[layer_cnt].layer->name() << "):\t";
+    std::cout << "[INFO] " << data_[layer_cnt].layer->id() << " " << opName(data_[layer_cnt].layer->op()) << " (" << data_[layer_cnt].layer->name() << "):\t";
 #endif
 #if DEBUG_VALUES
-    if (data_[layer_cnt].inputs.size()) {
-        std::cout<<"inputs={";
+    if (data_[layer_cnt].inputs.size())
+    {
+      std::cout << "inputs={";
     }
     for (int kk = 0; kk < (int) data_[layer_cnt].inputs.size(); ++kk)
     {
       const int id = data_[layer_cnt].layer->inputs_id_[kk];
-      std::cout << id ;
-      if (!std::is_same<T,float>::value) {
-          std::cout<<"(q=" << data_[layer_cnt].inputs[kk]->quantizer << ")";
+      std::cout << id;
+      if (!std::is_same<T, float>::value)
+      {
+        std::cout << "(q=" << data_[layer_cnt].inputs[kk]->quantizer << ")";
+      }
+      if (kk != (int) data_[layer_cnt].inputs.size() - 1)
+        std::cout << ", ";
     }
-      if (kk!=(int)data_[layer_cnt].inputs.size()-1) std::cout<<", ";
-    }
-    if (data_[layer_cnt].inputs.size()) {
-        std::cout << "} ";
+    if (data_[layer_cnt].inputs.size())
+    {
+      std::cout << "} ";
     }
 #endif
 
@@ -512,20 +497,25 @@ template<typename T> bool Model<T>::apply(std::vector<Tensor<T>> &in)
 #if SPARSE_SUPPORT
     if (!data_[layer_cnt].layer->out_.isSparse())
 #endif
-     {
-        std::cout<<"outputs=[";
-        if (std::is_same<T,float>::value) {
-            for (int k = 0; k < 8 && k < (int) data_[layer_cnt].layer->out_.size(); ++k)
-                std::cout << data_[layer_cnt].layer->out_[k]  << ' ';
-            if (data_[layer_cnt].layer->out_.size()>8) std::cout<<" ...";
-            std::cout<<"]\t";
-        } else {
-    float Q = (1 << data_[layer_cnt].layer->out_.quantizer);
-    for (int k = 0; k < 8 && k < (int) data_[layer_cnt].layer->out_.size(); ++k)
-      std::cout << data_[layer_cnt].layer->out_[k] / Q << ' ';
-            if (data_[layer_cnt].layer->out_.size()>8) std::cout<<" ...";
-            std::cout << "] q=" << data_[layer_cnt].layer->out_.quantizer << "]\t";
-        }
+    {
+      std::cout << "outputs=[";
+      if (std::is_same<T, float>::value)
+      {
+        for (int k = 0; k < 8 && k < (int) data_[layer_cnt].layer->out_.size(); ++k)
+          std::cout << data_[layer_cnt].layer->out_[k] << ' ';
+        if (data_[layer_cnt].layer->out_.size() > 8)
+          std::cout << " ...";
+        std::cout << "]\t";
+      }
+      else
+      {
+        float Q = (1 << data_[layer_cnt].layer->out_.quantizer);
+        for (int k = 0; k < 8 && k < (int) data_[layer_cnt].layer->out_.size(); ++k)
+          std::cout << data_[layer_cnt].layer->out_[k] / Q << ' ';
+        if (data_[layer_cnt].layer->out_.size() > 8)
+          std::cout << " ...";
+        std::cout << "] q=" << data_[layer_cnt].layer->out_.quantizer << "]\t";
+      }
     }
 #endif
 #if DEBUG_MODEL
@@ -559,20 +549,18 @@ template<typename T> typename Model<T>::Stat Model<T>::printOverflow(bool printi
     stat.mac_nz += data_[layer_cnt].layer->cpt_mac_nz;
     if (data_[layer_cnt].layer->cpt_overflow > 0)
     {
-      std::cout << "[WARN] layer " << data_[layer_cnt].layer->id() << ' ' << data_[layer_cnt].layer->name() << " ["
-                << opName(data_[layer_cnt].layer->op()) << "]: overflow: " << data_[layer_cnt].layer->cpt_overflow
-                << '/' << data_[layer_cnt].layer->cpt_op << " ("
+      std::cout << "[WARN] layer " << data_[layer_cnt].layer->id() << ' ' << data_[layer_cnt].layer->name() << " [" << opName(data_[layer_cnt].layer->op())
+                << "]: overflow: " << data_[layer_cnt].layer->cpt_overflow << '/' << data_[layer_cnt].layer->cpt_op << " ("
                 << data_[layer_cnt].layer->cpt_overflow * 100. / data_[layer_cnt].layer->cpt_op << "%)" << std::endl;
     }
     else if (printinfo && data_[layer_cnt].layer->cpt_op > 0)
     {
-      std::cout << "[INFO] layer " << data_[layer_cnt].layer->id() << ' ' << data_[layer_cnt].layer->name() << " ["
-                << opName(data_[layer_cnt].layer->op()) << "]: " << data_[layer_cnt].layer->cpt_op << " op"
-                << std::endl;
+      std::cout << "[INFO] layer " << data_[layer_cnt].layer->id() << ' ' << data_[layer_cnt].layer->name() << " [" << opName(data_[layer_cnt].layer->op())
+                << "]: " << data_[layer_cnt].layer->cpt_op << " op" << std::endl;
     }
   }
 #if DEBUG_COUNTERS && __AVX2__
-  std::cout<<"[WARN] counters should not be used in SIMD mode, please use scalar mode for reliable results"<<std::endl;
+  std::cout << "[WARN] counters should not be used in SIMD mode, please use scalar mode for reliable results" << std::endl;
   stat.op     = 0;
   stat.mac    = 0;
   stat.mac_nz = 0;
@@ -594,8 +582,7 @@ template<typename T> void Model<T>::resetCounters()
 }
 #endif
 
-template<typename T>
-std::vector<typename layers::Layer<T>::Id> Model<T>::getLayerIdsWithInput(typename layers::Layer<T>::Id id) const
+template<typename T> std::vector<typename layers::Layer<T>::Id> Model<T>::getLayerIdsWithInput(typename layers::Layer<T>::Id id) const
 {
   std::vector<typename layers::Layer<T>::Id> v;
   for (auto &L: data_)
@@ -619,8 +606,7 @@ template<typename T> typename Model<T>::LayerData &Model<T>::getLayer(const type
   return *it;
 }
 
-template<typename T>
-const typename Model<T>::LayerData &Model<T>::getLayer(const typename layers::Layer<T>::Id &id) const
+template<typename T> const typename Model<T>::LayerData &Model<T>::getLayer(const typename layers::Layer<T>::Id &id) const
 {
   auto it = std::find_if(data_.begin(), data_.end(), [&, id](const LayerData &d) { return d.layer->id() == id; });
   if (it == data_.end())
@@ -678,8 +664,7 @@ template<typename T> void Model<T>::insertCopyLayers()
       for (int n = 1; n < (int) layer_with_current_as_mutable_input.size(); ++n)
       {
         auto &L = getLayer(layer_with_current_as_mutable_input[n]);
-        SADL_DBG(std::cout << "[INFO] replace id=" << current_layer.id() << " by id=" << id_copy_layers[n - 1]
-                           << " in layer " << L.layer->id() << std::endl);
+        SADL_DBG(std::cout << "[INFO] replace id=" << current_layer.id() << " by id=" << id_copy_layers[n - 1] << " in layer " << L.layer->id() << std::endl);
         L.layer->replaceInputId(current_layer.id(), id_copy_layers[n - 1]);
       }
     }
@@ -706,8 +691,7 @@ template<typename T> void Model<T>::reshapeMatrix()
       if (d.size() == 2)
       {   // only transpose dim 2 for now
         // do not swap dim, just data
-        SADL_DBG(std::cout << "[INFO] transpose data " << L.layer->id() << ' ' << L.layer->name() << " " << R.dims()
-                           << std::endl);
+        SADL_DBG(std::cout << "[INFO] transpose data " << L.layer->id() << ' ' << L.layer->name() << " " << R.dims() << std::endl);
         Tensor<T> T2(d);
         T2.quantizer = R.quantizer;
         for (int i = 0; i < d[0]; ++i)
@@ -723,7 +707,7 @@ template<typename T> void Model<T>::reshapeConv2DFilters()
 {
   for (auto &v: data_)
   {
-    if (v.layer->op() == layers::OperationType::Conv2D)
+    if (v.layer->op() == layers::OperationType::Conv2D)   //  || v.layer->op() == layers::OperationType::Conv2DTranspose )
     {
       if (v.layer->inputsId().size() != 2)
       {
@@ -744,8 +728,7 @@ template<typename T> void Model<T>::reshapeConv2DFilters()
       auto tmp = d[2];
       d[2]     = d[3];
       d[3]     = tmp;
-      SADL_DBG(std::cout << "[INFO] reshape " << L.layer->id() << ' ' << L.layer->name() << " " << W.dims() << " => "
-                         << d << std::endl);
+      SADL_DBG(std::cout << "[INFO] reshape " << L.layer->id() << ' ' << L.layer->name() << " " << W.dims() << " => " << d << std::endl);
       Tensor<T> T2(d);
       T2.quantizer = W.quantizer;
       for (int i = 0; i < d[0]; ++i)

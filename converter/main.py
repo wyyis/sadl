@@ -115,7 +115,9 @@ class OPTYPE(IntEnum):
     Shape = (17,)
     Expand = (18,)
     Conv2DTranspose = (19,)
-    Slice = (20,)  # Currently slicing across depth is supported with default step size of 1
+    Slice = (
+        20,
+    )  # Currently slicing across depth is supported with default step size of 1
     # In "tf2cpp", the same layer performs the matrix multiplication
     # and the matrix multiplication by batches.
     BatchMatMul = (6,)
@@ -482,14 +484,14 @@ def parse_graph_node(
             a = getAttribute(node, "strides")
             additional["strides"] = a.ints
             if node.op_type == "Conv":
-              a = getAttribute(node, "group")
-              additional["group"] = a.i
+                a = getAttribute(node, "group")
+                additional["group"] = a.i
             a = getAttribute(node, "pads")
             # if pads is unavailable then no padding
             if a:
-              additional["pads"] = a.ints
+                additional["pads"] = a.ints
             else:
-              additional["pads"] = [0,0,0,0]
+                additional["pads"] = [0, 0, 0, 0]
         if node.op_type == "ConvTranspose":
             a = getAttribute(node, "output_padding")
             additional["output_padding"] = a.ints
@@ -860,22 +862,22 @@ def parse_graph_node(
     elif node.op_type == "Slice":
         # Slice
         if len(node.input) != 4:
-          quit("[ERROR] currently pytorch slicing not supported")        
+            quit("[ERROR] currently pytorch slicing not supported")
         # Currently slicing support only across width is added
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Slice
-        myGraph[node.output[0]]["inputs"]   = [map_onnx_to_myGraph[n0name]]
+        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]]
         # assume depth is the last one, assume axes are always 0, 1, 2, etc.
         start = getDims(getInitializer(node.input[1], model_onnx))
-        for i in range(len(start)-1):
-          if start[i] != 0:
-            quit("[ERROR] currently slicing only supported for last channel")
+        for i in range(len(start) - 1):
+            if start[i] != 0:
+                quit("[ERROR] currently slicing only supported for last channel")
         end = getDims(getInitializer(node.input[2], model_onnx))
-        for i in range(len(end)-1):
-          if end[i] != 2147483647:
-            quit("[ERROR] currently slicing only supported for last channel")            
+        for i in range(len(end) - 1):
+            if end[i] != 2147483647:
+                quit("[ERROR] currently slicing only supported for last channel")
         start_d = getDims(getInitializer(node.input[1], model_onnx))[-1]
-        end_d   = getDims(getInitializer(node.input[2], model_onnx))[-1]
+        end_d = getDims(getInitializer(node.input[2], model_onnx))[-1]
         additional = {}
         additional["start_d"] = start_d
         additional["end_d"] = end_d
@@ -1033,11 +1035,16 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
 
             elif node["op_type"] == OPTYPE.Slice:
                 if verbose:
-                    print("#\t start_depth index for slicing", node["additional"]["start_d"])
+                    print(
+                        "#\t start_depth index for slicing",
+                        node["additional"]["start_d"],
+                    )
                 f.write(struct.pack("i", int(node["additional"]["start_d"])))
 
                 if verbose:
-                    print("#\t end_depth index for slicing", node["additional"]["end_d"])
+                    print(
+                        "#\t end_depth index for slicing", node["additional"]["end_d"]
+                    )
                 f.write(struct.pack("i", int(node["additional"]["end_d"])))
 
             elif node["op_type"] == OPTYPE.Conv2D:
@@ -1058,7 +1065,7 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
                     if verbose:
                         print(f"#\t\t {p}")
                     f.write(struct.pack("i", int(p)))
-                
+
                 if verbose:
                     print("#\t  nb_group", node["additional"]["group"])
                 f.write(struct.pack("i", int(node["additional"]["group"])))

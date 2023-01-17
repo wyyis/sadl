@@ -44,10 +44,7 @@ namespace layers
 // ////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 1x1
 // ////////////////////////////////////////////////////////////////////////////////////////////////////////
-template<typename T>
-template<int s_h, int s_w>
-void Conv2D<T>::conv2d_1x1_s_dispatch(int nb_filters, int in_H, int in_W, int in_D, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A,
-                                      const Tensor<T> &kernel)
+template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s_dispatch(const Tensor<T> &A, const Tensor<T> &kernel)
 {
 #if __AVX2__
 #define CONV_MOD8 simd8_conv2d_1x1_s_d
@@ -58,38 +55,47 @@ void Conv2D<T>::conv2d_1x1_s_dispatch(int nb_filters, int in_H, int in_W, int in
 #define CONV_MOD16 conv2d_1x1_s_d
 #define CONV_MOD32 conv2d_1x1_s_d
 #endif
+  const int in_D{ A.dims()[3] };
   switch (in_D)
   {
-  case 1: conv2d_1x1_s_d<1, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
-  case 2: conv2d_1x1_s_d<2, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
-  case 4: conv2d_1x1_s_d<4, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
-  case 8: CONV_MOD8<8, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
-  case 16: CONV_MOD16<16, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
-  case 24: CONV_MOD8<24, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
-  case 32: CONV_MOD32<32, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
-  case 48: CONV_MOD16<48, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
-  case 64: CONV_MOD32<64, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
+  case 1: conv2d_1x1_s_d<1, s_h, s_w>(A, kernel); break;
+  case 2: conv2d_1x1_s_d<2, s_h, s_w>(A, kernel); break;
+  case 4: conv2d_1x1_s_d<4, s_h, s_w>(A, kernel); break;
+  case 8: CONV_MOD8<8, s_h, s_w>(A, kernel); break;
+  case 16: CONV_MOD16<16, s_h, s_w>(A, kernel); break;
+  case 24: CONV_MOD8<24, s_h, s_w>(A, kernel); break;
+  case 32: CONV_MOD32<32, s_h, s_w>(A, kernel); break;
+  case 48: CONV_MOD16<48, s_h, s_w>(A, kernel); break;
+  case 64: CONV_MOD32<64, s_h, s_w>(A, kernel); break;
   case 72:
     // better do 64 and than 8
-    CONV_MOD8<72, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel);
+    CONV_MOD8<72, s_h, s_w>(A, kernel);
     break;
-  case 96: CONV_MOD32<96, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
-  case 128: CONV_MOD32<128, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
-  case 160: CONV_MOD32<160, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
-  case 384: CONV_MOD32<384, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
-  case 480: CONV_MOD32<480, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
-  default: conv2d_1x1_s<s_h, s_w>(nb_filters, in_H, in_W, in_D, start_h, start_w, out_, A, kernel); break;
+  case 96: CONV_MOD32<96, s_h, s_w>(A, kernel); break;
+  case 128: CONV_MOD32<128, s_h, s_w>(A, kernel); break;
+  case 160: CONV_MOD32<160, s_h, s_w>(A, kernel); break;
+  case 384: CONV_MOD32<384, s_h, s_w>(A, kernel); break;
+  case 480: CONV_MOD32<480, s_h, s_w>(A, kernel); break;
+  default: conv2d_1x1_s<s_h, s_w>(A, kernel); break;
   }
 #undef CONV_MOD8
 #undef CONV_MOD16
 #undef CONV_MOD32
 }
 
-template<typename T>
-template<int s_h, int s_w>
-void Conv2D<T>::conv2d_1x1_s(int nb_filters, int in_H, int in_W, int in_D, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A,
-                             const Tensor<T> &kernel)
+template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s(const Tensor<T> &A, const Tensor<T> &kernel)
 {
+  const int     in_H{ A.dims()[1] };
+  const int     in_W{ A.dims()[2] };
+  const int     in_D{ A.dims()[3] };
+  const int     nb_filters{ kernel.dims()[2] };
+  constexpr int half_size_h{ 0 };
+  constexpr int half_size_w{ 0 };
+  const int     top{ pads_[0] };
+  const int     left{ pads_[1] };
+  const int     start_h{ half_size_h - top };
+  const int     start_w{ half_size_w - left };
+
 #if DEBUG_SIMD && __AVX2__
   std::cout << "\n[WARN] generic version conv1x1 inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "] " << in_H << 'x' << in_W << " "
             << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
@@ -119,10 +125,18 @@ void Conv2D<T>::conv2d_1x1_s(int nb_filters, int in_H, int in_W, int in_D, int s
   }
 }
 
-template<typename T>
-template<int in_D, int s_h, int s_w>
-void Conv2D<T>::conv2d_1x1_s_d(int nb_filters, int in_H, int in_W, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel)
+template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s_d(const Tensor<T> &A, const Tensor<T> &kernel)
 {
+  const int     in_H{ A.dims()[1] };
+  const int     in_W{ A.dims()[2] };
+  const int     nb_filters{ kernel.dims()[2] };
+  constexpr int half_size_h{ 0 };
+  constexpr int half_size_w{ 0 };
+  const int     top{ pads_[0] };
+  const int     left{ pads_[1] };
+  const int     start_h{ half_size_h - top };
+  const int     start_w{ half_size_w - left };
+
 #if DEBUG_SIMD && __AVX2__
   std::cout << "\n[WARN] generic version conv 1x1 inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
@@ -155,12 +169,18 @@ void Conv2D<T>::conv2d_1x1_s_d(int nb_filters, int in_H, int in_W, int start_h, 
 // ////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 1x1
 // ////////////////////////////////////////////////////////////////////////////////////////////////////////
-template<>
-template<int in_D, int s_h, int s_w>
-inline void Conv2D<float>::simd8_conv2d_1x1_s_d(int nb_filters, int in_H, int in_W, int start_h, int start_w, Tensor<float> &out_, const Tensor<float> &A,
-                                                const Tensor<float> &kernel)
+template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd8_conv2d_1x1_s_d(const Tensor<float> &A, const Tensor<float> &kernel)
 {
   static_assert(in_D % 8 == 0, "Should be used with mod8 filters.");
+  const int     in_H{ A.dims()[1] };
+  const int     in_W{ A.dims()[2] };
+  const int     nb_filters{ kernel.dims()[2] };
+  constexpr int half_size_h{ 0 };
+  constexpr int half_size_w{ 0 };
+  const int     top{ pads_[0] };
+  const int     left{ pads_[1] };
+  const int     start_h{ half_size_h - top };
+  const int     start_w{ half_size_w - left };
 #if DEBUG_SIMD && __AVX512F__
   if (in_D >= 16)
   {
@@ -196,13 +216,19 @@ inline void Conv2D<float>::simd8_conv2d_1x1_s_d(int nb_filters, int in_H, int in
 }
 
 #if __AVX512F__
-template<>
-template<int in_D, int s_h, int s_w>
-inline void Conv2D<float>::simd16_conv2d_1x1_s_d(int nb_filters, int in_H, int in_W, int start_h, int start_w, Tensor<float> &out_, const Tensor<float> &A,
-                                                 const Tensor<float> &kernel)
+template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd16_conv2d_1x1_s_d(const Tensor<float> &A, const Tensor<float> &kernel)
 {
   static_assert(in_D % 16 == 0, "Should be used with mod16 filters.");
   constexpr int im_nb = 0;
+  const int     in_H{ A.dims()[1] };
+  const int     in_W{ A.dims()[2] };
+  const int     nb_filters{ kernel.dims()[2] };
+  constexpr int half_size_h{ 0 };
+  constexpr int half_size_w{ 0 };
+  const int     top{ pads_[0] };
+  const int     left{ pads_[1] };
+  const int     start_h{ half_size_h - top };
+  const int     start_w{ half_size_w - left };
   for (int im_i = start_h; im_i < in_H; im_i += s_h)
   {
     for (int im_j = start_w; im_j < in_W; im_j += s_w)
@@ -230,14 +256,20 @@ inline void Conv2D<float>::simd16_conv2d_1x1_s_d(int nb_filters, int in_H, int i
 #endif
 
 // int16
-template<>
-template<int in_D, int s_h, int s_w>
-void Conv2D<int16_t>::simd8_conv2d_1x1_s_d(int nb_filters, int in_H, int in_W, int start_h, int start_w, Tensor<int16_t> &out_, const Tensor<int16_t> &A,
-                                           const Tensor<int16_t> &kernel)
+template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd8_conv2d_1x1_s_d(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
 {   // should be sse42
 #if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int16_t;
 #endif
+  const int     in_H{ A.dims()[1] };
+  const int     in_W{ A.dims()[2] };
+  const int     nb_filters{ kernel.dims()[2] };
+  constexpr int half_size_h{ 0 };
+  constexpr int half_size_w{ 0 };
+  const int     top{ pads_[0] };
+  const int     left{ pads_[1] };
+  const int     start_h{ half_size_h - top };
+  const int     start_w{ half_size_w - left };
   static_assert(in_D % 8 == 0, "Should be used with mod16 filters.");
 #if DEBUG_SIMD && __AVX2__
   if (in_D >= 8)
@@ -273,14 +305,20 @@ void Conv2D<int16_t>::simd8_conv2d_1x1_s_d(int nb_filters, int in_H, int in_W, i
   }
 }
 
-template<>
-template<int in_D, int s_h, int s_w>
-void Conv2D<int16_t>::simd16_conv2d_1x1_s_d(int nb_filters, int in_H, int in_W, int start_h, int start_w, Tensor<int16_t> &out_, const Tensor<int16_t> &A,
-                                            const Tensor<int16_t> &kernel)
+template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd16_conv2d_1x1_s_d(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
 {
 #if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int16_t;
 #endif
+  const int     in_H{ A.dims()[1] };
+  const int     in_W{ A.dims()[2] };
+  const int     nb_filters{ kernel.dims()[2] };
+  constexpr int half_size_h{ 0 };
+  constexpr int half_size_w{ 0 };
+  const int     top{ pads_[0] };
+  const int     left{ pads_[1] };
+  const int     start_h{ half_size_h - top };
+  const int     start_w{ half_size_w - left };
   static_assert(in_D % 16 == 0, "Should be used with mod16 filters.");
 #if DEBUG_SIMD && __AVX512BW__
   if (in_D >= 32)
@@ -317,13 +355,19 @@ void Conv2D<int16_t>::simd16_conv2d_1x1_s_d(int nb_filters, int in_H, int in_W, 
 }
 
 #if __AVX512BW__
-template<>
-template<int in_D, int s_h, int s_w>
-void Conv2D<int16_t>::simd32_conv2d_1x1_s_d(int nb_filters, int in_H, int in_W, int start_h, int start_w, Tensor<int16_t> &out_, const Tensor<int16_t> &A,
-                                            const Tensor<int16_t> &kernel)
+template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd32_conv2d_1x1_s_d(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
 {
   static_assert(in_D % 32 == 0, "Should be used with mod32 filters.");
-  using T             = int16_t;
+  using T = int16_t;
+  const int     in_H{ A.dims()[1] };
+  const int     in_W{ A.dims()[2] };
+  const int     nb_filters{ kernel.dims()[2] };
+  constexpr int half_size_h{ 0 };
+  constexpr int half_size_w{ 0 };
+  const int     top{ pads_[0] };
+  const int     left{ pads_[1] };
+  const int     start_h{ half_size_h - top };
+  const int     start_w{ half_size_w - left };
   constexpr int im_nb = 0;
   const int     shift = kernel.quantizer + q_;
   for (int im_i = start_h; im_i < in_H; im_i += s_h)

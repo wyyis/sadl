@@ -56,7 +56,7 @@ protected:
   virtual bool loadInternal(std::istream &file, Version /*v*/) override;
   Dimensions   strides_;
   Dimensions   pads_;
-  int          q_ = 0;
+  int          q_      = 0;
   int          groups_ = 1;
 
   template<int s_h, int s_w> bool apply_s(const Tensor<T> &A, const Tensor<T> &kernel);
@@ -67,79 +67,57 @@ protected:
   template<int s_h, int s_w> void conv2d_5x5_s(const Tensor<T> &A, const Tensor<T> &kernel);
 
   // 1x1
-  template<int s_h, int s_w>
-  void conv2d_1x1_s_dispatch(int nb_filters, int in_H, int in_W, int in_D, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A,
-                             const Tensor<T> &kernel);
+  template<int s_h, int s_w> void conv2d_1x1_s_dispatch(const Tensor<T> &A, const Tensor<T> &kernel);
 
-  template<int in_D, int s_h, int s_w>
-  void conv2d_1x1_s_d(int nb_filters, int in_H, int in_W, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
+  template<int in_D, int s_h, int s_w> void conv2d_1x1_s_d(const Tensor<T> &A, const Tensor<T> &kernel);
 
-  template<int s_h, int s_w>
-  void conv2d_1x1_s(int nb_filters, int in_H, int in_W, int in_D, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
+  template<int s_h, int s_w> void conv2d_1x1_s(const Tensor<T> &A, const Tensor<T> &kernel);
 
   // 3x3
-  template<int s_h, int s_w>
-  void conv2d_3x3_s_peel(int nb_filters, int in_H, int in_W, int in_D, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
+  template<int s_h, int s_w> void conv2d_3x3_s_peel(const Tensor<T> &A, const Tensor<T> &kernel);
 
-  template<int s_h, int s_w>
-  void conv2d_3x3_s_core_dispatch(int nb_filters, int in_H, int in_W, int in_D, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A,
-                                  const Tensor<T> &kernel);
+  template<int s_h, int s_w> void conv2d_3x3_s_core_dispatch(const Tensor<T> &A, const Tensor<T> &kernel);
 
-  template<int s_h, int s_w>
-  void conv2d_3x3_s_core(int nb_filters, int in_H, int in_W, int in_D, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
+  template<int s_h, int s_w> void conv2d_3x3_s_core(const Tensor<T> &A, const Tensor<T> &kernel);
 
-  template<int in_D, int s_h, int s_w>
-  void conv2d_3x3_s_d_core(int nb_filters, int in_H, int in_W, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
+  template<int in_D, int s_h, int s_w> void conv2d_3x3_s_d_core(const Tensor<T> &A, const Tensor<T> &kernel);
 
   // i x j
-  template<int s_h, int s_w>
-  void conv2d_ixj_s_peel(int nb_filters, int in_H, int in_W, int in_D, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
+  template<int s_h, int s_w> void conv2d_ixj_s_peel(const Tensor<T> &A, const Tensor<T> &kernel);
 
-  template<int s_h, int s_w>
-  void conv2d_ixj_s_core_dispatch(int nb_filters, int in_H, int in_W, int in_D, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A,
-                                  const Tensor<T> &kernel);
+  template<int s_h, int s_w> void conv2d_ixj_s_core_dispatch(const Tensor<T> &A, const Tensor<T> &kernel);
 
-  template<int s_h, int s_w>
-  void conv2d_ixj_s_core(int nb_filters, int in_H, int in_W, int in_D, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
+  template<int s_h, int s_w> void conv2d_ixj_s_core(const Tensor<T> &A, const Tensor<T> &kernel);
 
-  template<int in_D, int s_h, int s_w>
-  void conv2d_ixj_s_d_core(int nb_filters, int in_H, int in_W, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
+  template<int in_D, int s_h, int s_w> void conv2d_ixj_s11_gD_d_core(const Tensor<T> &A, const Tensor<T> &kernel);
 
 #if __AVX2__
-  template<int in_D, int s_h, int s_w>
-  void simd8_conv2d_1x1_s_d(int /*nb_filters*/, int /*in_H*/, int /*in_W*/, int /*start_h*/, int /*start_w*/, Tensor<T> & /*out_*/, const Tensor<T> & /*A*/,
-                            const Tensor<T> & /*kernel*/)
+  template<int in_D, int s_h, int s_w> void simd8_conv2d_1x1_s_d(const Tensor<T> & /*A*/, const Tensor<T> & /*kernel*/)
   {
     assert(false);
     exit(-1);
   }
-  template<int in_D, int s_h, int s_w>
-  void simd16_conv2d_1x1_s_d(int nb_filters, int in_H, int in_W, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel)
+  template<int in_D, int s_h, int s_w> void simd16_conv2d_1x1_s_d(const Tensor<T> &A, const Tensor<T> &kernel)
   {
-    simd8_conv2d_1x1_s_d<in_D, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel);
+    simd8_conv2d_1x1_s_d<in_D, s_h, s_w>(A, kernel);
   }
-  template<int in_D, int s_h, int s_w>
-  void simd32_conv2d_1x1_s_d(int nb_filters, int in_H, int in_W, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel)
+  template<int in_D, int s_h, int s_w> void simd32_conv2d_1x1_s_d(const Tensor<T> &A, const Tensor<T> &kernel)
   {
-    simd16_conv2d_1x1_s_d<in_D, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel);
+    simd16_conv2d_1x1_s_d<in_D, s_h, s_w>(A, kernel);
   }
 
-  template<int in_D, int s_h, int s_w>
-  void simd8_conv2d_3x3_s_d(int /*nb_filters*/, int /*in_H*/, int /*in_W*/, int /*start_h*/, int /*start_w*/, Tensor<T> & /*out_*/, const Tensor<T> & /*A*/,
-                            const Tensor<T> & /*kernel*/)
+  template<int in_D, int s_h, int s_w> void simd8_conv2d_3x3_s_d(const Tensor<T> & /*A*/, const Tensor<T> & /*kernel*/)
   {
     assert(false);
     exit(-1);
   }
-  template<int in_D, int s_h, int s_w>
-  void simd16_conv2d_3x3_s_d(int nb_filters, int in_H, int in_W, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel)
+  template<int in_D, int s_h, int s_w> void simd16_conv2d_3x3_s_d(const Tensor<T> &A, const Tensor<T> &kernel)
   {
-    simd8_conv2d_3x3_s_d<in_D, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel);
+    simd8_conv2d_3x3_s_d<in_D, s_h, s_w>(A, kernel);
   }
-  template<int in_D, int s_h, int s_w>
-  void simd32_conv2d_3x3_s_d(int nb_filters, int in_H, int in_W, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel)
+  template<int in_D, int s_h, int s_w> void simd32_conv2d_3x3_s_d(const Tensor<T> &A, const Tensor<T> &kernel)
   {
-    simd16_conv2d_3x3_s_d<in_D, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel);
+    simd16_conv2d_3x3_s_d<in_D, s_h, s_w>(A, kernel);
   }
 #endif
   DUMP_MODEL_EXT;
@@ -162,25 +140,26 @@ template<typename T> bool Conv2D<T>::apply(std::vector<Tensor<T> *> &in)
   assert(kernel.quantizer + q_ >= 0);
 #define DEBUG_CONV2D 0
 #if DEBUG_CONV2D
-  std::cout<<"[WARNING] generic conv2d for debug"<<std::endl;
-  conv2d(out_,A,kernel);
+  std::cout << "[WARNING] generic conv2d for debug" << std::endl;
+  conv2d(out_, A, kernel);
   return true;
 #endif
   if (strides_[1] == 1 && strides_[2] == 1)
   {
     return apply_s<1, 1>(A, kernel);
   }
-  else if (strides_[1] == 1 && strides_[2] == 2  && groups_ == 1)
+  else if (strides_[1] == 1 && strides_[2] == 2 && groups_ == 1)
   {
     return apply_s<1, 2>(A, kernel);
   }
-  else if ((strides_[1] == 2 && strides_[2] == 1)  && groups_ == 1)
+  else if ((strides_[1] == 2 && strides_[2] == 1) && groups_ == 1)
   {
     return apply_s<2, 1>(A, kernel);
   }
-  else if (strides_[1] == 2 && strides_[2] == 2 )
+  else if (strides_[1] == 2 && strides_[2] == 2 && groups_ == 1)
   {
-    return apply_s<2, 2>(A, kernel);;
+    return apply_s<2, 2>(A, kernel);
+    ;
   }
   else
   {
@@ -195,8 +174,6 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
 {
   int       in_H{ A.dims()[1] };
   int       in_W{ A.dims()[2] };
-  const int in_D{ A.dims()[3] };
-  const int nb_filters{ kernel.dims()[2] };
   const int half_size_h{ kernel.dims()[0] / 2 };
   const int half_size_w{ kernel.dims()[1] / 2 };
   const int top{ pads_[0] };
@@ -209,38 +186,14 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
   if (groups_ == 1)
   {
     if (half_size_h == 0 && half_size_w == 0)   // 1x1
-  {
-    conv2d_1x1_s_dispatch<s_h, s_w>(nb_filters, in_H, in_W, in_D, start_h, start_w, out_, A, kernel);
-  }
+    {
+      conv2d_1x1_s_dispatch<s_h, s_w>(A, kernel);
+    }
     else if (half_size_h == 1 && half_size_w == 1)   // 3x3
-  {
-    if (!Tensor<T>::skip_border)
-    {
-      conv2d_3x3_s_peel<s_h, s_w>(nb_filters, in_H, in_W, in_D, start_h, start_w, out_, A, kernel);
-    }
-    else
-    {   // skip border
-      if (s_h == 1 && s_w == 1)
-      {
-        start_h += out_.border_skip;
-        start_w += out_.border_skip;
-        in_H -= out_.border_skip;
-        in_W -= out_.border_skip;
-        out_.border_skip++;
-      }
-    }
-    conv2d_3x3_s_core_dispatch<s_h, s_w>(nb_filters, in_H, in_W, in_D, start_h, start_w, out_, A, kernel);
-    }
-    else if (half_size_h == 2 && half_size_w == 2)   // 5x5
-    {
-      // static_assert(s_h==2&&s_w==2);
-      conv2d_5x5_s<2, 2>(A, kernel);
-    }
-    else if (half_size_h != half_size_w)   // ixj
     {
       if (!Tensor<T>::skip_border)
       {
-        conv2d_ixj_s_peel<s_h, s_w>(nb_filters, in_H, in_W, in_D, start_h, start_w, out_, A, kernel);
+        conv2d_3x3_s_peel<s_h, s_w>(A, kernel);
       }
       else
       {   // skip border
@@ -253,14 +206,38 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
           out_.border_skip++;
         }
       }
-      conv2d_ixj_s_core_dispatch<s_h, s_w>(nb_filters, in_H, in_W, in_D, start_h, start_w, out_, A, kernel);
-  }
-  else
-  {
-    assert(false);
-    // conv2d()
-    return false;
-  }
+      conv2d_3x3_s_core_dispatch<s_h, s_w>(A, kernel);
+    }
+    else if (half_size_h == 2 && half_size_w == 2)   // 5x5
+    {
+      if (Tensor<T>::skip_border)
+      {
+        std::cerr << "[ERROR] skip border with 5x5 not supported" << std::endl;
+        assert(false);
+        exit(-1);
+      }
+      conv2d_5x5_s<s_h, s_w>(A, kernel);
+    }
+    else if (half_size_h != half_size_w)   // ixj
+    {
+      if (!Tensor<T>::skip_border)
+      {
+        conv2d_ixj_s_peel<s_h, s_w>(A, kernel);
+      }
+      else
+      {   // skip border
+        std::cerr << "[ERROR] skip border with ixj not supported" << std::endl;
+        assert(false);
+        exit(-1);
+      }
+      conv2d_ixj_s_core_dispatch<s_h, s_w>(A, kernel);
+    }
+    else
+    {
+      assert(false);
+      // conv2d()
+      return false;
+    }
   }
   else   // groups
   {
@@ -268,24 +245,18 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
     {
       if (!Tensor<T>::skip_border)
       {
-        conv2d_ixj_s_peel<s_h, s_w>(nb_filters, in_H, in_W, in_D, start_h, start_w, out_, A, kernel);
+        conv2d_ixj_s_peel<s_h, s_w>(A, kernel);
       }
       else
       {   // skip border
-        if (s_h == 1 && s_w == 1)
-        {
-          start_h += out_.border_skip;
-          start_w += out_.border_skip;
-          in_H -= out_.border_skip;
-          in_W -= out_.border_skip;
-          out_.border_skip++;
-        }
+        std::cerr << "[ERROR] skip border with ixj not supported" << std::endl;
+        assert(false);
+        exit(-1);
       }
-      conv2d_ixj_s_core_dispatch<s_h, s_w>(nb_filters, in_H, in_W, in_D, start_h, start_w, out_, A, kernel);
+      conv2d_ixj_s_core_dispatch<s_h, s_w>(A, kernel);
     }
     else
     {
-
       conv2d(out_, A, kernel);
     }
   }
@@ -303,15 +274,21 @@ template<typename T> bool Conv2D<T>::init(const std::vector<Tensor<T> *> &in)
     return false;
   if (in[1]->dims().size() != 4)
     return false;
-  //  if (in[1]->dims()[0] != in[1]->dims()[1]) // square kernel
-  //    return false;
-  if ((in[1]->dims()[0]) % 2 == 0)
-    return false;
-  const bool tempo_ok=in[1]->dims()[0]==5&&strides_[1]==2;
-  if (in[1]->dims()[0] / 2 > 1 && !tempo_ok)
+  if ((in[1]->dims()[0]) % 2 == 0)   // even kernel
     return false;
   if (in[0]->dims()[0] != 1)
     return false;
+  if (in[0]->dims()[0] != 1)
+    return false;
+  if (in[1]->dims()[0] / 2 != pads_[0] ||   // pad is same
+      in[1]->dims()[1] / 2 != pads_[1])
+  {
+    return false;
+  }
+  // Hout=floor((H+2*p-k)/s+1)
+  // assume p =k/2 (pad == same)
+  // and kernel even
+  // => Hout=ceil(H/s)
   Dimensions dim;
   dim.resize(4);
   dim[0] = in[0]->dims()[0];
@@ -321,10 +298,10 @@ template<typename T> bool Conv2D<T>::init(const std::vector<Tensor<T> *> &in)
   out_.resize(dim);
   if (groups_ != 1)
   {
-      static bool once=true;
+    static bool once = true;
     if (once)
       std::cout << "[WARNING] generic support for groups !=1 only for debug, do not use" << std::endl;
-      once=false;
+    once = false;
   }
   SADL_DBG(std::cout << "  - output Conv2D: " << out_.dims() << std::endl);
   initDone_ = true;
@@ -405,37 +382,35 @@ template<typename T> bool Conv2D<T>::loadInternal(std::istream &file, Version v)
 }
 
 // should never be used for perf reasons
-template<typename T>
-void Conv2D<T>::conv2d(Tensor<T> &out_, const Tensor<T> &A,
-                       const Tensor<T> &kernel)
+template<typename T> void Conv2D<T>::conv2d(Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel)
 {
   const int in_H{ A.dims()[1] };
   const int in_W{ A.dims()[2] };
   const int in_D{ A.dims()[3] };
   const int nb_filters{ kernel.dims()[2] };
-  const int     half_size_i{ kernel.dims()[0] / 2 };
-  const int     half_size_j{ kernel.dims()[1] / 2 };
+  const int half_size_i{ kernel.dims()[0] / 2 };
+  const int half_size_j{ kernel.dims()[1] / 2 };
   const int top{ pads_[0] };
   const int left{ pads_[1] };
   const int start_h{ half_size_i - top };
   const int start_w{ half_size_j - left };
-  const int s_h=strides_[1];
-  const int s_w=strides_[2];
+  const int s_h = strides_[1];
+  const int s_w = strides_[2];
 #if DEBUG_SIMD && __AVX2__
   std::cout << "\n[WARN] debug generic version conv inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "] " << in_H << 'x' << in_W
             << " groups=" << groups_ << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC"
             << std::endl;
 #endif
-  constexpr int im_nb = 0;
-  const int     shift = kernel.quantizer + q_;
+  constexpr int im_nb     = 0;
+  const int     shift     = kernel.quantizer + q_;
   const int     cout_by_g = nb_filters / groups_;
   const int     cin_by_g  = in_D / groups_;
   for (int filter = 0; filter < nb_filters; ++filter)
   {
     int offset = (filter / cout_by_g) * cin_by_g;
-    for (int im_i = start_h ; im_i < in_H ; im_i += s_h)
+    for (int im_i = start_h; im_i < in_H; im_i += s_h)
     {
-      for (int im_j = start_w ; im_j < in_W ; im_j += s_w)
+      for (int im_j = start_w; im_j < in_W; im_j += s_w)
       {
         typename ComputationType<T>::type x = 0;
         for (int filter_i = -half_size_i; filter_i <= half_size_i; ++filter_i)
@@ -444,13 +419,13 @@ void Conv2D<T>::conv2d(Tensor<T> &out_, const Tensor<T> &A,
           for (int filter_j = -half_size_j; filter_j <= half_size_j; ++filter_j)
           {
             // fixed
-            for (int filter_d = 0; filter_d < in_D/groups_; ++filter_d)
+            for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
             {
               int ii = im_i + filter_i;
               int jj = im_j + filter_j;
               int ki = half_size_i + filter_i;
               int kj = half_size_j + filter_j;
-              if (A.in(im_nb, ii, jj, offset+filter_d))
+              if (A.in(im_nb, ii, jj, offset + filter_d))
               {
                 x += (typename ComputationType<T>::type) A(im_nb, ii, jj, offset + filter_d) * kernel(ki, kj, filter, filter_d);
                 COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
@@ -467,8 +442,8 @@ void Conv2D<T>::conv2d(Tensor<T> &out_, const Tensor<T> &A,
   }
 }
 
-              }
-            }
+}   // namespace layers
+}   // namespace sadl
 #include "layer_conv2d_1x1.h"
 #include "layer_conv2d_3x3.h"
 #include "layer_conv2d_5x5.h"

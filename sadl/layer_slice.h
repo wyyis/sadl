@@ -49,22 +49,21 @@ public:
 
 protected:
   virtual bool loadInternal(std::istream &file, Version v) override;
-  int32_t start_d;
-  int32_t end_d;
+  int32_t      start_d;
+  int32_t      end_d;
   DUMP_MODEL_EXT;
 };
-
 
 template<typename T> bool Slice<T>::apply(std::vector<Tensor<T> *> &in)
 {
   assert(in.size() == 1);
-  const Tensor<T> &A    = *in[0];
-  int       in_H{ A.dims()[1] };
-  int       in_W{ A.dims()[2] };
-  const int in_D{ A.dims()[3] };
-  constexpr int im_nb = 0;
-  constexpr int pow2_31=std::numeric_limits<int>::max();
-  //ONNX is sending 2^31 - 1 as value if end index is last channel
+  const Tensor<T> &A = *in[0];
+  int              in_H{ A.dims()[1] };
+  int              in_W{ A.dims()[2] };
+  const int        in_D{ A.dims()[3] };
+  constexpr int    im_nb   = 0;
+  constexpr int    pow2_31 = std::numeric_limits<int>::max();
+  // ONNX is sending 2^31 - 1 as value if end index is last channel
   if (end_d == pow2_31)
   {
     end_d = in_D;
@@ -90,7 +89,7 @@ template<typename T> bool Slice<T>::init(const std::vector<Tensor<T> *> &in)
   /*
   Right now slicing only across the depth
   */
-  constexpr int pow2_31=std::numeric_limits<int>::max();
+  constexpr int pow2_31 = std::numeric_limits<int>::max();
   if (in.size() != 1)
     return false;
   SADL_DBG(std::cout << " - input Slice " << in[0]->dims() << std::endl);
@@ -100,7 +99,7 @@ template<typename T> bool Slice<T>::init(const std::vector<Tensor<T> *> &in)
   dim[0] = in[0]->dims()[0];
   dim[1] = in[0]->dims()[1];
   dim[2] = in[0]->dims()[2];
-  //ONNX is sending 2^31 - 1 as value if end index is last channel
+  // ONNX is sending 2^31 - 1 as value if end index is last channel
   if (end_d == pow2_31)
   {
     end_d = in[0]->dims()[3];
@@ -108,7 +107,7 @@ template<typename T> bool Slice<T>::init(const std::vector<Tensor<T> *> &in)
   dim[3] = end_d - start_d;
   out_.resize(dim);
   SADL_DBG(std::cout << "  - output Slice: " << out_.dims() << std::endl);
-  
+
   initDone_ = true;
   return true;
 }

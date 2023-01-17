@@ -7,13 +7,14 @@ inline sadl::layers::TensorInternalType::Type getModelType(const std::string &fi
 {
   const std::string MAGICNUMBER = "SADL0003";
   std::ifstream     file(filename, std::ios::binary);
-  if (!file) {
+  if (!file)
+  {
     std::cerr << "[ERROR] No file " << filename << std::endl;
     exit(-1);
   }
-  char         magic[9];
+  char magic[9];
   file.read(magic, 8);
-  magic[8]       = '\0';
+  magic[8]            = '\0';
   std::string magic_s = magic;
   if (magic_s != MAGICNUMBER)
   {
@@ -25,4 +26,3 @@ inline sadl::layers::TensorInternalType::Type getModelType(const std::string &fi
   file.read((char *) &x, sizeof(int8_t));
   return (sadl::layers::TensorInternalType::Type) x;
 }
-

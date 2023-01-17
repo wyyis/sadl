@@ -35,6 +35,7 @@
 #if __AVX2__ || __SSE4_2__
 #include <immintrin.h>
 #endif
+#include "simd_utils.h"
 
 namespace sadl
 {
@@ -60,7 +61,7 @@ protected:
 #endif
 
 #if SPARSE_SUPPORT
-  bool                  apply_sparse_matmul(std::vector<Tensor<T> *> &in);
+  bool apply_sparse_matmul(std::vector<Tensor<T> *> &in);
 #if __AVX2__
   bool apply_sparse_matmul_simd16(std::vector<Tensor<T> *> &in);
 #endif
@@ -108,7 +109,6 @@ template<typename T> bool MatMul<T>::apply(std::vector<Tensor<T> *> &in)
   if (A.dims().size() - 1 == B.dims().size())
     dum--;
   const int H{ A.dims().back() };   // to be chnaged if SIMD for more than dim1 and dim2
-
   switch (dum)
   {
   case 2:
@@ -117,7 +117,7 @@ template<typename T> bool MatMul<T>::apply(std::vector<Tensor<T> *> &in)
       return SPARSE_MATMULT(in);
     else
 #endif
-    if (H % 16 == 0)
+      if (H % 16 == 0)
       return MULT16_DIM2(in);
     else if (H % 8 == 0)
       return MULT8_DIM2(in);
@@ -274,8 +274,9 @@ template<typename T> template<int NN> bool MatMul<T>::apply_dim3(std::vector<Ten
   const int        last = A.dims().size() - 1;
   const int        N{ A.dims()[last - 2] };
   const int        H{ A.dims()[last - 1] };
-  const int        W{ (A.dims()[last] / NN) * NN };
   const int        R{ B.dims().back() };
+  const int        W{ (A.dims()[last] / NN) * NN };
+  (void) W;
 #if __AVX2__ && DEBUG_SIMD
   std::cout << "\n[WARN] generic version matmul dim3 " << A.dims() << ' ' << B.dims() << "(H=" << H << ") " << (N * R * H * W) / 1000 << " kMAC" << std::endl;
 #endif   // SIMD
@@ -440,8 +441,7 @@ template<> inline bool MatMul<int16_t>::apply_sparse_matmul_simd8(std::vector<Te
         bptr += 8;
       }
 
-      __m128i hi64 =
-        _mm_unpackhi_epi64(s, s);   // 3-operand non-destructive AVX lets us save a byte without needing a movdqa
+      __m128i hi64  = _mm_unpackhi_epi64(s, s);   // 3-operand non-destructive AVX lets us save a byte without needing a movdqa
       __m128i sum64 = _mm_add_epi32(hi64, s);
       __m128i hi32  = _mm_shuffle_epi32(sum64, _MM_SHUFFLE(2, 3, 0, 1));   // Swap the low two elements
       __m128i sum32 = _mm_add_epi32(sum64, hi32);
@@ -530,12 +530,7 @@ template<typename T> bool MatMul<T>::apply_sparse_matmul_simd16(std::vector<Tens
 
 template<typename T> bool MatMul<T>::init(const std::vector<Tensor<T> *> &in)
 {
-  // old:
-  // old:
-  // multiply matrix of inner dim [a b ] or [x a b] or [ x a b y] (the [a b]
-  // matrix) x and y should be same new: output[..., i, j] = sum_k (a[..., i, k]
-  // * b[..., k, j]), for all indices i, j.
-
+  // output[..., i, j] = sum_k (a[..., i, k] * b[..., k, j]), for all indices i, j.
   SADL_DBG(std::cout << "  - input matmul: " << in[0]->dims() << ' ' << in[1]->dims() << std::endl);
 
   if (in.size() != 2)
@@ -551,12 +546,6 @@ template<typename T> bool MatMul<T>::init(const std::vector<Tensor<T> *> &in)
   {
     return false;
   }
-
-  if (in[0]->dims().size() != in[1]->dims().size() && !(in[0]->dims().size() - 1 == in[1]->dims().size() && in[0]->dims()[0] == 1))
-  {
-    return false;
-  }
-
   if (in[0]->dims().size() != in[1]->dims().size() && !(in[0]->dims().size() - 1 == in[1]->dims().size() && in[0]->dims()[0] == 1))
   {
     return false;

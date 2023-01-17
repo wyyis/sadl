@@ -132,15 +132,15 @@ template<typename T> bool Transpose<T>::init(const std::vector<Tensor<T> *> &in)
   dim.resize((int) in[1]->size());
   for (int k = 0; k < in[1]->size(); ++k)
   {
-    if ((*in[1])(k) == -1)
+    if ((*in[1]) (k) == -1)
     {   // keep dim of org
       dim[k]   = in[0]->dims()[k];
       perm_[k] = k;
     }
     else
     {
-      dim[k]   = in[0]->dims()[(int) ((*in[1])(k))];
-      perm_[k] = (int) ((*in[1])(k));
+      dim[k]   = in[0]->dims()[(int) ((*in[1]) (k))];
+      perm_[k] = (int) ((*in[1]) (k));
     }
   }
   if (dim.nbElements() != in[0]->dims().nbElements())

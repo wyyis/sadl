@@ -37,7 +37,6 @@
 #include <immintrin.h>
 #endif
 
-
 #if __AVX2__
 static inline float sum8_float(__m256 x)
 {
@@ -60,7 +59,7 @@ static inline typename sadl::ComputationType<int32_t>::type sum64_int32(__m256i 
 static inline typename sadl::ComputationType<int16_t>::type hsum_epi32_avx(__m128i x)
 {
   __m128i hi64 = _mm_unpackhi_epi64(x, x);   // 3-operand non-destructive AVX lets us save a
-    // byte without needing a movdqa
+                                             // byte without needing a movdqa
   __m128i sum64 = _mm_add_epi32(hi64, x);
   __m128i hi32  = _mm_shuffle_epi32(sum64, _MM_SHUFFLE(2, 3, 0, 1));   // Swap the low two elements
   __m128i sum32 = _mm_add_epi32(sum64, hi32);
@@ -75,8 +74,7 @@ static inline typename sadl::ComputationType<int16_t>::type sum32_int16(__m256i 
 
 static inline typename sadl::ComputationType<int16_t>::type sum32_int16(__m128i s)
 {
-  __m128i hi64 =
-    _mm_unpackhi_epi64(s, s);   // 3-operand non-destructive AVX lets us save a byte without needing a movdqa
+  __m128i hi64  = _mm_unpackhi_epi64(s, s);   // 3-operand non-destructive AVX lets us save a byte without needing a movdqa
   __m128i sum64 = _mm_add_epi32(hi64, s);
   __m128i hi32  = _mm_shuffle_epi32(sum64, _MM_SHUFFLE(2, 3, 0, 1));   // Swap the low two elements
   __m128i sum32 = _mm_add_epi32(sum64, hi32);
@@ -102,4 +100,3 @@ static inline float sum16_float(const __m512 vec_in)
 }
 #endif
 #endif
-

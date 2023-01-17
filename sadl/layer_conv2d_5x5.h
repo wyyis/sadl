@@ -37,51 +37,54 @@
 #include <immintrin.h>
 #endif
 
-namespace sadl {
-namespace layers {
-
-template<typename T>
-template<int s_h,int s_w>
-void Conv2D<T>::conv2d_5x5_s(const Tensor<T> &A,const Tensor<T> &kernel)
+namespace sadl
 {
-  int       in_H{ A.dims()[1] };
-  int       in_W{ A.dims()[2]  };
+namespace layers
+{
+template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_5x5_s(const Tensor<T> &A, const Tensor<T> &kernel)
+{
+  const int in_H{ A.dims()[1] };
+  const int in_W{ A.dims()[2] };
   const int in_D{ A.dims()[3] };
   const int nb_filters{ kernel.dims()[2] };
-  constexpr int half_size{ 5 / 2 };
-  const int top{ pads_[0] };
-  const int left{ pads_[1] };
-  int       start_h{ top };
-  int       start_w{ left};
-  constexpr int im_nb = 0;
-  const int     shift = kernel.quantizer + q_;
+  const int half_size_i{ 5 / 2 };
+  const int half_size_j{ 5 / 2 };
+  assert(half_size_i == pads_[0]);
+  assert(half_size_j == pads_[1]);
+  const int start_h{ 0 };
+  const int start_w{ 0 };
 #if DEBUG_SIMD && __AVX2__
-  std::cout << "\n[WARN] debug generic version conv inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "] " << in_H << 'x' << in_W << " "
-            << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
+  std::cout << "\n[WARN] no SIMD version conv inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "] " << in_H << 'x' << in_W
+            << " groups=" << groups_ << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC"
+            << std::endl;
 #endif
-
+  constexpr int im_nb     = 0;
+  const int     shift     = kernel.quantizer + q_;
+  const int     cout_by_g = nb_filters / groups_;
+  const int     cin_by_g  = in_D / groups_;
   for (int filter = 0; filter < nb_filters; ++filter)
   {
-    for (int im_i = start_h + s_h; im_i < in_H  /*- s_h*/; im_i += s_h)
+    int offset = (filter / cout_by_g) * cin_by_g;
+    for (int im_i = start_h; im_i < in_H; im_i += s_h)
     {
-      for (int im_j = start_w + s_w; im_j < in_W /*- s_w*/; im_j += s_w)
+      for (int im_j = start_w; im_j < in_W; im_j += s_w)
       {
         typename ComputationType<T>::type x = 0;
-        for (int filter_i = -half_size; filter_i <= half_size; ++filter_i)
+        for (int filter_i = -half_size_i; filter_i <= half_size_i; ++filter_i)
         {
           // fixed
-          for (int filter_j = -half_size; filter_j <= half_size; ++filter_j)
+          for (int filter_j = -half_size_j; filter_j <= half_size_j; ++filter_j)
           {
             // fixed
-            for (int filter_d = 0; filter_d < in_D; ++filter_d)
+            for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
             {
               int ii = im_i + filter_i;
               int jj = im_j + filter_j;
-              int ki = half_size + filter_i;
-              int kj = half_size + filter_j;
-              if (A.in(im_nb, ii, jj, filter_d))
+              int ki = half_size_i + filter_i;
+              int kj = half_size_j + filter_j;
+              if (A.in(im_nb, ii, jj, offset + filter_d))
               {
-                x += (typename ComputationType<T>::type) A(im_nb, ii, jj, filter_d) * kernel(ki, kj, filter, filter_d);
+                x += (typename ComputationType<T>::type) A(im_nb, ii, jj, offset + filter_d) * kernel(ki, kj, filter, filter_d);
                 COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
               }
             }
@@ -97,7 +100,5 @@ void Conv2D<T>::conv2d_5x5_s(const Tensor<T> &A,const Tensor<T> &kernel)
 }
 
 // NO SIMD yet
-}
-}
-
-
+}   // namespace layers
+}   // namespace sadl
