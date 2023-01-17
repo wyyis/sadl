@@ -44,7 +44,6 @@ public:
   using Layer<T>::out_;   // to avoid this->
   using Layer<T>::initDone_;
 
-
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
   virtual bool mutateInput() const override { return true; }
@@ -52,7 +51,6 @@ public:
 protected:
   virtual bool loadInternal(std::istream &file, Version v) override;
 };
-
 
 // TODO : check all dims, check loop for optiz
 template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
@@ -64,24 +62,26 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
     return false;
   }
 
-
-  int shift0,shift1,qfinal;
-  if (in[0]->quantizer < in[1]->quantizer) {
-    shift0=0;
-    shift1=in[1]->quantizer-in[0]->quantizer;
-    qfinal=in[0]->quantizer;
-  } else {
-    shift0=in[0]->quantizer-in[1]->quantizer;
-    shift1=0;
-    qfinal=in[1]->quantizer;
+  int shift0, shift1, qfinal;
+  if (in[0]->quantizer < in[1]->quantizer)
+  {
+    shift0 = 0;
+    shift1 = in[1]->quantizer - in[0]->quantizer;
+    qfinal = in[0]->quantizer;
+  }
+  else
+  {
+    shift0 = in[0]->quantizer - in[1]->quantizer;
+    shift1 = 0;
+    qfinal = in[1]->quantizer;
   }
   swap(*in[0], out_);
   // adapt output width to second input (which are the bias) in order to be able to rescale as desired the input
-  out_.quantizer =qfinal;
+  out_.quantizer = qfinal;
 
-  if (shift0>0)
+  if (shift0 > 0)
   {
-    const int shift=shift0;
+    const int shift = shift0;
     if (in[0]->dims() == in[1]->dims())
     {
       for (auto it0 = out_.begin(), it1 = in[1]->begin(); it0 != out_.end(); ++it0, ++it1)
@@ -169,9 +169,9 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
       }
     }
   }
-  else // shift1
+  else   // shift1
   {
-    const int shift=shift1;
+    const int shift = shift1;
     if (in[0]->dims() == in[1]->dims())
     {
       for (auto it0 = out_.begin(), it1 = in[1]->begin(); it0 != out_.end(); ++it0, ++it1)
@@ -188,10 +188,10 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
     {
       if (in[1]->size() == 1)
       {   // for constant
-        const Tensor<T> &B     = *in[1];
-        T valt=B[0];
-        ComputationType<T>::quantize(valt,shift);
-        const T          value = valt;
+        const Tensor<T> &B    = *in[1];
+        T                valt = B[0];
+        ComputationType<T>::quantize(valt, shift);
+        const T value = valt;
         for (auto &x: out_)
         {
           typename ComputationType<T>::type z = x;
@@ -211,8 +211,8 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
           for (int i = 0; i < H; ++i)
           {
             typename ComputationType<T>::type z = B[i];
-            ComputationType<T>::quantize(z,shift);
-            z +=out_(n, i);
+            ComputationType<T>::quantize(z, shift);
+            z += out_(n, i);
             COUNTERS(z);
             SATURATE(z);
             out_(n, i) = z;
@@ -231,8 +231,8 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
             for (int j = 0; j < W; ++j)
             {
               typename ComputationType<T>::type z = B[j];
-              ComputationType<T>::quantize(z,shift);
-              z +=out_(n, i,j);
+              ComputationType<T>::quantize(z, shift);
+              z += out_(n, i, j);
               COUNTERS(z);
               SATURATE(z);
               out_(n, i, j) = z;
@@ -253,8 +253,8 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
               for (int k = 0; k < K; ++k)
               {
                 typename ComputationType<T>::type z = B[k];
-                ComputationType<T>::quantize(z,shift);
-                z +=out_(n, i,j,k);
+                ComputationType<T>::quantize(z, shift);
+                z += out_(n, i, j, k);
                 COUNTERS(z);
                 SATURATE(z);
                 out_(n, i, j, k) = z;
@@ -264,7 +264,6 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
   }
   return true;
 }
-
 
 // data in in[0]
 // bias in in[1]

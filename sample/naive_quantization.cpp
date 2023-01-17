@@ -62,151 +62,161 @@ using namespace std;
 
 namespace
 {
-constexpr int kNoQValue=-1000;
+constexpr int kNoQValue = -1000;
 
-bool toQuantize(sadl::layers::OperationType::Type type) {
-    // negative logic
-    return type  !=  sadl::layers::OperationType::Add &&
-            type  !=  sadl::layers::OperationType::BiasAdd &&
-            type  !=  sadl::layers::OperationType::Concat &&
-            type !=  sadl::layers::OperationType::Copy &&
-            type !=  sadl::layers::OperationType::Expand &&
-            type !=  sadl::layers::OperationType::Flatten &&
-            type !=  sadl::layers::OperationType::Identity &&
-            type !=  sadl::layers::OperationType::LeakyRelu &&
-            type !=  sadl::layers::OperationType::MaxPool &&
-            type !=  sadl::layers::OperationType::Relu &&
-            type !=  sadl::layers::OperationType::Reshape &&
-            type !=  sadl::layers::OperationType::Shape &&
-            type !=  sadl::layers::OperationType::Slice &&
-            type !=  sadl::layers::OperationType::Transpose;
-}
-
-
-template <typename T>
-void quantizeTensor(const sadl::Tensor<float> &B, sadl::Tensor<T> &Bq) {
-    double Q = (1 << Bq.quantizer);
-    for (int k = 0; k < B.size(); ++k) {
-        double z = round(B[k] * Q);
-        if (z <= -numeric_limits<T>::max()) {
-            z = -numeric_limits<T>::max() + 1;
-        }
-        if (z >= numeric_limits<T>::max()) {
-            z = numeric_limits<T>::max() - 1;
-        }
-        Bq[k] = (T)z;
-    }
-}
-
-template <typename T>
-void quantize(sadl::layers::Layer<T> &layerQ, const sadl::layers::Layer<float> &layer_float, int quantizer) {
-
-    // layers with internal quantizer
-    if (layerQ.op() == sadl::layers::OperationType::Conv2D) dynamic_cast<sadl::layers::Conv2D<T> &>(layerQ).q_ = quantizer;
-    else if (layerQ.op() == sadl::layers::OperationType::MatMul) dynamic_cast<sadl::layers::MatMul<T> &>(layerQ).q_ = quantizer;
-    else if (layerQ.op() == sadl::layers::OperationType::Conv2DTranspose) dynamic_cast<sadl::layers::Conv2DTranspose<T> &>(layerQ).q_ = quantizer;
-    else if (layerQ.op() == sadl::layers::OperationType::Mul) dynamic_cast<sadl::layers::Mul<T> &>(layerQ).q_ = quantizer;
-    else if (layerQ.op() == sadl::layers::OperationType::Placeholder) dynamic_cast<sadl::layers::Placeholder<T> &>(layerQ).q_ = quantizer;
-    else if (layerQ.op() == sadl::layers::OperationType::Const) {
-        layerQ.out_.quantizer = quantizer;
-        quantizeTensor(layer_float.out_, layerQ.out_);
-    } else {
-        cerr << "[ERROR] unsupported layer " << sadl::layers::opName(layerQ.op()) << endl;
-        exit(-1);
-    }
-}
-
-
-template<typename T> void quantize(const string &filename,const string &filename_out,const std::vector<int> &quantizers)
+bool toQuantize(sadl::layers::OperationType::Type type)
 {
-    // load float model
-    sadl::layers::TensorInternalType::Type type_model = getModelType(filename);
-    if (type_model!=sadl::layers::TensorInternalType::Float) {
-        std::cerr<<"[ERROR] please input a float model"<<std::endl;
-        exit(-1);
-    }
+  // negative logic
+  return type != sadl::layers::OperationType::Add && type != sadl::layers::OperationType::BiasAdd && type != sadl::layers::OperationType::Concat
+         && type != sadl::layers::OperationType::Copy && type != sadl::layers::OperationType::Expand && type != sadl::layers::OperationType::Flatten
+         && type != sadl::layers::OperationType::Identity && type != sadl::layers::OperationType::LeakyRelu && type != sadl::layers::OperationType::MaxPool
+         && type != sadl::layers::OperationType::Relu && type != sadl::layers::OperationType::Reshape && type != sadl::layers::OperationType::Shape
+         && type != sadl::layers::OperationType::Slice && type != sadl::layers::OperationType::Transpose;
+}
 
-    sadl::Model<float> model;
-    ifstream       file(filename, ios::binary);
-    cout << "[INFO] Model loading" << endl;
-    if (!model.load(file))
+template<typename T> void quantizeTensor(const sadl::Tensor<float> &B, sadl::Tensor<T> &Bq)
+{
+  double Q = (1 << Bq.quantizer);
+  for (int k = 0; k < B.size(); ++k)
+  {
+    double z = round(B[k] * Q);
+    if (z <= -numeric_limits<T>::max())
     {
-        cerr << "[ERROR] Unable to read model " << filename << endl;
+      z = -numeric_limits<T>::max() + 1;
+    }
+    if (z >= numeric_limits<T>::max())
+    {
+      z = numeric_limits<T>::max() - 1;
+    }
+    Bq[k] = (T) z;
+  }
+}
+
+template<typename T> void quantize(sadl::layers::Layer<T> &layerQ, const sadl::layers::Layer<float> &layer_float, int quantizer)
+{
+  // layers with internal quantizer
+  if (layerQ.op() == sadl::layers::OperationType::Conv2D)
+    dynamic_cast<sadl::layers::Conv2D<T> &>(layerQ).q_ = quantizer;
+  else if (layerQ.op() == sadl::layers::OperationType::MatMul)
+    dynamic_cast<sadl::layers::MatMul<T> &>(layerQ).q_ = quantizer;
+  else if (layerQ.op() == sadl::layers::OperationType::Conv2DTranspose)
+    dynamic_cast<sadl::layers::Conv2DTranspose<T> &>(layerQ).q_ = quantizer;
+  else if (layerQ.op() == sadl::layers::OperationType::Mul)
+    dynamic_cast<sadl::layers::Mul<T> &>(layerQ).q_ = quantizer;
+  else if (layerQ.op() == sadl::layers::OperationType::Placeholder)
+    dynamic_cast<sadl::layers::Placeholder<T> &>(layerQ).q_ = quantizer;
+  else if (layerQ.op() == sadl::layers::OperationType::Const)
+  {
+    layerQ.out_.quantizer = quantizer;
+    quantizeTensor(layer_float.out_, layerQ.out_);
+  }
+  else
+  {
+    cerr << "[ERROR] unsupported layer " << sadl::layers::opName(layerQ.op()) << endl;
+    exit(-1);
+  }
+}
+
+template<typename T> void quantize(const string &filename, const string &filename_out, const std::vector<int> &quantizers)
+{
+  // load float model
+  sadl::layers::TensorInternalType::Type type_model = getModelType(filename);
+  if (type_model != sadl::layers::TensorInternalType::Float)
+  {
+    std::cerr << "[ERROR] please input a float model" << std::endl;
+    exit(-1);
+  }
+
+  sadl::Model<float> model;
+  ifstream           file(filename, ios::binary);
+  cout << "[INFO] Model loading" << endl;
+  if (!model.load(file))
+  {
+    cerr << "[ERROR] Unable to read model " << filename << endl;
+    exit(-1);
+  }
+
+  // init quantize model
+  sadl::Model<T> modelQ;
+  if (!copy(model, modelQ))
+  {
+    cerr << "[ERROR] Unable to copy model " << endl;
+    exit(-1);
+  }
+
+  // we need to set the placeholders layers (input layers) size because init is not done
+  auto                         inputs = model.getInputsTemplate();
+  std::vector<sadl::Tensor<T>> inputsQ{ inputs.size() };
+  for (int s = 0; s < (int) inputsQ.size(); ++s)
+  {
+    inputsQ[s].resize(inputs[s].dims());
+  }
+  int cpt = 0;
+  for (auto &id_input: modelQ.ids_input)
+  {
+    auto &L = modelQ.getLayer(id_input);
+    if (L.layer->op() == sadl::layers::OperationType::Placeholder)
+    {
+      assert(cpt < (int) inputs.size());
+      std::vector<sadl::Tensor<T> *> v = { &inputsQ[cpt] };
+      ++cpt;
+      L.layer->init(v);
+    }
+  }
+  // quantize each layer + set quantizer
+  for (int k = 0; k < (int) modelQ.data_.size(); ++k)
+  {   //
+    auto &layer = *modelQ.data_[k].layer;
+    if (toQuantize(layer.op()))
+    {
+      if (layer.id() >= (int) quantizers.size() || quantizers[layer.id()] == kNoQValue)
+      {
+        std::cerr << "[ERROR] need a quantizer for layer " << layer.id() << " op=" << sadl::layers::opName(layer.op()) << " name=" << layer.name() << std::endl;
         exit(-1);
+      }
+      int q = quantizers[layer.id()];
+      quantize<T>(layer, *model.getLayer(layer.id()).layer, q);
     }
+  }
 
-    // init quantize model
-    sadl::Model<T> modelQ;
-    if (!copy(model, modelQ)) {
-        cerr << "[ERROR] Unable to copy model " << endl;
-        exit(-1);
-    }
-
-    // we need to set the placeholders layers (input layers) size because init is not done
-    auto inputs=model.getInputsTemplate();
-    std::vector<sadl::Tensor<T>> inputsQ{inputs.size()};
-    for (int s = 0; s < (int)inputsQ.size(); ++s) {
-        inputsQ[s].resize(inputs[s].dims());
-    }
-    int cpt = 0;
-    for (auto &id_input: modelQ.ids_input) {
-        auto &L = modelQ.getLayer(id_input);
-        if (L.layer->op() == sadl::layers::OperationType::Placeholder) {
-            assert(cpt<(int)inputs.size());
-            std::vector<sadl::Tensor<T> *> v = {&inputsQ[cpt]};
-            ++cpt;
-            L.layer->init(v);
-        }
-    }
-    // quantize each layer + set quantizer
-    for (int k=0;k<(int)modelQ.data_.size();++k) {  //
-        auto &layer=*modelQ.data_[k].layer;
-        if (toQuantize(layer.op())) {
-            if (layer.id()>=(int)quantizers.size()||quantizers[layer.id()]==kNoQValue) {
-                std::cerr << "[ERROR] need a quantizer for layer " << layer.id() <<" op="<<sadl::layers::opName(layer.op())<<" name="<<layer.name()<<std::endl;
-                exit(-1);
-            }
-            int q=quantizers[layer.id()];
-            quantize<T>(layer, *model.getLayer(layer.id()).layer, q);
-        }
-    }
-
-    // dump to file
-    ofstream file_out(filename_out, ios::binary);
-    modelQ.dump(file_out);
-    cout << "[INFO] quantize model in " << filename_out << endl;
-
+  // dump to file
+  ofstream file_out(filename_out, ios::binary);
+  modelQ.dump(file_out);
+  cout << "[INFO] quantize model in " << filename_out << endl;
 }
 
 }   // namespace
 
 int main(int argc, char **argv)
 {
-    if (argc != 3)
-    {
-        cout << "[ERROR] quantize filename_model_float filename_model_int16" << endl;
-        return 1;
-    }
+  if (argc != 3)
+  {
+    cout << "[ERROR] quantize filename_model_float filename_model_int16" << endl;
+    return 1;
+  }
 
-    const string filename_model = argv[1];
-    const string filename_model_out = argv[2];
-    // get the list of quantizers
-    std::cout<<"For layers needing a quantization, the original value x (in float) is replaced by X=round(x*2^N)\n"
-               "Enter the list of pairs: layer id and N (EOF to finish)"<<std::endl;
-    int id,N;
-    int max_id=0;
-    std::list<pair<int,int>> id_q;
-    while(std::cin>>id>>N) {
-        id_q.push_back({id,N});
-        max_id=max(max_id,id);
-    }
-    std::vector<int> quantizers;
-    quantizers.resize(max_id+1);
-    fill(quantizers.begin(),quantizers.end(),kNoQValue);
-    for(auto x: id_q) {
-        quantizers[x.first]=x.second;
-    }
-    quantize<int16_t>(filename_model,filename_model_out,quantizers);
+  const string filename_model     = argv[1];
+  const string filename_model_out = argv[2];
+  // get the list of quantizers
+  std::cout << "For layers needing a quantization, the original value x (in float) is replaced by X=round(x*2^N)\n"
+               "Enter the list of pairs: layer id and N (EOF to finish)"
+            << std::endl;
+  int                       id, N;
+  int                       max_id = 0;
+  std::list<pair<int, int>> id_q;
+  while (std::cin >> id >> N)
+  {
+    id_q.push_back({ id, N });
+    max_id = max(max_id, id);
+  }
+  std::vector<int> quantizers;
+  quantizers.resize(max_id + 1);
+  fill(quantizers.begin(), quantizers.end(), kNoQValue);
+  for (auto x: id_q)
+  {
+    quantizers[x.first] = x.second;
+  }
+  quantize<int16_t>(filename_model, filename_model_out, quantizers);
 
-    return 0;
+  return 0;
 }

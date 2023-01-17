@@ -31,10 +31,10 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define DEBUG_VALUES        1 // show values
-#define DEBUG_MODEL         1 // show pb with model
-#define DEBUG_PRINT         1 // print model info
-#define DEBUG_SIMD          1 // tell about non simd version
+#define DEBUG_VALUES 1   // show values
+#define DEBUG_MODEL 1    // show pb with model
+#define DEBUG_PRINT 1    // print model info
+#define DEBUG_SIMD 1     // tell about non simd version
 
 #include <sadl/model.h>
 #include <cmath>
@@ -46,16 +46,15 @@ using namespace std;
 
 namespace
 {
-
 template<typename T> void infer(const string &filename)
 {
   sadl::Model<T> model;
 #if SPARSE_SUPPORT
   // for debug only
-  model.sparsity_size_threshold=3;
-  model.sparsity_threshold=0.5f;
-#endif    
-  ifstream       file(filename, ios::binary);
+  model.sparsity_size_threshold = 3;
+  model.sparsity_threshold      = 0.5f;
+#endif
+  ifstream file(filename, ios::binary);
   cout << "[INFO] Model loading" << endl;
   if (!model.load(file))
   {

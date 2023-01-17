@@ -59,11 +59,11 @@ protected:
   Dimensions   out_pads_;
   int          q_ = 0;
   // should never be used
-  void conv2dtranspose(int nb_filters, int in_D,Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
+  void conv2dtranspose(int nb_filters, int in_D, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
 #if __AVX512F__
-  template<int in_D> void conv2dtranspose_simd512(int nb_filters,  Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
+  template<int in_D> void conv2dtranspose_simd512(int nb_filters, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
 #endif
-  using T2=typename ComputationType<T>::type;
+  using T2 = typename ComputationType<T>::type;
   Tensor<T2> tempo_;
   DUMP_MODEL_EXT;
 };
@@ -84,33 +84,31 @@ template<typename T> bool Conv2DTranspose<T>::apply(std::vector<Tensor<T> *> &in
   assert(out_.quantizer >= 0);
   assert(kernel.quantizer + q_ >= 0);
 
-   const int nb_filters{ out_.dims()[3] }; // kernel.dims()[2] };
-//   int       in_H{ A.dims()[1] };
-//   int       in_W{ A.dims()[2] };
-   const int in_D{ A.dims()[3] };
-   //const int half_size{ kernel.dims()[0] / 2 };
-   //const int top{ pads_[0] };
-   //const int left{ pads_[1] };
+  const int nb_filters{ out_.dims()[3] };   // kernel.dims()[2] };
+                                            //   int       in_H{ A.dims()[1] };
+                                            //   int       in_W{ A.dims()[2] };
+  const int in_D{ A.dims()[3] };
+  // const int half_size{ kernel.dims()[0] / 2 };
+  // const int top{ pads_[0] };
+  // const int left{ pads_[1] };
   // int       start_h{ half_size - top };
   // int       start_w{ half_size - left };
 
 #if __AVX512F__
-   switch(in_D) {
-   case 32: conv2dtranspose_simd512<32>(nb_filters,out_,A,kernel); break;
-   case 64: conv2dtranspose_simd512<64>(nb_filters,out_,A,kernel); break;
-   case 128: conv2dtranspose_simd512<128>(nb_filters,out_,A,kernel); break;
-   case 192: conv2dtranspose_simd512<192>(nb_filters,out_,A,kernel); break;
-   case 256: conv2dtranspose_simd512<256>(nb_filters,out_,A,kernel); break;
-   default:
-       conv2dtranspose(nb_filters,in_D,out_,A,kernel);
-   }
+  switch (in_D)
+  {
+  case 32: conv2dtranspose_simd512<32>(nb_filters, out_, A, kernel); break;
+  case 64: conv2dtranspose_simd512<64>(nb_filters, out_, A, kernel); break;
+  case 128: conv2dtranspose_simd512<128>(nb_filters, out_, A, kernel); break;
+  case 192: conv2dtranspose_simd512<192>(nb_filters, out_, A, kernel); break;
+  case 256: conv2dtranspose_simd512<256>(nb_filters, out_, A, kernel); break;
+  default: conv2dtranspose(nb_filters, in_D, out_, A, kernel);
+  }
 #else
-  conv2dtranspose(nb_filters,in_D,out_,A,kernel);
+  conv2dtranspose(nb_filters, in_D, out_, A, kernel);
 #endif
   return true;
 }
-
-
 
 // data [batch, in_height, in_width, in_channels]
 // kernel [filter_height, filter_width, in_channels, out_channels]
@@ -129,13 +127,12 @@ template<typename T> bool Conv2DTranspose<T>::init(const std::vector<Tensor<T> *
     return false;
 
   // The spatial dimensions of a convolutional kernel must be 3 or 5
-  if (
-          (in[1]->dims()[0] !=3 )
-          && (in[1]->dims()[0] !=5 ))
+  if ((in[1]->dims()[0] != 3) && (in[1]->dims()[0] != 5))
     return false;
 
-  if (! ((in[1]->dims()[0] ==3 && pads_[1] == 1) || (in[1]->dims()[0] == 5 && pads_[1] == 2)) ) {
-       return false;
+  if (!((in[1]->dims()[0] == 3 && pads_[1] == 1) || (in[1]->dims()[0] == 5 && pads_[1] == 2)))
+  {
+    return false;
   }
   Dimensions dim;
   dim.resize(4);
@@ -146,9 +143,9 @@ template<typename T> bool Conv2DTranspose<T>::init(const std::vector<Tensor<T> *
   out_.resize(dim);
   SADL_DBG(std::cout << "  - output Conv2DTranspose: " << out_.dims() << std::endl);
   // init tempo
-  int half_size=in[1]->dims()[0]/2;
-  dim[1]+=half_size*2;
-  dim[2]+=half_size*2;
+  int half_size = in[1]->dims()[0] / 2;
+  dim[1] += half_size * 2;
+  dim[2] += half_size * 2;
   tempo_.resize(dim);
   initDone_ = true;
   return true;
@@ -206,9 +203,10 @@ template<typename T> bool Conv2DTranspose<T>::loadInternal(std::istream &file, V
   {
     file.read((char *) &x, sizeof(x));
     pads_[k] = x;
-    if (x != 1 && x!=2) {
-        std::cerr << "[ERROR] pads values not supported: " << x << std::endl;
-        return false;
+    if (x != 1 && x != 2)
+    {
+      std::cerr << "[ERROR] pads values not supported: " << x << std::endl;
+      return false;
     }
   }
   SADL_DBG(std::cout << "  - pads: " << pads_ << std::endl);
@@ -224,9 +222,10 @@ template<typename T> bool Conv2DTranspose<T>::loadInternal(std::istream &file, V
   {
     file.read((char *) &x, sizeof(x));
     out_pads_[k] = x;
-    if (x != 1) {
-        std::cerr << "[ERROR] output pads !=1 " << x << std::endl;
-        return false;
+    if (x != 1)
+    {
+      std::cerr << "[ERROR] output pads !=1 " << x << std::endl;
+      return false;
     }
   }
   SADL_DBG(std::cout << "  - out_pads: " << out_pads_ << std::endl);
@@ -240,138 +239,136 @@ template<typename T> bool Conv2DTranspose<T>::loadInternal(std::istream &file, V
 }
 
 // should never be used for perf reasons
-template<typename T>
-void Conv2DTranspose<T>::conv2dtranspose(int nb_filters, int in_D,Tensor<T> &out_, const Tensor<T> &A,
-                       const Tensor<T> &kernel)
+template<typename T> void Conv2DTranspose<T>::conv2dtranspose(int nb_filters, int in_D, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel)
 {
 #if DEBUG_SIMD && __AVX2__
-  const  int       in_H{ A.dims()[1] };
-  const  int       in_W{ A.dims()[2] };
+  const int in_H{ A.dims()[1] };
+  const int in_W{ A.dims()[2] };
   std::cout << "\n[WARN] debug generic version convtranspose inD=" << in_D << " outD=" << nb_filters <<
-               //" s=[" << s_w << ' ' << s_h << "] "
-                in_H << 'x' << in_W << " " <<
-           // << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H /) * (in_W / s_w) / 1000 << " kMAC"
-               std::endl;
+    //" s=[" << s_w << ' ' << s_h << "] "
+    in_H << 'x' << in_W << " " <<
+    // << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H /) * (in_W / s_w) / 1000 << " kMAC"
+    std::endl;
 #endif
   constexpr int im_nb = 0;
-  assert(strides_[1]==2);
-  assert(strides_[2]==2);
-  int     half_size=kernel.dims()[0]/2;
-  constexpr int sw=2;
-  constexpr int sh=2;
+  assert(strides_[1] == 2);
+  assert(strides_[2] == 2);
+  int           half_size = kernel.dims()[0] / 2;
+  constexpr int sw        = 2;
+  constexpr int sh        = 2;
 
-  const int     shift = kernel.quantizer + q_;
-  const int out_h=out_.dims()[1];
-  const int out_w=out_.dims()[2];
+  const int shift = kernel.quantizer + q_;
+  const int out_h = out_.dims()[1];
+  const int out_w = out_.dims()[2];
   tempo_.fill(T2{});
 
   for (int filter = 0; filter < nb_filters; ++filter)
   {
-      for (int im_i = 0; im_i < out_h; im_i += sh)
+    for (int im_i = 0; im_i < out_h; im_i += sh)
+    {
+      for (int im_j = 0; im_j < out_w; im_j += sw)
       {
-          for (int im_j = 0; im_j < out_w; im_j += sw)
+        const int i1 = im_i / sh;
+        const int j1 = im_j / sw;
+        assert(A.in(im_nb, i1, j1, 0));
+        for (int filter_i = -half_size; filter_i <= half_size; ++filter_i)
+        {
+          // fixed
+          for (int filter_j = -half_size; filter_j <= half_size; ++filter_j)
           {
-              const int i1=im_i/sh;
-              const int j1=im_j/sw;
-              assert(A.in(im_nb,i1,j1,0));
-              for (int filter_i = -half_size; filter_i <= half_size; ++filter_i)
-              {
-                  // fixed
-                  for (int filter_j = -half_size; filter_j <= half_size; ++filter_j)
-                  {
-                      // fixed
-                      const int ki = half_size + filter_i;
-                      const int kj = half_size + filter_j;
-                      const int ii = im_i + ki;
-                      const int jj = im_j + kj;
-                      T2 s{};
-                      for (int filter_d = 0; filter_d < in_D; ++filter_d)
-                      {
-                          s+= A(im_nb, i1, j1, filter_d) * kernel(ki, kj, filter, filter_d);
-                          COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
-                      }
-                      tempo_(im_nb,ii,jj,filter) += s;
-                  }
-              }
+            // fixed
+            const int ki = half_size + filter_i;
+            const int kj = half_size + filter_j;
+            const int ii = im_i + ki;
+            const int jj = im_j + kj;
+            T2        s{};
+            for (int filter_d = 0; filter_d < in_D; ++filter_d)
+            {
+              s += A(im_nb, i1, j1, filter_d) * kernel(ki, kj, filter, filter_d);
+              COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
+            }
+            tempo_(im_nb, ii, jj, filter) += s;
           }
+        }
       }
-      for (int im_i = 0; im_i < out_h; ++im_i)
+    }
+    for (int im_i = 0; im_i < out_h; ++im_i)
+    {
+      for (int im_j = 0; im_j < out_w; ++im_j)
       {
-          for (int im_j = 0; im_j < out_w; ++im_j)
-          {
-              auto x=tempo_(im_nb,im_i+half_size,im_j+half_size,filter);
-              ComputationType<T>::quantize(x, shift);
-              COUNTERS(x);
-              SATURATE(x);
-              out_(im_nb,im_i,im_j,filter)=static_cast<T>(x);
-          }
+        auto x = tempo_(im_nb, im_i + half_size, im_j + half_size, filter);
+        ComputationType<T>::quantize(x, shift);
+        COUNTERS(x);
+        SATURATE(x);
+        out_(im_nb, im_i, im_j, filter) = static_cast<T>(x);
       }
+    }
   }
 }
 
 #if __AVX512F__
 template<>
 template<int in_D>
-void Conv2DTranspose<float>::conv2dtranspose_simd512(int nb_filters,  Tensor<float> &out_, const Tensor<float> &A, const Tensor<float> &kernel)
+void Conv2DTranspose<float>::conv2dtranspose_simd512(int nb_filters, Tensor<float> &out_, const Tensor<float> &A, const Tensor<float> &kernel)
 {
   constexpr int im_nb = 0;
-  assert(strides_[1]==2);
-  assert(strides_[2]==2);
-  assert(kernel.dims()[0]==kernel.dims()[1]);
-  int     half_size=kernel.dims()[0]/2;
+  assert(strides_[1] == 2);
+  assert(strides_[2] == 2);
+  assert(kernel.dims()[0] == kernel.dims()[1]);
+  int half_size = kernel.dims()[0] / 2;
   static_assert(in_D % 16 == 0, "Should be used with mod16 filters.");
-  constexpr int sw=2;
-  constexpr int sh=2;
+  constexpr int sw = 2;
+  constexpr int sh = 2;
 
-  const int out_h=out_.dims()[1];
-  const int out_w=out_.dims()[2];
+  const int out_h = out_.dims()[1];
+  const int out_w = out_.dims()[2];
   tempo_.fill(T2{});
 
   for (int filter = 0; filter < nb_filters; ++filter)
   {
-      for (int im_i = 0; im_i < out_h; im_i += sh)
+    for (int im_i = 0; im_i < out_h; im_i += sh)
+    {
+      for (int im_j = 0; im_j < out_w; im_j += sw)
       {
-          for (int im_j = 0; im_j < out_w; im_j += sw)
+        const int i1 = im_i / sh;
+        const int j1 = im_j / sw;
+        assert(A.in(im_nb, i1, j1, 0));
+        for (int filter_i = -half_size; filter_i <= half_size; ++filter_i)
+        {
+          // fixed
+          for (int filter_j = -half_size; filter_j <= half_size; ++filter_j)
           {
-              const int i1=im_i/sh;
-              const int j1=im_j/sw;
-              assert(A.in(im_nb,i1,j1,0));
-              for (int filter_i = -half_size; filter_i <= half_size; ++filter_i)
-              {
-                  // fixed
-                  for (int filter_j = -half_size; filter_j <= half_size; ++filter_j)
-                  {
-                      __m512 s = _mm512_setzero_ps();
-                      const int ki = half_size + filter_i;
-                      const int kj = half_size + filter_j;
-                      const int ii = im_i + ki;
-                      const int jj = im_j + kj;
-                      const float *kptr = kernel.addr(ki, kj, filter, 0);
-                      const float *aptr = A.addr(im_nb, i1, j1, 0);
-                      // fixed
-                      for (int filter_d = 0; filter_d < in_D; filter_d+=16)
-                      {
-                          const __m512 k0   = _mm512_loadu_ps(kptr+filter_d); // not always aligned
+            __m512       s    = _mm512_setzero_ps();
+            const int    ki   = half_size + filter_i;
+            const int    kj   = half_size + filter_j;
+            const int    ii   = im_i + ki;
+            const int    jj   = im_j + kj;
+            const float *kptr = kernel.addr(ki, kj, filter, 0);
+            const float *aptr = A.addr(im_nb, i1, j1, 0);
+            // fixed
+            for (int filter_d = 0; filter_d < in_D; filter_d += 16)
+            {
+              const __m512 k0 = _mm512_loadu_ps(kptr + filter_d);   // not always aligned
 #if __FMA__
-                          s = _mm512_fmadd_ps(k0, _mm512_load_ps(aptr+filter_d), s);
+              s = _mm512_fmadd_ps(k0, _mm512_load_ps(aptr + filter_d), s);
 #else
-                          const __m512 m0 = _mm512_mul_ps(k0, _mm512_load_ps(aptr+filter_d));
-                          s               = _mm512_add_ps(s, m0);
+              const __m512 m0 = _mm512_mul_ps(k0, _mm512_load_ps(aptr + filter_d));
+              s               = _mm512_add_ps(s, m0);
 #endif
-                      }
-                      tempo_(im_nb,ii,jj,filter) += sum16_float(s);
-                  }
-              }
+            }
+            tempo_(im_nb, ii, jj, filter) += sum16_float(s);
           }
+        }
       }
-      for (int im_i = 0; im_i < out_h; ++im_i)
+    }
+    for (int im_i = 0; im_i < out_h; ++im_i)
+    {
+      for (int im_j = 0; im_j < out_w; ++im_j)
       {
-          for (int im_j = 0; im_j < out_w; ++im_j)
-          {
-              auto x=tempo_(im_nb,im_i+half_size,im_j+half_size,filter);
-              out_(im_nb,im_i,im_j,filter)=x;
-          }
+        auto x                          = tempo_(im_nb, im_i + half_size, im_j + half_size, filter);
+        out_(im_nb, im_i, im_j, filter) = x;
       }
+    }
   }
 }
 #endif
@@ -379,77 +376,79 @@ void Conv2DTranspose<float>::conv2dtranspose_simd512(int nb_filters,  Tensor<flo
 #if __AVX512BW__
 template<>
 template<int in_D>
-void Conv2DTranspose<int16_t>::conv2dtranspose_simd512(int nb_filters,  Tensor<int16_t> &out_, const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
+void Conv2DTranspose<int16_t>::conv2dtranspose_simd512(int nb_filters, Tensor<int16_t> &out_, const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
 {
   constexpr int im_nb = 0;
-  assert(strides_[1]==2);
-  assert(strides_[2]==2);
+  assert(strides_[1] == 2);
+  assert(strides_[2] == 2);
   static_assert(in_D % 32 == 0, "Should be used with mod32 filters.");
 #if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int16_t;
 #endif
-  assert(kernel.dims()[0]==kernel.dims()[1]);
-  const int     half_size=kernel.dims()[0]/2;
+  assert(kernel.dims()[0] == kernel.dims()[1]);
+  const int half_size = kernel.dims()[0] / 2;
   static_assert(in_D % 32 == 0, "Should be used with mod32 filters.");
-  constexpr int sw=2;
-  constexpr int sh=2;
-  const int out_h=out_.dims()[1];
-  const int out_w=out_.dims()[2];
+  constexpr int sw    = 2;
+  constexpr int sh    = 2;
+  const int     out_h = out_.dims()[1];
+  const int     out_w = out_.dims()[2];
   tempo_.fill(T2{});
-  const int     shift = kernel.quantizer + q_;
+  const int shift = kernel.quantizer + q_;
 
   for (int filter = 0; filter < nb_filters; ++filter)
   {
-      for (int im_i = 0; im_i < out_h; im_i += sh)
+    for (int im_i = 0; im_i < out_h; im_i += sh)
+    {
+      for (int im_j = 0; im_j < out_w; im_j += sw)
       {
-          for (int im_j = 0; im_j < out_w; im_j += sw)
+        const int i1 = im_i / sh;
+        const int j1 = im_j / sw;
+        assert(A.in(im_nb, i1, j1, 0));
+        const T *aptr = A.addr(im_nb, i1, j1, 0);
+        for (int filter_i = -half_size; filter_i <= half_size; ++filter_i)
+        {
+          // fixed
+          for (int filter_j = -half_size; filter_j <= half_size; ++filter_j)
           {
-              const int i1=im_i/sh;
-              const int j1=im_j/sw;
-              assert(A.in(im_nb,i1,j1,0));
-              const T *aptr = A.addr(im_nb, i1, j1, 0);
-              for (int filter_i = -half_size; filter_i <= half_size; ++filter_i)
-              {
-                  // fixed
-                  for (int filter_j = -half_size; filter_j <= half_size; ++filter_j)
-                  {
-                      __m512i s = _mm512_setzero_si512();
-                      const int ki = half_size + filter_i;
-                      const int kj = half_size + filter_j;
-                      const int ii = im_i + ki;
-                      const int jj = im_j + kj;
-                      const T *kptr = kernel.addr(ki, kj, filter, 0);
-                      // fixed
-                      for (int filter_d = 0; filter_d < in_D; filter_d+=32)
-                      {
-                          const __m512i k0   = _mm512_loadu_si512(kptr+filter_d); // not always aligned
-                          const __m512i v0   = _mm512_load_si512(aptr+filter_d);
-                          const __m512i mad0 = _mm512_madd_epi16(k0, v0);   // res in si32
-                          s                  = _mm512_add_epi32(s, mad0);
-                      }
-                      tempo_(im_nb,ii,jj,filter) += _mm512_reduce_add_epi32(s);
-                  }
-              }
+            __m512i   s    = _mm512_setzero_si512();
+            const int ki   = half_size + filter_i;
+            const int kj   = half_size + filter_j;
+            const int ii   = im_i + ki;
+            const int jj   = im_j + kj;
+            const T * kptr = kernel.addr(ki, kj, filter, 0);
+            // fixed
+            for (int filter_d = 0; filter_d < in_D; filter_d += 32)
+            {
+              const __m512i k0   = _mm512_loadu_si512(kptr + filter_d);   // not always aligned
+              const __m512i v0   = _mm512_load_si512(aptr + filter_d);
+              const __m512i mad0 = _mm512_madd_epi16(k0, v0);   // res in si32
+              s                  = _mm512_add_epi32(s, mad0);
+            }
+            tempo_(im_nb, ii, jj, filter) += _mm512_reduce_add_epi32(s);
           }
+        }
       }
-      for (int im_i = 0; im_i < out_h; ++im_i)
+    }
+    for (int im_i = 0; im_i < out_h; ++im_i)
+    {
+      for (int im_j = 0; im_j < out_w; ++im_j)
       {
-          for (int im_j = 0; im_j < out_w; ++im_j)
-          {
-              auto z=tempo_(im_nb,im_i+half_size,im_j+half_size,filter)>>shift;
-              SATURATE(z);
-              out_(im_nb,im_i,im_j,filter)=z;
-          }
+        auto z = tempo_(im_nb, im_i + half_size, im_j + half_size, filter) >> shift;
+        SATURATE(z);
+        out_(im_nb, im_i, im_j, filter) = z;
       }
+    }
   }
 }
 #endif
 
 #if __AVX512BW__ || __AVX512F__
 template<typename T>
-template<int in_D> void Conv2DTranspose<T>::conv2dtranspose_simd512(int nb_filters,  Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel) {
-    std::cerr<<"TODO "<<std::endl;
-    exit(-1);
+template<int in_D>
+void Conv2DTranspose<T>::conv2dtranspose_simd512(int nb_filters, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel)
+{
+  std::cerr << "TODO " << std::endl;
+  exit(-1);
 }
 #endif
 

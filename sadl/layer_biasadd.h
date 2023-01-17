@@ -70,7 +70,7 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
       {
         typename ComputationType<T>::type z = *it0;
         ComputationType<T>::shift_left(z, -shift);
-//        ComputationType<T>::quantize(z, shift);
+        //        ComputationType<T>::quantize(z, shift);
         z += *it1;
         COUNTERS(z);
         SATURATE(z);

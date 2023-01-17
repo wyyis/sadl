@@ -37,24 +37,29 @@
 #include <immintrin.h>
 #endif
 
-namespace sadl {
-namespace layers {
-
-
-template<typename T>
-template<int s_h, int s_w>
-void Conv2D<T>::conv2d_ixj_s_peel(int nb_filters, int in_H, int in_W, int in_D, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A,
-                                  const Tensor<T> &kernel)
+namespace sadl
 {
-  constexpr int im_nb      = 0;
-  const int     shift      = kernel.quantizer + q_;
+namespace layers
+{
+template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_peel(const Tensor<T> &A, const Tensor<T> &kernel)
+{
+  constexpr int im_nb = 0;
+  const int     shift = kernel.quantizer + q_;
   const int     ihalf_size{ kernel.dims()[0] / 2 };
   const int     jhalf_size{ kernel.dims()[1] / 2 };
-  const int     cout_by_g = nb_filters / groups_;
-  const int     cin_by_g  = in_D / groups_;
+  int           in_H{ A.dims()[1] };
+  int           in_W{ A.dims()[2] };
+  const int     in_D{ A.dims()[3] };
+  const int     nb_filters{ kernel.dims()[2] };
+  const int     top{ pads_[0] };
+  const int     left{ pads_[1] };
+  int           start_h{ ihalf_size - top };
+  int           start_w{ jhalf_size - left };
+
+  const int cout_by_g = nb_filters / groups_;
+  const int cin_by_g  = in_D / groups_;
   for (int filter_nb = 0; filter_nb < nb_filters; ++filter_nb)
   {
-
     int offset = (filter_nb / cout_by_g) * cin_by_g;
 
     // corners
@@ -68,7 +73,7 @@ void Conv2D<T>::conv2d_ixj_s_peel(int nb_filters, int in_H, int in_W, int in_D, 
         {
           for (int filter_j = j0; filter_j <= j1; ++filter_j)
           {
-            for (int filter_d = 0; filter_d < in_D/groups_; ++filter_d)
+            for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
             {
               int ii = im_i + filter_i;
               int jj = im_j + filter_j;
@@ -132,7 +137,7 @@ void Conv2D<T>::conv2d_ixj_s_peel(int nb_filters, int in_H, int in_W, int in_D, 
           {
             for (int filter_j = -start_w; filter_j <= jhalf_size; ++filter_j)
             {
-              for (int filter_d = 0; filter_d < in_D/groups_; ++filter_d)
+              for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
               {
                 int ii = im_i + filter_i;
                 int jj = im_j + filter_j;
@@ -158,7 +163,7 @@ void Conv2D<T>::conv2d_ixj_s_peel(int nb_filters, int in_H, int in_W, int in_D, 
           {
             for (int filter_j = -jhalf_size; filter_j <= end_filter; ++filter_j)
             {
-              for (int filter_d = 0; filter_d < in_D/groups_; ++filter_d)
+              for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
               {
                 int ii = im_i + filter_i;
                 int jj = im_j + filter_j;
@@ -188,7 +193,7 @@ void Conv2D<T>::conv2d_ixj_s_peel(int nb_filters, int in_H, int in_W, int in_D, 
           {
             for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
             {
-              for (int filter_d = 0; filter_d < in_D/groups_; ++filter_d)
+              for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
               {
                 int ii = im_i + filter_i;
                 int jj = im_j + filter_j;
@@ -214,7 +219,7 @@ void Conv2D<T>::conv2d_ixj_s_peel(int nb_filters, int in_H, int in_W, int in_D, 
           {
             for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
             {
-              for (int filter_d = 0; filter_d < in_D/groups_; ++filter_d)
+              for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
               {
                 int ii = im_i + filter_i;
                 int jj = im_j + filter_j;
@@ -235,60 +240,41 @@ void Conv2D<T>::conv2d_ixj_s_peel(int nb_filters, int in_H, int in_W, int in_D, 
   }   // filter_nb
 }
 
-
-template<typename T>
-template<int s_h, int s_w>
-void Conv2D<T>::conv2d_ixj_s_core_dispatch(int nb_filters, int in_H, int in_W, int in_D, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A,
-                                           const Tensor<T> &kernel)
+template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_core(const Tensor<T> &A, const Tensor<T> &kernel)
 {
-//Update SIMD function once supported
-#if __AVX2__
-#define CONV_MOD8 conv2d_ixj_s_d_core
-#else
-#define CONV_MOD8 conv2d_ixj_s_d_core
-#endif
-
-  switch (in_D)
-  {
-  case 24: CONV_MOD8<24, s_h, s_w>(nb_filters, in_H, in_W, start_h, start_w, out_, A, kernel); break;
-  default: conv2d_ixj_s_core<s_h, s_w>(nb_filters, in_H, in_W, in_D, start_h, start_w, out_, A, kernel); break;
-  }
-#undef CONV_MOD8
-}
-
-
-
-
-template<typename T>
-template<int s_h, int s_w>
-void Conv2D<T>::conv2d_ixj_s_core(int nb_filters, int in_H, int in_W, int in_D, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A,
-                                  const Tensor<T> &kernel)
-{
-#if DEBUG_SIMD && __AVX2__
-  std::cout << "\n[WARN] generic version conv ixj inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
-            << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
-#endif
-  constexpr int im_nb     = 0;
+  constexpr int im_nb = 0;
   const int     ihalf_size{ kernel.dims()[0] / 2 };
   const int     jhalf_size{ kernel.dims()[1] / 2 };
+  const int     in_D{ A.dims()[3] };
+  const int     nb_filters{ kernel.dims()[2] };
   const int     shift     = kernel.quantizer + q_;
   const int     cout_by_g = nb_filters / groups_;
   const int     cin_by_g  = in_D / groups_;
-  const int top{ pads_[0] };
-  const int left{ pads_[1] };
+  const int     top{ pads_[0] };
+  const int     left{ pads_[1] };
+  int           in_H{ A.dims()[1] };
+  int           in_W{ A.dims()[2] };
+  int           start_h{ ihalf_size - top };
+  int           start_w{ jhalf_size - left };
+#if DEBUG_SIMD && __AVX2__
+  std::cout << "\n[WARN] generic version conv " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << groups_ << " inD=" << in_D << " outD=" << nb_filters
+            << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
+            << "?? kMAC" << std::endl;
+#endif
+
   for (int im_i = start_h + top; im_i < in_H - top; im_i += s_h)
   {
     for (int im_j = start_w + left; im_j < in_W - left; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
-        int offset = (filter / cout_by_g) * cin_by_g;
-        typename ComputationType<T>::type x = 0;
+        int                               offset = (filter / cout_by_g) * cin_by_g;
+        typename ComputationType<T>::type x      = 0;
         for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
         {   // fixed
           for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
           {   // fixed
-            for (int filter_d = 0; filter_d < in_D/groups_; ++filter_d)
+            for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
             {
               int ii = im_i + filter_i;
               int jj = im_j + filter_j;
@@ -308,46 +294,48 @@ void Conv2D<T>::conv2d_ixj_s_core(int nb_filters, int in_H, int in_W, int in_D, 
   }
 }
 
-
-template<typename T>
-template<int in_D, int s_h, int s_w>
-void Conv2D<T>::conv2d_ixj_s_d_core(int nb_filters, int in_H, int in_W, int start_h, int start_w, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel)
+template<typename T> template<int in_D, int ihalf_size, int jhalf_size> void Conv2D<T>::conv2d_ixj_s11_gD_d_core(const Tensor<T> &A, const Tensor<T> &kernel)
 {
-#if DEBUG_SIMD && __AVX2__
-  std::cout << "\n[WARN] generic version conv ixj inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
-            << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
-#endif
-  constexpr int im_nb     = 0;
-  const int     ihalf_size{ kernel.dims()[0] / 2 };
-  const int     jhalf_size{ kernel.dims()[1] / 2 };
-  const int     shift     = kernel.quantizer + q_;
-  const int     cout_by_g = nb_filters / groups_;
-  const int     cin_by_g  = in_D / groups_;
+  constexpr int nb_filters = in_D;
+  constexpr int s_h        = 1;
+  constexpr int s_w        = 1;
+  constexpr int im_nb      = 0;
+  //  const int     ihalf_size{ kernel.dims()[0] / 2 };
+  //  const int     jhalf_size{ kernel.dims()[1] / 2 };
+  const int shift = kernel.quantizer + q_;
   const int top{ pads_[0] };
   const int left{ pads_[1] };
+  int       in_H{ A.dims()[1] };
+  int       in_W{ A.dims()[2] };
+  int       start_h{ ihalf_size - top };
+  int       start_w{ jhalf_size - left };
+#if DEBUG_SIMD && __AVX2__
+  std::cout << "\n[WARN] partially generic version conv " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << groups_ << " inD=" << in_D
+            << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
+            << "?? kMAC" << std::endl;
+#endif
+
   for (int im_i = start_h + top; im_i < in_H - top; im_i += s_h)
   {
     for (int im_j = start_w + left; im_j < in_W - left; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
-        int offset = (filter / cout_by_g) * cin_by_g;
         typename ComputationType<T>::type x = 0;
-        for (int filter_d = 0; filter_d < in_D/groups_; ++filter_d)
-        {
-          for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
+
+        for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
+        {   // fixed
+          for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
           {   // fixed
-            for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
-            {   // fixed
-              int ii = im_i + filter_i;
-              int jj = im_j + filter_j;
-              int ki = ihalf_size + filter_i;
-              int kj = jhalf_size + filter_j;
-              x += (typename ComputationType<T>::type) A(im_nb, ii, jj, offset + filter_d) * kernel(ki, kj, filter, filter_d);
-              COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
-            }
+            int ii = im_i + filter_i;
+            int jj = im_j + filter_j;
+            int ki = ihalf_size + filter_i;
+            int kj = jhalf_size + filter_j;
+            x += (typename ComputationType<T>::type) A(im_nb, ii, jj, filter) * kernel(ki, kj, filter, 0);
+            COUNTERS_MAC(kernel(ki, kj, filter, 0));
           }
         }
+
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
@@ -357,6 +345,59 @@ void Conv2D<T>::conv2d_ixj_s_d_core(int nb_filters, int in_H, int in_W, int star
   }
 }
 
+template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_core_dispatch(const Tensor<T> &A, const Tensor<T> &kernel)
+{
+  const int in_D{ A.dims()[3] };
+  const int nb_filters{ kernel.dims()[2] };
+  if (in_D % 8 == 0 && in_D == groups_ && in_D == nb_filters && s_h == 1 && s_w == 1)
+  {
+    if (kernel.dims()[0] / 2 == 0 && kernel.dims()[1] / 2 == 1)
+    {
+      constexpr int ki = 0;
+      constexpr int kj = 1;
+      switch (in_D)
+      {
+      case 8:
+        conv2d_ixj_s11_gD_d_core<8, ki, kj>(A, kernel);
+        return;
+        break;
+      case 16:
+        conv2d_ixj_s11_gD_d_core<16, ki, kj>(A, kernel);
+        return;
+        break;
+      case 24:
+        conv2d_ixj_s11_gD_d_core<24, ki, kj>(A, kernel);
+        return;
+        break;
+      default:   // do default
+        break;
+      }
+    }
+    else if (kernel.dims()[0] / 2 == 1 && kernel.dims()[1] / 2 == 0)
+    {
+      constexpr int ki = 1;
+      constexpr int kj = 0;
+      switch (in_D)
+      {
+      case 8:
+        conv2d_ixj_s11_gD_d_core<8, ki, kj>(A, kernel);
+        return;
+        break;
+      case 16:
+        conv2d_ixj_s11_gD_d_core<16, ki, kj>(A, kernel);
+        return;
+        break;
+      case 24:
+        conv2d_ixj_s11_gD_d_core<24, ki, kj>(A, kernel);
+        return;
+        break;
+      default:   // do default
+        break;
+      }
+    }
+  }
+  conv2d_ixj_s_core<s_h, s_w>(A, kernel);
+}
 
-}
-}
+}   // namespace layers
+}   // namespace sadl
