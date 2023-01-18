@@ -56,8 +56,8 @@ protected:
 // assume data in in[0] and shape in in[1]
 template<typename T> bool Transpose<T>::apply(std::vector<Tensor<T> *> &in)
 {
-  Dimensions d = out_.dims();   // {in[0]->dims()[0], in[0]->dims()[3],
-                                // in[0]->dims()[1], in[0]->dims()[2]};
+  Dimensions d = out_.dims();   // {in[0]->dims()[0], in[0]->dims()[3], in[0]->dims()[1], in[0]->dims()[2]};
+
   const auto &A  = *in[0];
   Dimensions  Ad = A.dims();
   if (d.size() == 1)

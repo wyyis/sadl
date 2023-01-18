@@ -259,10 +259,11 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_cor
   std::cout << "\n[WARN] generic version conv 3x3 inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
 #endif
-
-  for (int im_i = start_h + s_h; im_i < in_H - s_h; im_i += s_h)
+  assert(start_h + s_h - half_size_h >= 0);
+  assert(start_w + s_w - half_size_w >= 0);
+  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - s_w; im_j += s_w)
+    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -347,9 +348,9 @@ template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d
 #endif
   // const int top{ pads_[0] };
   // const int left{ pads_[1] };
-  for (int im_i = start_h + s_h; im_i < in_H - s_h; im_i += s_h)
+  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - s_w; im_j += s_w)
+    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -405,9 +406,9 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<float>::simd8_conv2d
               << in_W << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
   }
 #endif
-  for (int im_i = start_h + s_h; im_i < in_H - s_h; im_i += s_h)
+  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - s_w; im_j += s_w)
+    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -458,9 +459,9 @@ template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd1
   const int     left{ pads_[1] };
   const int     start_h{ half_size_h - top };
   const int     start_w{ half_size_w - left };
-  for (int im_i = start_h + s_h; im_i < in_H - s_h; im_i += s_h)
+  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - s_w; im_j += s_w)
+    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -522,9 +523,9 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int32_t>::simd8_conv
   }
 #endif
 
-  for (int im_i = start_h + s_h; im_i < in_H - s_h; im_i += s_h)
+  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - s_w; im_j += s_w)
+    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -590,9 +591,9 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd8_conv
               << in_W << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
   }
 #endif
-  for (int im_i = start_h + s_h; im_i < in_H - s_h; im_i += s_h)
+  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - s_w; im_j += s_w)
+    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -651,9 +652,9 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd16_con
               << in_W << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
   }
 #endif
-  for (int im_i = start_h + s_h; im_i < in_H - s_h; im_i += s_h)
+  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - s_w; im_j += s_w)
+    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -704,9 +705,9 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd32_con
   const int     left{ pads_[1] };
   const int     start_h{ half_size_h - top };
   const int     start_w{ half_size_w - left };
-  for (int im_i = start_h + s_h; im_i < in_H - s_h; im_i += s_h)
+  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - s_w; im_j += s_w)
+    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {

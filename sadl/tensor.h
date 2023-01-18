@@ -149,7 +149,7 @@ public:
 
   void resize(Dimensions d);
 
-  // lineqar access
+  // linear access
   value_type &operator[](int i);
   value_type  operator[](int i) const;
 
@@ -586,7 +586,7 @@ template<typename T> std::ostream &operator<<(std::ostream &out, const Tensor<T>
         out << '\n';
       for (int i = 0; i < t.dims()[1]; ++i)
       {
-        out << "[";
+        out << "  [";
         if (t.dims()[1] > 1)
           out << '\n';
         for (int j = 0; j < t.dims()[2]; ++j)
@@ -606,7 +606,7 @@ template<typename T> std::ostream &operator<<(std::ostream &out, const Tensor<T>
     out << "[";
     for (int i = 0; i < t.dims()[0]; ++i)
     {
-      out << "[";
+      out << " [";
       if (t.dims()[0] > 1)
         out << '\n';
       for (int j = 0; j < t.dims()[1]; ++j)
