@@ -261,10 +261,11 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
             << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << "?? kMAC" << std::endl;
 #endif
-
-  for (int im_i = start_h + top; im_i < in_H - top; im_i += s_h)
+  assert(start_h + s_h - ihalf_size >= 0);
+  assert(start_w + s_w - jhalf_size >= 0);
+  for (int im_i = start_h + s_h; im_i < in_H - ihalf_size; im_i += s_h)
   {
-    for (int im_j = start_w + left; im_j < in_W - left; im_j += s_w)
+    for (int im_j = start_w + s_w; im_j < in_W - jhalf_size; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -300,24 +301,22 @@ template<typename T> template<int in_D, int ihalf_size, int jhalf_size> void Con
   constexpr int s_h        = 1;
   constexpr int s_w        = 1;
   constexpr int im_nb      = 0;
-  //  const int     ihalf_size{ kernel.dims()[0] / 2 };
-  //  const int     jhalf_size{ kernel.dims()[1] / 2 };
-  const int shift = kernel.quantizer + q_;
-  const int top{ pads_[0] };
-  const int left{ pads_[1] };
-  int       in_H{ A.dims()[1] };
-  int       in_W{ A.dims()[2] };
-  int       start_h{ ihalf_size - top };
-  int       start_w{ jhalf_size - left };
+  const int     shift      = kernel.quantizer + q_;
+  const int     top{ pads_[0] };
+  const int     left{ pads_[1] };
+  int           in_H{ A.dims()[1] };
+  int           in_W{ A.dims()[2] };
+  int           start_h{ ihalf_size - top };
+  int           start_w{ jhalf_size - left };
 #if DEBUG_SIMD && __AVX2__
   std::cout << "\n[WARN] partially generic version conv " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << groups_ << " inD=" << in_D
             << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << "?? kMAC" << std::endl;
 #endif
 
-  for (int im_i = start_h + top; im_i < in_H - top; im_i += s_h)
+  for (int im_i = start_h + top; im_i < in_H - ihalf_size; im_i += s_h)
   {
-    for (int im_j = start_w + left; im_j < in_W - left; im_j += s_w)
+    for (int im_j = start_w + left; im_j < in_W - jhalf_size; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {

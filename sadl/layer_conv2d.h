@@ -280,21 +280,27 @@ template<typename T> bool Conv2D<T>::init(const std::vector<Tensor<T> *> &in)
     return false;
   if (in[0]->dims()[0] != 1)
     return false;
-  if (in[1]->dims()[0] / 2 != pads_[0] ||   // pad is same
-      in[1]->dims()[1] / 2 != pads_[1])
-  {
-    return false;
-  }
+  // more generic: test if padding == same
+  const int in_H{ in[0]->dims()[1] };
+  const int in_W{ in[0]->dims()[2] };
+  const int k_h{ in[1]->dims()[0] };
+  const int k_w{ in[1]->dims()[1] };
+  const int s_h   = strides_[1];
+  const int s_w   = strides_[2];
+  int       out_H = floor((float) (in_H + pads_[0] + pads_[2] - k_h) / s_h + 1);
+  int       out_W = floor((float) (in_W + pads_[1] + pads_[3] - k_w) / s_w + 1);
+
   // Hout=floor((H+2*p-k)/s+1)
   // assume p =k/2 (pad == same)
-  // and kernel even
-  // => Hout=ceil(H/s)
+  // and kernel even  => Hout=ceil(H/s)
   Dimensions dim;
   dim.resize(4);
   dim[0] = in[0]->dims()[0];
   dim[1] = (int) ceil(in[0]->dims()[1] / (float) strides_[1]);
   dim[2] = (int) ceil(in[0]->dims()[2] / (float) strides_[2]);
   dim[3] = in[1]->dims()[2];
+  if (out_H != dim[1] || out_W != dim[2])   // warning, fail with tf2 3x3s2 pad=same i=(5,4)
+    return false;
   out_.resize(dim);
   if (groups_ != 1)
   {

@@ -47,12 +47,12 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_5x5_s(con
   const int in_W{ A.dims()[2] };
   const int in_D{ A.dims()[3] };
   const int nb_filters{ kernel.dims()[2] };
-  const int half_size_i{ 5 / 2 };
-  const int half_size_j{ 5 / 2 };
+  constexpr int half_size_i{ 5 / 2 };
+  constexpr int half_size_j{ 5 / 2 };
   assert(half_size_i == pads_[0]);
   assert(half_size_j == pads_[1]);
-  const int start_h{ 0 };
-  const int start_w{ 0 };
+  constexpr int start_h{ 0 };
+  constexpr int start_w{ 0 };
 #if DEBUG_SIMD && __AVX2__
   std::cout << "\n[WARN] no SIMD version conv inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "] " << in_H << 'x' << in_W
             << " groups=" << groups_ << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC"
