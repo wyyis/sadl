@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +41,8 @@ template<typename T> class LeakyRelu : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
@@ -55,14 +55,14 @@ protected:
 template<typename T> bool LeakyRelu<T>::apply(std::vector<Tensor<T> *> &in)
 {
   assert(in.size() == 2);
-  assert(in[0]->dims() == out_.dims());
+  assert(in[0]->dims() == m_out.dims());
   const Tensor<T> &A = *in[1];
-  swap(*in[0], out_);
+  swap(*in[0], m_out);
   // keep same qunatiz as input
   const typename ComputationType<T>::type alpha = A[0];
 
   const int alpha_q = A.quantizer;
-  for (auto &x: out_)
+  for (auto &x: m_out)
   {
     if (x < 0)
     {
@@ -81,15 +81,12 @@ template<typename T> bool LeakyRelu<T>::init(const std::vector<Tensor<T> *> &in)
 {
   if (in.size() != 2)
     return false;
-  out_.resize(in[0]->dims());
-  initDone_ = true;
+  m_out.resize(in[0]->dims());
+  m_initDone = true;
   return true;
 }
 
-template<typename T> bool LeakyRelu<T>::loadInternal(std::istream &, Version)
-{
-  return true;
-}
+template<typename T> bool LeakyRelu<T>::loadInternal(std::istream &, Version) { return true; }
 
 }   // namespace layers
 }   // namespace sadl

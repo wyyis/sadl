@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +41,8 @@ template<typename T> class Expand : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
@@ -56,20 +56,20 @@ template<typename T> bool Expand<T>::apply(std::vector<Tensor<T> *> &in)
 {
   assert(in.size() == 2);
   // second layer is reshape prms, already process in init
-  out_.border_skip = in[0]->border_skip;   // adapt output width to bias
-  out_.quantizer   = in[0]->quantizer;
+  m_out.border_skip = in[0]->border_skip;   // adapt output width to bias
+  m_out.quantizer   = in[0]->quantizer;
   // border to skip??
   if (in[0]->size() == 1)
   {   // broadcast
     const auto v = (*in[0])[0];
-    fill(out_.begin(), out_.end(), v);
+    fill(m_out.begin(), m_out.end(), v);
   }
   else
   {
     // quick hack: to improve
-    if (out_.dims().size() == 4)
+    if (m_out.dims().size() == 4)
     {
-      const Dimensions d = out_.dims();
+      const Dimensions d = m_out.dims();
       assert(d[0] == 1);
       assert(in[0]->dims()[3] == 1);
       for (int i = 0; i < 1 /*d[0]*/; ++i)
@@ -81,9 +81,9 @@ template<typename T> bool Expand<T>::apply(std::vector<Tensor<T> *> &in)
             const auto offset_in0 = (d[2] * (d[1] * i + j) + k);
             const auto offset_in1 = d[3] * offset_in0;
             const auto v          = in[0]->data()[offset_in0];
-            for (int l = 0; l < out_.dims()[3]; ++l)
+            for (int l = 0; l < m_out.dims()[3]; ++l)
             {
-              out_.data()[offset_in1 + l] = v;
+              m_out.data()[offset_in1 + l] = v;
             }
           }
         }
@@ -139,16 +139,13 @@ template<typename T> bool Expand<T>::init(const std::vector<Tensor<T> *> &in)
     std::cerr << "[ERROR] value to expand not supported " << in[0]->dims() << " expand to " << dim << std::endl;
     return false;
   }
-  out_.resize(dim);
+  m_out.resize(dim);
   SADL_DBG(std::cout << "  - new shape: " << dim << std::endl);
-  initDone_ = true;
+  m_initDone = true;
   return true;
 }
 
-template<typename T> bool Expand<T>::loadInternal(std::istream &, Version)
-{
-  return true;
-}
+template<typename T> bool Expand<T>::loadInternal(std::istream &, Version) { return true; }
 
 }   // namespace layers
 }   // namespace sadl

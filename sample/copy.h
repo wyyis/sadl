@@ -7,57 +7,72 @@ using namespace std;
 template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::layers::Layer<T> &layerQ)
 {
   // from loadPrefix
-  layerQ.name_      = layer.name_;
-  layerQ.inputs_id_ = layer.inputs_id_;
+  layerQ.m_name      = layer.m_name;
+  layerQ.m_inputs_id = layer.m_inputs_id;
   // WARNING: SHOULD BE SYNC BY HAND WITH NEW LAYERS
   // IF LOADINTERNAL IMPLEMENTED FOR A LAYER
   switch (layerQ.op())
   {
-  case sadl::layers::OperationType::Add: break;
-  case sadl::layers::OperationType::BiasAdd: break;
-  case sadl::layers::OperationType::Concat: break;
+  case sadl::layers::OperationType::Add:
+    break;
+  case sadl::layers::OperationType::BiasAdd:
+    break;
+  case sadl::layers::OperationType::Concat:
+    break;
   case sadl::layers::OperationType::Const:
-    layerQ.out_.resize(layer.out_.dims());
-    for (int k = 0; k < layer.out_.size(); ++k)
-      layerQ.out_[k] = layer.out_[k];
+    layerQ.m_out.resize(layer.m_out.dims());
+    for (int k = 0; k < layer.m_out.size(); ++k)
+      layerQ.m_out[k] = layer.m_out[k];
     break;
   case sadl::layers::OperationType::Conv2D:
-    dynamic_cast<sadl::layers::Conv2D<T> &>(layerQ).strides_ = dynamic_cast<const sadl::layers::Conv2D<float> &>(layer).strides_;
-    dynamic_cast<sadl::layers::Conv2D<T> &>(layerQ).pads_    = dynamic_cast<const sadl::layers::Conv2D<float> &>(layer).pads_;
-    dynamic_cast<sadl::layers::Conv2D<T> &>(layerQ).groups_  = dynamic_cast<const sadl::layers::Conv2D<float> &>(layer).groups_;
+    dynamic_cast<sadl::layers::Conv2D<T> &>(layerQ).m_strides = dynamic_cast<const sadl::layers::Conv2D<float> &>(layer).m_strides;
+    dynamic_cast<sadl::layers::Conv2D<T> &>(layerQ).m_pads    = dynamic_cast<const sadl::layers::Conv2D<float> &>(layer).m_pads;
+    dynamic_cast<sadl::layers::Conv2D<T> &>(layerQ).m_groups  = dynamic_cast<const sadl::layers::Conv2D<float> &>(layer).m_groups;
     break;
   case sadl::layers::OperationType::Conv2DTranspose:
-    dynamic_cast<sadl::layers::Conv2DTranspose<T> &>(layerQ).strides_  = dynamic_cast<const sadl::layers::Conv2DTranspose<float> &>(layer).strides_;
-    dynamic_cast<sadl::layers::Conv2DTranspose<T> &>(layerQ).pads_     = dynamic_cast<const sadl::layers::Conv2DTranspose<float> &>(layer).pads_;
-    dynamic_cast<sadl::layers::Conv2DTranspose<T> &>(layerQ).out_pads_ = dynamic_cast<const sadl::layers::Conv2DTranspose<float> &>(layer).out_pads_;
+    dynamic_cast<sadl::layers::Conv2DTranspose<T> &>(layerQ).m_strides  = dynamic_cast<const sadl::layers::Conv2DTranspose<float> &>(layer).m_strides;
+    dynamic_cast<sadl::layers::Conv2DTranspose<T> &>(layerQ).m_pads     = dynamic_cast<const sadl::layers::Conv2DTranspose<float> &>(layer).m_pads;
+    dynamic_cast<sadl::layers::Conv2DTranspose<T> &>(layerQ).m_out_pads = dynamic_cast<const sadl::layers::Conv2DTranspose<float> &>(layer).m_out_pads;
     break;
-  case sadl::layers::OperationType::Copy: break;
-  case sadl::layers::OperationType::Identity: break;
-  case sadl::layers::OperationType::LeakyRelu: break;
-  case sadl::layers::OperationType::MatMul: break;
+  case sadl::layers::OperationType::Copy:
+    break;
+  case sadl::layers::OperationType::Identity:
+    break;
+  case sadl::layers::OperationType::LeakyRelu:
+    break;
+  case sadl::layers::OperationType::MatMul:
+    break;
   case sadl::layers::OperationType::MaxPool:
-    dynamic_cast<sadl::layers::MaxPool<T> &>(layerQ).kernel_  = dynamic_cast<const sadl::layers::MaxPool<float> &>(layer).kernel_;
-    dynamic_cast<sadl::layers::MaxPool<T> &>(layerQ).strides_ = dynamic_cast<const sadl::layers::MaxPool<float> &>(layer).strides_;
-    dynamic_cast<sadl::layers::MaxPool<T> &>(layerQ).pads_    = dynamic_cast<const sadl::layers::MaxPool<float> &>(layer).pads_;
+    dynamic_cast<sadl::layers::MaxPool<T> &>(layerQ).m_kernel  = dynamic_cast<const sadl::layers::MaxPool<float> &>(layer).m_kernel;
+    dynamic_cast<sadl::layers::MaxPool<T> &>(layerQ).m_strides = dynamic_cast<const sadl::layers::MaxPool<float> &>(layer).m_strides;
+    dynamic_cast<sadl::layers::MaxPool<T> &>(layerQ).m_pads    = dynamic_cast<const sadl::layers::MaxPool<float> &>(layer).m_pads;
     break;
-  case sadl::layers::OperationType::Maximum: break;
-  case sadl::layers::OperationType::Mul: break;
-  case sadl::layers::OperationType::Placeholder: /* do not copy q */; break;
-  case sadl::layers::OperationType::Relu: break;
-  case sadl::layers::OperationType::Reshape: break;
-  case sadl::layers::OperationType::OperationTypeCount: break;
+  case sadl::layers::OperationType::Maximum:
+    break;
+  case sadl::layers::OperationType::Mul:
+    break;
+  case sadl::layers::OperationType::Placeholder: /* do not copy q */;
+    break;
+  case sadl::layers::OperationType::Relu:
+    break;
+  case sadl::layers::OperationType::Reshape:
+    break;
+  case sadl::layers::OperationType::OperationTypeCount:
+    break;
   case sadl::layers::OperationType::Transpose:
-    dynamic_cast<sadl::layers::Transpose<T> &>(layerQ).perm_ = dynamic_cast<const sadl::layers::Transpose<float> &>(layer).perm_;
+    dynamic_cast<sadl::layers::Transpose<T> &>(layerQ).m_perm = dynamic_cast<const sadl::layers::Transpose<float> &>(layer).m_perm;
     break;
   case sadl::layers::OperationType::Flatten:
-    dynamic_cast<sadl::layers::Flatten<T> &>(layerQ).axis_ = dynamic_cast<const sadl::layers::Flatten<float> &>(layer).axis_;
-    dynamic_cast<sadl::layers::Flatten<T> &>(layerQ).dim_  = dynamic_cast<const sadl::layers::Flatten<float> &>(layer).dim_;
+    dynamic_cast<sadl::layers::Flatten<T> &>(layerQ).m_axis = dynamic_cast<const sadl::layers::Flatten<float> &>(layer).m_axis;
+    dynamic_cast<sadl::layers::Flatten<T> &>(layerQ).m_dim  = dynamic_cast<const sadl::layers::Flatten<float> &>(layer).m_dim;
     break;
-  case sadl::layers::OperationType::Shape: break;
-  case sadl::layers::OperationType::Expand: break;
+  case sadl::layers::OperationType::Shape:
+    break;
+  case sadl::layers::OperationType::Expand:
+    break;
   case sadl::layers::OperationType::Slice:
-    dynamic_cast<sadl::layers::Slice<T> &>(layerQ).start_d = dynamic_cast<const sadl::layers::Slice<float> &>(layer).start_d;
-    dynamic_cast<sadl::layers::Slice<T> &>(layerQ).end_d   = dynamic_cast<const sadl::layers::Slice<float> &>(layer).end_d;
+    dynamic_cast<sadl::layers::Slice<T> &>(layerQ).m_start_d = dynamic_cast<const sadl::layers::Slice<float> &>(layer).m_start_d;
+    dynamic_cast<sadl::layers::Slice<T> &>(layerQ).m_end_d   = dynamic_cast<const sadl::layers::Slice<float> &>(layer).m_end_d;
     break;
     // no default to get warning
   }
@@ -67,17 +82,17 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
 
 template<typename T> bool copy(const sadl::Model<float> &model, sadl::Model<T> &modelQ)
 {
-  modelQ.version_ = sadl::Version::sadl03;
-  modelQ.data_.clear();
-  modelQ.data_.resize(model.data_.size());
-  modelQ.ids_input  = model.ids_input;
-  modelQ.ids_output = model.ids_output;
-  int nb_layers     = modelQ.data_.size();
+  modelQ.m_version = sadl::Version::sadl03;
+  modelQ.m_data.clear();
+  modelQ.m_data.resize(model.m_data.size());
+  modelQ.m_ids_input  = model.m_ids_input;
+  modelQ.m_ids_output = model.m_ids_output;
+  int nb_layers     = modelQ.m_data.size();
   for (int k = 0; k < nb_layers; ++k)
   {
-    modelQ.data_[k].layer = sadl::createLayer<T>(model.data_[k].layer->id(), model.data_[k].layer->op());
-    modelQ.data_[k].inputs.clear();
-    copy(*model.data_[k].layer, *modelQ.data_[k].layer);
+    modelQ.m_data[k].layer = sadl::createLayer<T>(model.m_data[k].layer->id(), model.m_data[k].layer->op());
+    modelQ.m_data[k].inputs.clear();
+    copy(*model.m_data[k].layer, *modelQ.m_data[k].layer);
   }
   return true;
 }

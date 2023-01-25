@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -61,7 +61,9 @@ namespace layers
 inline std::string opName(const OperationType::Type op)
 {
 #define DIRTYCASEPRINT(X)                                                                                                                                      \
-  case OperationType::X: oss << #X; break
+  case OperationType::X:                                                                                                                                       \
+    oss << #X;                                                                                                                                                 \
+    break
   std::ostringstream oss;
   switch (op)
   {
@@ -86,7 +88,9 @@ inline std::string opName(const OperationType::Type op)
     DIRTYCASEPRINT(Shape);
     DIRTYCASEPRINT(Expand);
     DIRTYCASEPRINT(Slice);
-  default: oss << "??"; break;
+  default:
+    oss << "??";
+    break;
   }
   return oss.str();
 #undef DIRTYCASEPRINT

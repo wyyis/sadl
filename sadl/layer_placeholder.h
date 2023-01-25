@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,31 +42,31 @@ template<typename T> class Placeholder : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
   virtual bool mutateInput() const override { return true; }
-  int          quantizer() const { return q_; }
-  Dimensions   dims() const { return dims_; }
+  int          quantizer() const { return m_q; }
+  Dimensions   dims() const { return m_dims; }
 
 protected:
   virtual bool loadInternal(std::istream &file, Version v) override;
-  int          q_ = -1000;   // will override user input
-  Dimensions   dims_;        // can be use as a hint by user
+  int          m_q = -1000;   // will override user input
+  Dimensions   m_dims;        // can be use as a hint by user
   DUMP_MODEL_EXT;
 };
 
 template<typename T> bool Placeholder<T>::apply(std::vector<Tensor<T> *> &in)
 {
   assert(in.size() == 1);
-  swap(*in[0], out_);
-  if (q_ >= 0)
+  swap(*in[0], m_out);
+  if (m_q >= 0)
   {   // v2
-    out_.quantizer = q_;
+    m_out.quantizer = m_q;
   }
-  out_.border_skip = 0;
+  m_out.border_skip = 0;
   return true;
 }
 
@@ -74,9 +74,9 @@ template<typename T> bool Placeholder<T>::init(const std::vector<Tensor<T> *> &i
 {
   if (in.size() != 1)
     return false;
-  out_.resize(in[0]->dims());
-  dims_     = in[0]->dims();
-  initDone_ = true;
+  m_out.resize(in[0]->dims());
+  m_dims     = in[0]->dims();
+  m_initDone = true;
   return true;
 }
 
@@ -89,20 +89,20 @@ template<typename T> bool Placeholder<T>::loadInternal(std::istream &file, Versi
     std::cerr << "[ERROR] invalid nb of dimensions: " << x << std::endl;
     return false;
   }
-  dims_.resize(x);
-  file.read((char *) dims_.begin(), sizeof(int) * x);
+  m_dims.resize(x);
+  file.read((char *) m_dims.begin(), sizeof(int) * x);
   // HACK
-  if (dims_.size() == 1)
+  if (m_dims.size() == 1)
   {
-    x = dims_[0];
-    dims_.resize(2);
-    dims_[0] = 1;
-    dims_[1] = x;
+    x = m_dims[0];
+    m_dims.resize(2);
+    m_dims[0] = 1;
+    m_dims[1] = x;
   }
   // END HACK
-  file.read((char *) &q_, sizeof(q_));
-  SADL_DBG(std::cout << "  - dim: " << dims_ << std::endl);
-  SADL_DBG(std::cout << "  - q: " << q_ << std::endl);
+  file.read((char *) &m_q, sizeof(m_q));
+  SADL_DBG(std::cout << "  - dim: " << m_dims << std::endl);
+  SADL_DBG(std::cout << "  - q: " << m_q << std::endl);
   return true;
 }
 

@@ -2,77 +2,77 @@
 
 template<typename T> bool sadl::layers::Conv2D<T>::dump(std::ostream &file)
 {
-  int32_t x = strides_.size();
+  int32_t x = m_strides.size();
   file.write((const char *) &x, sizeof(int32_t));
-  file.write((const char *) strides_.begin(), strides_.size() * sizeof(int32_t));
-  x = pads_.size();
+  file.write((const char *) m_strides.begin(), m_strides.size() * sizeof(int32_t));
+  x = m_pads.size();
   file.write((const char *) &x, sizeof(int32_t));
-  file.write((const char *) pads_.begin(), pads_.size() * sizeof(int32_t));
-  file.write((const char *) &groups_, sizeof(groups_));
-  file.write((const char *) &q_, sizeof(q_));
+  file.write((const char *) m_pads.begin(), m_pads.size() * sizeof(int32_t));
+  file.write((const char *) &m_groups, sizeof(m_groups));
+  file.write((const char *) &m_q, sizeof(m_q));
   return true;
 }
 
 template<typename T> bool sadl::layers::Conv2DTranspose<T>::dump(std::ostream &file)
 {
-  int32_t x = strides_.size();
+  int32_t x = m_strides.size();
   file.write((const char *) &x, sizeof(int32_t));
-  file.write((const char *) strides_.begin(), strides_.size() * sizeof(int32_t));
-  x = pads_.size();
+  file.write((const char *) m_strides.begin(), m_strides.size() * sizeof(int32_t));
+  x = m_pads.size();
   file.write((const char *) &x, sizeof(int32_t));
-  file.write((const char *) pads_.begin(), pads_.size() * sizeof(int32_t));
-  x = out_pads_.size();
+  file.write((const char *) m_pads.begin(), m_pads.size() * sizeof(int32_t));
+  x = m_out_pads.size();
   file.write((const char *) &x, sizeof(int32_t));
-  file.write((const char *) out_pads_.begin(), out_pads_.size() * sizeof(int32_t));
-  file.write((const char *) &q_, sizeof(q_));
+  file.write((const char *) m_out_pads.begin(), m_out_pads.size() * sizeof(int32_t));
+  file.write((const char *) &m_q, sizeof(m_q));
   return true;
 }
 
 template<typename T> bool sadl::layers::Slice<T>::dump(std::ostream &file)
 {
-  file.write((const char *) &start_d, sizeof(start_d));
-  file.write((const char *) &end_d, sizeof(end_d));
+  file.write((const char *) &m_start_d, sizeof(m_start_d));
+  file.write((const char *) &m_end_d, sizeof(m_end_d));
   return true;
 }
 
 template<typename T> bool sadl::layers::MatMul<T>::dump(std::ostream &file)
 {
-  file.write((const char *) &q_, sizeof(q_));
+  file.write((const char *) &m_q, sizeof(m_q));
   return true;
 }
 
 template<typename T> bool sadl::layers::Mul<T>::dump(std::ostream &file)
 {
-  file.write((const char *) &q_, sizeof(q_));
+  file.write((const char *) &m_q, sizeof(m_q));
   return true;
 }
 
 template<typename T> bool sadl::layers::Placeholder<T>::dump(std::ostream &file)
 {
-  int32_t x = dims_.size();
+  int32_t x = m_dims.size();
   file.write((const char *) &x, sizeof(x));
-  file.write((const char *) dims_.begin(), sizeof(int) * x);
-  file.write((const char *) &q_, sizeof(q_));
+  file.write((const char *) m_dims.begin(), sizeof(int) * x);
+  file.write((const char *) &m_q, sizeof(m_q));
   return true;
 }
 
 template<typename T> bool sadl::layers::MaxPool<T>::dump(std::ostream &file)
 {
-  int32_t x = strides_.size();
+  int32_t x = m_strides.size();
   file.write((const char *) &x, sizeof(int32_t));
-  file.write((const char *) strides_.begin(), strides_.size() * sizeof(int32_t));
-  x = kernel_.size();
+  file.write((const char *) m_strides.begin(), m_strides.size() * sizeof(int32_t));
+  x = m_kernel.size();
   file.write((const char *) &x, sizeof(int32_t));
-  file.write((const char *) kernel_.begin(), kernel_.size() * sizeof(int32_t));
-  x = pads_.size();
+  file.write((const char *) m_kernel.begin(), m_kernel.size() * sizeof(int32_t));
+  x = m_pads.size();
   file.write((const char *) &x, sizeof(int32_t));
-  file.write((const char *) pads_.begin(), pads_.size() * sizeof(int32_t));
+  file.write((const char *) m_pads.begin(), m_pads.size() * sizeof(int32_t));
   return true;
 }
 
 template<typename T> bool sadl::layers::Flatten<T>::dump(std::ostream &file)
 {
-  int32_t x = axis_;
+  int32_t x = m_axis;
   file.write((const char *) &x, sizeof(int32_t));
   return true;
 }
@@ -80,9 +80,9 @@ template<typename T> bool sadl::layers::Flatten<T>::dump(std::ostream &file)
 template<typename T> bool sadl::layers::Const<T>::dump(std::ostream &file)
 {
   // load values
-  int32_t x = out_.dims().size();
+  int32_t x = m_out.dims().size();
   file.write((const char *) &x, sizeof(x));
-  file.write((const char *) out_.dims().begin(), x * sizeof(int));
+  file.write((const char *) m_out.dims().begin(), x * sizeof(int));
   if (std::is_same<T, int16_t>::value)
   {
     x = TensorInternalType::Int16;
@@ -103,8 +103,8 @@ template<typename T> bool sadl::layers::Const<T>::dump(std::ostream &file)
   file.write((const char *) &x, sizeof(x));
 
   if (!std::is_same<T, float>::value)
-    file.write((const char *) &out_.quantizer, sizeof(out_.quantizer));
-  file.write((const char *) out_.data(), out_.size() * sizeof(T));
+    file.write((const char *) &m_out.quantizer, sizeof(m_out.quantizer));
+  file.write((const char *) m_out.data(), m_out.size() * sizeof(T));
   return true;
 }
 
@@ -116,6 +116,12 @@ template<typename T> bool sadl::layers::Layer<T>::dump(std::ostream &file)
 
 template<typename T> bool sadl::Model<T>::dump(std::ostream &file)
 {
+  if (!file)
+  {
+    std::cerr << "The file is not open." << std::endl;
+    return false;
+  }
+
   char magic[9] = "SADL0003";
   file.write(magic, 8);
   int32_t x = 0;
@@ -132,30 +138,30 @@ template<typename T> bool sadl::Model<T>::dump(std::ostream &file)
   }
   file.write((const char *) &x, sizeof(int32_t));
 
-  int32_t nb_layers = data_.size();
+  int32_t nb_layers = m_data.size();
   file.write((const char *) &nb_layers, sizeof(int32_t));
-  int32_t nb = ids_input.size();
+  int32_t nb = m_ids_input.size();
   file.write((const char *) &nb, sizeof(int32_t));
-  file.write((const char *) ids_input.data(), sizeof(int32_t) * nb);
-  nb = ids_output.size();
+  file.write((const char *) m_ids_input.data(), sizeof(int32_t) * nb);
+  nb = m_ids_output.size();
   file.write((const char *) &nb, sizeof(int32_t));
-  file.write((const char *) ids_output.data(), sizeof(int32_t) * nb);
+  file.write((const char *) m_ids_output.data(), sizeof(int32_t) * nb);
 
   for (int k = 0; k < nb_layers; ++k)
   {
     // save header
-    int32_t x = data_[k].layer->id();
+    int32_t x = m_data[k].layer->id();
     file.write((const char *) &x, sizeof(int32_t));
-    x = data_[k].layer->op();
+    x = m_data[k].layer->op();
     file.write((const char *) &x, sizeof(int32_t));
     // savePrefix
-    int32_t L = data_[k].layer->name_.size();
+    int32_t L = m_data[k].layer->m_name.size();
     file.write((const char *) &L, sizeof(int32_t));
-    file.write((const char *) data_[k].layer->name_.c_str(), data_[k].layer->name_.size());
-    L = data_[k].layer->inputs_id_.size();
+    file.write((const char *) m_data[k].layer->m_name.c_str(), m_data[k].layer->m_name.size());
+    L = m_data[k].layer->m_inputs_id.size();
     file.write((const char *) &L, sizeof(int32_t));
-    file.write((const char *) data_[k].layer->inputs_id_.data(), data_[k].layer->inputs_id_.size() * sizeof(int32_t));
-    data_[k].layer->dump(file);
+    file.write((const char *) m_data[k].layer->m_inputs_id.data(), m_data[k].layer->m_inputs_id.size() * sizeof(int32_t));
+    m_data[k].layer->dump(file);
   }
   return true;
 }

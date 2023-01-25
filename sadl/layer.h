@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -88,7 +88,7 @@ public:
   using Id         = int32_t;
   using value_type = T;
 
-  Layer(Id iid, OperationType::Type iop) : id_(iid), op_(iop) {}
+  Layer(Id iid, OperationType::Type iop) : m_id(iid), m_op(iop) {}
   virtual ~Layer() = default;
 
   virtual bool apply(std::vector<Tensor<T> *> &in)      = 0;   // note: we ca modify inputs for optiz purpose
@@ -104,10 +104,10 @@ public:
   OperationType::Type    op() const;
   void                   replaceInputId(Id old, Id newid);
 #if DEBUG_MODEL
-  bool computed_ = false;
+  bool m_computed = false;
 #endif
 #if DEBUG_KEEP_OUTPUT
-  Tensor<T> outcopy_;
+  Tensor<T> m_outcopy;
 #endif
 #if DEBUG_COUNTERS
   int64_t cpt_op       = 0;
@@ -118,59 +118,35 @@ public:
 protected:
   bool                      loadPrefix(std::istream &file, Version v);
   virtual bool              loadInternal(std::istream &file, Version v) = 0;
-  Tensor<T>                 out_;
-  const Id                  id_;
-  const OperationType::Type op_;
-  std::string               name_;
-  std::vector<Id>           inputs_id_;
-  bool                      initDone_ = false;
+  Tensor<T>                 m_out;
+  const Id                  m_id;
+  const OperationType::Type m_op;
+  std::string               m_name;
+  std::vector<Id>           m_inputs_id;
+  bool                      m_initDone = false;
   template<typename> friend class sadl::Model;
   DUMP_MODEL_EXT;
 };
 
-template<typename T> bool Layer<T>::load(std::istream &file, Version v)
-{
-  return loadPrefix(file, v) && loadInternal(file, v);
-}
+template<typename T> bool Layer<T>::load(std::istream &file, Version v) { return loadPrefix(file, v) && loadInternal(file, v); }
 
-template<typename T> bool Layer<T>::initDone() const
-{
-  return initDone_;
-}
+template<typename T> bool Layer<T>::initDone() const { return m_initDone; }
 
-template<typename T> sadl::Tensor<T> &Layer<T>::output()
-{
-  return out_;
-}
+template<typename T> sadl::Tensor<T> &Layer<T>::output() { return m_out; }
 
-template<typename T> const std::string &Layer<T>::name() const
-{
-  return name_;
-}
+template<typename T> const std::string &Layer<T>::name() const { return m_name; }
 
-template<typename T> typename Layer<T>::Id Layer<T>::id() const
-{
-  return id_;
-}
+template<typename T> typename Layer<T>::Id Layer<T>::id() const { return m_id; }
 
-template<typename T> const std::vector<typename Layer<T>::Id> &Layer<T>::inputsId() const
-{
-  return inputs_id_;
-}
+template<typename T> const std::vector<typename Layer<T>::Id> &Layer<T>::inputsId() const { return m_inputs_id; }
 
-template<typename T> OperationType::Type Layer<T>::op() const
-{
-  return op_;
-}
+template<typename T> OperationType::Type Layer<T>::op() const { return m_op; }
 
-template<typename T> void Layer<T>::replaceInputId(Layer<T>::Id old, Layer<T>::Id newid)
-{
-  std::replace(inputs_id_.begin(), inputs_id_.end(), old, newid);
-}
+template<typename T> void Layer<T>::replaceInputId(Layer<T>::Id old, Layer<T>::Id newid) { std::replace(m_inputs_id.begin(), m_inputs_id.end(), old, newid); }
 
 template<typename T> bool Layer<T>::loadPrefix(std::istream &file, Version v)
 {
-  initDone_ = false;
+  m_initDone = false;
   int32_t L = 0;
   file.read((char *) &L, sizeof(int32_t));
   constexpr int maxLength = 2048;
@@ -178,14 +154,14 @@ template<typename T> bool Layer<T>::loadPrefix(std::istream &file, Version v)
   char s[maxLength];
   file.read(s, L);
   s[L]  = '\0';
-  name_ = s;
-  SADL_DBG(std::cout << "  - name: " << name_ << '\n');
+  m_name = s;
+  SADL_DBG(std::cout << "  - name: " << m_name << '\n');
 
   file.read((char *) &L, sizeof(int32_t));
   assert(L >= 0 && L < 8);
-  inputs_id_.resize(L);
+  m_inputs_id.resize(L);
   SADL_DBG(std::cout << "  - inputs: ");
-  for (auto &x: inputs_id_)
+  for (auto &x: m_inputs_id)
   {
     file.read((char *) &x, sizeof(int32_t));
     SADL_DBG(std::cout << x << ' ');

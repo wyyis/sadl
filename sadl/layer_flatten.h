@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +41,8 @@ template<typename T> class Flatten : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
@@ -50,17 +50,17 @@ public:
 
 protected:
   virtual bool loadInternal(std::istream &file, Version v) override;
-  int32_t      axis_;
-  Dimensions   dim_;   // dims after flatten
+  int32_t      m_axis;
+  Dimensions   m_dim;   // dims after flatten
   DUMP_MODEL_EXT;
 };
 
 template<typename T> bool Flatten<T>::apply(std::vector<Tensor<T> *> &in)
 {
   assert(in.size() == 1);
-  assert(in[0]->size() == out_.size());
+  assert(in[0]->size() == m_out.size());
   // resize done at init
-  swapData(*in[0], out_);
+  swapData(*in[0], m_out);
 
   return true;
 }
@@ -70,17 +70,17 @@ template<typename T> bool Flatten<T>::init(const std::vector<Tensor<T> *> &in)
   if (in.size() != 1)
     return false;
   SADL_DBG(std::cout << "  - " << in[0]->dims() << std::endl);
-  int nb_dim = axis_ + 1;
-  dim_.resize(nb_dim);
-  for (int k = 0; k < axis_; ++k)
-    dim_[k] = in[0]->dims()[k];
+  int nb_dim = m_axis + 1;
+  m_dim.resize(nb_dim);
+  for (int k = 0; k < m_axis; ++k)
+    m_dim[k] = in[0]->dims()[k];
   int s = 1;
-  for (int k = axis_; k < in[0]->dims().size(); ++k)
+  for (int k = m_axis; k < in[0]->dims().size(); ++k)
     s *= in[0]->dims()[k];
-  dim_[axis_] = s;
-  SADL_DBG(std::cout << "  - new shape: " << dim_ << std::endl);
-  out_.resize(dim_);
-  initDone_ = true;
+  m_dim[m_axis] = s;
+  SADL_DBG(std::cout << "  - new shape: " << m_dim << std::endl);
+  m_out.resize(m_dim);
+  m_initDone = true;
   return true;
 }
 
@@ -94,8 +94,8 @@ template<typename T> bool Flatten<T>::loadInternal(std::istream &file, Version)
     std::cerr << "[ERROR] invalid axis: " << x << std::endl;
     return false;
   }
-  axis_ = x;
-  SADL_DBG(std::cout << "  - start axis: " << axis_ << std::endl);
+  m_axis = x;
+  SADL_DBG(std::cout << "  - start axis: " << m_axis << std::endl);
   return true;
 }
 

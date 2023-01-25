@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,8 +45,8 @@ template<typename T> class MatMul : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
@@ -70,7 +70,7 @@ protected:
 #endif
 #endif
 
-  int q_ = 0;
+  int m_q = 0;
   DUMP_MODEL_EXT;
 };
 
@@ -97,9 +97,9 @@ template<typename T> bool MatMul<T>::apply(std::vector<Tensor<T> *> &in)
 
   const Tensor<T> &A{ *in[0] };
   const Tensor<T> &B{ *in[1] };
-  out_.quantizer = A.quantizer - q_;
-  assert(out_.quantizer >= 0);
-  assert(in[1]->quantizer + q_ >= 0);
+  m_out.quantizer = A.quantizer - m_q;
+  assert(m_out.quantizer >= 0);
+  assert(in[1]->quantizer + m_q >= 0);
   int dum = A.dims().size();
   // cases:
   // A: always a tensor
@@ -108,7 +108,7 @@ template<typename T> bool MatMul<T>::apply(std::vector<Tensor<T> *> &in)
   // 2- A [1,x] B[x] || A [1,x,y] B[y,z] || A [1,x,y,z] B[x,z,t]
   if (A.dims().size() - 1 == B.dims().size())
     dum--;
-  const int H{ A.dims().back() };   // to be chnaged if SIMD for more than dim1 and dim2
+  const int H{ A.dims().back() };   // to be changed if SIMD for more than dim1 and dim2
   switch (dum)
   {
   case 2:
@@ -124,8 +124,12 @@ template<typename T> bool MatMul<T>::apply(std::vector<Tensor<T> *> &in)
     else
       return apply_dim2<1>(in);
     break;
-  case 3: return apply_dim3<1>(in); break;
-  default: std::cerr << "Logical error MatMul::apply(std::vector<Tensor<T> *> &in)" << A.dims() << ' ' << B.dims() << std::endl; return false;
+  case 3:
+    return apply_dim3<1>(in);
+    break;
+  default:
+    std::cerr << "Logical error MatMul::apply(std::vector<Tensor<T> *> &in)" << A.dims() << ' ' << B.dims() << std::endl;
+    return false;
   }
 }
 
@@ -147,25 +151,29 @@ template<> inline bool MatMul<float>::apply_dim2_simd8(std::vector<Tensor<float>
   }
 #endif
   assert(H % 8 == 0);
+  constexpr int idx_start{ 0 };
+  const int     idx_end{ H };
   for (int b = 0; b < N; ++b)
   {
-    float *optr = out_.data() + R * b;
+    float *optr = m_out.data() + R * b;
     for (int t = 0; t < R; ++t)
     {
-      __m256       s    = _mm256_setzero_ps();
-      const float *aptr = A.data() + b * H;
-      const float *bptr = B.data() + t * H;   // T * i + t  (i, t); => B[t*H+i] if transposed
-      for (int i = 0; i < H; i += 8, aptr += 8, bptr += 8)
+      __m256 s = _mm256_setzero_ps();
       {
-        __m256 a = _mm256_load_ps(aptr);
-        __m256 b = _mm256_load_ps(bptr);
+        const float *aptr = A.data() + b * H + idx_start;
+        const float *bptr = B.data() + t * H + idx_start;   // T * i + t  (i, t); => B[t*H+i] if transposed
+        for (int i = idx_start; i < idx_end; i += 8, aptr += 8, bptr += 8)
+        {
+          __m256 a = _mm256_load_ps(aptr);
+          __m256 b = _mm256_load_ps(bptr);
 #if __FMA__
-        s = _mm256_fmadd_ps(a, b, s);
+          s = _mm256_fmadd_ps(a, b, s);
 #else
-        s = _mm256_add_ps(s, _mm256_mul_ps(a, b));   // s+= _mm256_mul_ps(a, b); //
+          s = _mm256_add_ps(s, _mm256_mul_ps(a, b));
 #endif
+        }
       }
-      optr[t] = sum8_float(s);   // out_(b, t) = sum8_float(s);
+      optr[t] = sum8_float(s);
     }
   }
   return true;
@@ -181,25 +189,27 @@ template<> inline bool MatMul<float>::apply_dim2_simd16(std::vector<Tensor<float
   const int            H{ A.dims()[last] };
   const int            R{ B.dims()[1] };
   assert(H % 16 == 0);
+  constexpr int idx_start{ 0 };
+  const int     idx_end{ H };
   for (int b = 0; b < N; ++b)
   {
-    float *optr = out_.data() + R * b;
+    float *optr = m_out.data() + R * b;
     for (int t = 0; t < R; ++t)
     {
-      __m512       s    = _mm512_setzero_ps();
-      const float *aptr = A.data() + b * H;
-
-      // The matrix of weights is transposed.
-      const float *bptr = B.data() + t * H;
-      for (int i = 0; i < H; i += 16, aptr += 16, bptr += 16)
+      __m512 s = _mm512_setzero_ps();
       {
-        __m512 a = _mm512_load_ps(aptr);
-        __m512 b = _mm512_load_ps(bptr);
+        const float *aptr = A.data() + b * H + idx_start;
+        const float *bptr = B.data() + t * H + idx_start;
+        for (int i = idx_start; i < idx_end; i += 16, aptr += 16, bptr += 16)
+        {
+          __m512 a = _mm512_load_ps(aptr);
+          __m512 b = _mm512_load_ps(bptr);
 #if __FMA__
-        s = _mm512_fmadd_ps(a, b, s);
+          s = _mm512_fmadd_ps(a, b, s);
 #else
-        s = _mm512_add_ps(s, _mm512_mul_ps(a, b));
+          s = _mm512_add_ps(s, _mm512_mul_ps(a, b));
 #endif
+        }
       }
       optr[t] = sum16_float(s);
     }
@@ -213,7 +223,7 @@ template<typename T> template<int NN> bool MatMul<T>::apply_dim2(std::vector<Ten
 {
   const Tensor<T> &A{ *in[0] };
   const Tensor<T> &B{ *in[1] };
-  const int        shift{ in[1]->quantizer + q_ };
+  const int        shift{ in[1]->quantizer + m_q };
   const int        last = A.dims().size() - 1;
   const int        N{ A.dims()[last - 1] };
   const int        H{ (A.dims()[last] / NN) * NN };
@@ -221,6 +231,8 @@ template<typename T> template<int NN> bool MatMul<T>::apply_dim2(std::vector<Ten
 #if __AVX2__ && DEBUG_SIMD
   std::cout << "\n[WARN] generic version matmul dim2 " << A.dims() << ' ' << B.dims() << "(H=" << H << ") " << (N * R * H) / 1000 << " kMAC" << std::endl;
 #endif   // SIMD
+  constexpr int idx_start{ 0 };
+  const int     idx_end{ H };
   if (A.dims().size() == 2)
   {
     for (int b = 0; b < N; ++b)
@@ -230,15 +242,17 @@ template<typename T> template<int NN> bool MatMul<T>::apply_dim2(std::vector<Ten
       {
         typename ComputationType<T>::type x    = 0;
         const T *                         bptr = B.data() + t * H;   // T * i + t  (i, t); => B[t*H+i] if transposed
-        for (int i = 0; i < H; ++i)
         {
-          x += (typename ComputationType<T>::type) aptr[i] * bptr[i];   // A(b,i)*B(i, t);
-          COUNTERS_MAC(bptr[i]);
+          for (int i = idx_start; i < idx_end; ++i)
+          {
+            x += (typename ComputationType<T>::type) aptr[i] * bptr[i];   // A(b,i)*B(i, t);
+            COUNTERS_MAC(bptr[i]);
+          }
         }
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        out_(b, t) = (T) x;
+        m_out(b, t) = (T) x;
       }
     }
   }
@@ -251,15 +265,17 @@ template<typename T> template<int NN> bool MatMul<T>::apply_dim2(std::vector<Ten
       {
         typename ComputationType<T>::type x    = 0;
         const T *                         bptr = B.data() + t * H;   // T * i + t  (i, t); => B[t*H+i] if transposed
-        for (int i = 0; i < H; ++i)
         {
-          x += (typename ComputationType<T>::type) aptr[i] * bptr[i];   // A(0,b,i)*B(i, t);
-          COUNTERS_MAC(bptr[i]);
+          for (int i = idx_start; i < idx_end; ++i)
+          {
+            x += (typename ComputationType<T>::type) aptr[i] * bptr[i];   // A(0,b,i)*B(i, t);
+            COUNTERS_MAC(bptr[i]);
+          }
         }
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        out_(0, b, t) = (T) x;
+        m_out(0, b, t) = (T) x;
       }
     }
   }
@@ -270,7 +286,7 @@ template<typename T> template<int NN> bool MatMul<T>::apply_dim3(std::vector<Ten
 {
   const Tensor<T> &A{ *in[0] };
   const Tensor<T> &B{ *in[1] };
-  const int        shift{ in[1]->quantizer + q_ };
+  const int        shift{ in[1]->quantizer + m_q };
   const int        last = A.dims().size() - 1;
   const int        N{ A.dims()[last - 2] };
   const int        H{ A.dims()[last - 1] };
@@ -280,6 +296,8 @@ template<typename T> template<int NN> bool MatMul<T>::apply_dim3(std::vector<Ten
 #if __AVX2__ && DEBUG_SIMD
   std::cout << "\n[WARN] generic version matmul dim3 " << A.dims() << ' ' << B.dims() << "(H=" << H << ") " << (N * R * H * W) / 1000 << " kMAC" << std::endl;
 #endif   // SIMD
+  constexpr int idx_start{ 0 };
+  const int     idx_end{ W };
   if (A.dims().size() == 3)
   {
     for (int b = 0; b < N; ++b)
@@ -289,15 +307,17 @@ template<typename T> template<int NN> bool MatMul<T>::apply_dim3(std::vector<Ten
         for (int t = 0; t < R; ++t)
         {
           typename ComputationType<T>::type x = 0;
-          for (int j = 0; j < W; ++j)
           {
-            x += (typename ComputationType<T>::type) A(b, i, j) * B(b, j, t);
-            COUNTERS_MAC(B(b, j, t));
+            for (int j = idx_start; j < idx_end; ++j)
+            {
+              x += (typename ComputationType<T>::type) A(b, i, j) * B(b, j, t);
+              COUNTERS_MAC(B(b, j, t));
+            }
           }
           ComputationType<T>::quantize(x, shift);
           COUNTERS(x);
           SATURATE(x);
-          out_(b, i, t) = (T) x;
+          m_out(b, i, t) = (T) x;
         }
       }
     }
@@ -311,15 +331,17 @@ template<typename T> template<int NN> bool MatMul<T>::apply_dim3(std::vector<Ten
         for (int t = 0; t < R; ++t)
         {
           typename ComputationType<T>::type x = 0;
-          for (int j = 0; j < W; ++j)
           {
-            x += (typename ComputationType<T>::type) A(0, b, i, j) * B(b, j, t);
-            COUNTERS_MAC(B(b, j, t));
+            for (int j = idx_start; j < idx_end; ++j)
+            {
+              x += (typename ComputationType<T>::type) A(0, b, i, j) * B(b, j, t);
+              COUNTERS_MAC(B(b, j, t));
+            }
           }
           ComputationType<T>::quantize(x, shift);
           COUNTERS(x);
           SATURATE(x);
-          out_(0, b, i, t) = (T) x;
+          m_out(0, b, i, t) = (T) x;
         }
       }
     }
@@ -332,12 +354,12 @@ template<typename T> bool MatMul<T>::apply_sparse_matmul(std::vector<Tensor<T> *
 {
   const Tensor<T> &A{ *in[0] };
   const Tensor<T> &B{ *in[1] };
-  const int        shift{ in[1]->quantizer + q_ };
+  const int        shift{ in[1]->quantizer + m_q };
   const int        last = A.dims().size() - 1;
   const int        N{ A.dims()[last - 1] };
   const int        H{ A.dims()[last] };
 
-  out_.fill(0);
+  m_out.fill(0);
 
   uint32_t offset_data = 0;
   uint16_t i           = 0;
@@ -362,7 +384,7 @@ template<typename T> bool MatMul<T>::apply_sparse_matmul(std::vector<Tensor<T> *
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        out_(b, i) = (T) x;
+        m_out(b, i) = (T) x;
         i++;
       }
     }
@@ -387,7 +409,7 @@ template<typename T> bool MatMul<T>::apply_sparse_matmul(std::vector<Tensor<T> *
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        out_(0, b, i) = (T) x;
+        m_out(0, b, i) = (T) x;
         i++;
       }
     }
@@ -403,12 +425,12 @@ template<> inline bool MatMul<int16_t>::apply_sparse_matmul_simd8(std::vector<Te
 
   const Tensor<int16_t> &A{ *in[0] };
   const Tensor<int16_t> &B{ *in[1] };
-  const int              shift{ in[1]->quantizer + q_ };
+  const int              shift{ in[1]->quantizer + m_q };
   const int              last = A.dims().size() - 1;
   const int              N{ A.dims()[last - 1] };
   const int              H{ A.dims()[last] };
 
-  out_.fill(0);
+  m_out.fill(0);
 
   int t = 0;
 
@@ -450,7 +472,7 @@ template<> inline bool MatMul<int16_t>::apply_sparse_matmul_simd8(std::vector<Te
 
       ComputationType<int16_t>::quantize(z, shift);
       SATURATE(z);
-      out_[t] = z;
+      m_out[t] = z;
 
       t++;
     }
@@ -458,10 +480,7 @@ template<> inline bool MatMul<int16_t>::apply_sparse_matmul_simd8(std::vector<Te
   return true;
 }
 
-template<typename T> bool MatMul<T>::apply_sparse_matmul_simd8(std::vector<Tensor<T> *> &in)
-{
-  return apply_sparse_matmul(in);
-}
+template<typename T> bool MatMul<T>::apply_sparse_matmul_simd8(std::vector<Tensor<T> *> &in) { return apply_sparse_matmul(in); }
 #endif
 
 #if __AVX2__
@@ -471,12 +490,12 @@ template<> inline bool MatMul<int16_t>::apply_sparse_matmul_simd16(std::vector<T
 
   const Tensor<int16_t> &A{ *in[0] };
   const Tensor<int16_t> &B{ *in[1] };
-  const int              shift{ in[1]->quantizer + q_ };
+  const int              shift{ in[1]->quantizer + m_q };
   const int              last = A.dims().size() - 1;
   const int              N{ A.dims()[last - 1] };
   const int              H{ A.dims()[last] };
 
-  out_.fill(0);
+  m_out.fill(0);
 
   int t = 0;
 
@@ -512,7 +531,7 @@ template<> inline bool MatMul<int16_t>::apply_sparse_matmul_simd16(std::vector<T
       typename ComputationType<int16_t>::type z = sum32_int16(s);
       ComputationType<int16_t>::quantize(z, shift);
       SATURATE(z);
-      out_[t] = z;
+      m_out[t] = z;
 
       t++;
     }
@@ -521,10 +540,7 @@ template<> inline bool MatMul<int16_t>::apply_sparse_matmul_simd16(std::vector<T
   return true;
 }
 
-template<typename T> bool MatMul<T>::apply_sparse_matmul_simd16(std::vector<Tensor<T> *> &in)
-{
-  return apply_sparse_matmul(in);
-}
+template<typename T> bool MatMul<T>::apply_sparse_matmul_simd16(std::vector<Tensor<T> *> &in) { return apply_sparse_matmul(in); }
 #endif
 #endif
 
@@ -590,16 +606,16 @@ template<typename T> bool MatMul<T>::init(const std::vector<Tensor<T> *> &in)
     }
   }
   dim[last] = in[1]->dims().back();
-  out_.resize(dim);
-  SADL_DBG(std::cout << "  - output matmul: " << out_.dims() << std::endl);
-  initDone_ = true;
+  m_out.resize(dim);
+  SADL_DBG(std::cout << "  - output matmul: " << m_out.dims() << std::endl);
+  m_initDone = true;
   return true;
 }
 
 template<typename T> bool MatMul<T>::loadInternal(std::istream &file, Version v)
 {
-  file.read((char *) &q_, sizeof(q_));
-  SADL_DBG(std::cout << "  - q: " << q_ << std::endl);
+  file.read((char *) &m_q, sizeof(m_q));
+  SADL_DBG(std::cout << "  - q: " << m_q << std::endl);
   return true;
 }
 

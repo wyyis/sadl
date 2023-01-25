@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,17 +41,17 @@ template<typename T> class MaxPool : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
 
 protected:
   virtual bool loadInternal(std::istream &file, Version v) override;
-  Dimensions   kernel_;
-  Dimensions   strides_;
-  Dimensions   pads_;
+  Dimensions   m_kernel;
+  Dimensions   m_strides;
+  Dimensions   m_pads;
   DUMP_MODEL_EXT;
 };
 
@@ -65,13 +65,13 @@ template<typename T> bool MaxPool<T>::apply(std::vector<Tensor<T> *> &in)
   assert(in[0]->dims().size() == 4);
 
   const Tensor<T> &A            = *in[0];
-  const int        N            = out_.dims()[0];
-  const int        H            = out_.dims()[1];
-  const int        W            = out_.dims()[2];
-  const int        D            = out_.dims()[3];
-  const int        offset_end   = kernel_[1] / 2;
-  const int        offset_start = kernel_[1] - 1 - offset_end;
-  const int        step         = strides_[1];
+  const int        N            = m_out.dims()[0];
+  const int        H            = m_out.dims()[1];
+  const int        W            = m_out.dims()[2];
+  const int        D            = m_out.dims()[3];
+  const int        offset_end   = m_kernel[1] / 2;
+  const int        offset_start = m_kernel[1] - 1 - offset_end;
+  const int        step         = m_strides[1];
   const int        in_H         = in[0]->dims()[1];
 
   // currently adhoc start
@@ -101,8 +101,8 @@ template<typename T> bool MaxPool<T>::apply(std::vector<Tensor<T> *> &in)
     exit(-1);
   }
 
-  out_.quantizer   = in[0]->quantizer;     // adapt output width to bias
-  out_.border_skip = in[0]->border_skip;   // to check
+  m_out.quantizer   = in[0]->quantizer;     // adapt output width to bias
+  m_out.border_skip = in[0]->border_skip;   // to check
 
   for (int im_nb = 0; im_nb < N; ++im_nb)
   {
@@ -128,7 +128,7 @@ template<typename T> bool MaxPool<T>::apply(std::vector<Tensor<T> *> &in)
               }
             }
           }
-          out_(im_nb, im_i, im_j, im_d) = xx;
+          m_out(im_nb, im_i, im_j, im_d) = xx;
         }
       }
     }
@@ -144,29 +144,29 @@ template<typename T> bool MaxPool<T>::init(const std::vector<Tensor<T> *> &in)
   if (in.size() != 1)
     return false;
   SADL_DBG(std::cout << "  - input maxpool: " << in[0]->dims() << std::endl);
-  SADL_DBG(std::cout << "  - stride: " << strides_ << std::endl);
-  SADL_DBG(std::cout << "  - kernel: " << kernel_ << std::endl);
+  SADL_DBG(std::cout << "  - stride: " << m_strides << std::endl);
+  SADL_DBG(std::cout << "  - kernel: " << m_kernel << std::endl);
   if (in[0]->dims().size() != 4)
     return false;
 
   // convervative check
-  if (kernel_.size() != 4)
+  if (m_kernel.size() != 4)
     return false;
   // no pooling on batch and depth
-  if (kernel_[0] != 1 || kernel_[3] != 1)
+  if (m_kernel[0] != 1 || m_kernel[3] != 1)
     return false;
 
   // no stride on batch and depth
-  if (strides_.size() != 4)
+  if (m_strides.size() != 4)
     return false;
-  if (strides_[0] != 1 || strides_[3] != 1)
+  if (m_strides[0] != 1 || m_strides[3] != 1)
     return false;
 
   // square filter
-  if (kernel_[1] != kernel_[2])
+  if (m_kernel[1] != m_kernel[2])
     return false;
   // square stride
-  if (strides_[1] != strides_[2])
+  if (m_strides[1] != m_strides[2])
     return false;
 
   Dimensions dim;
@@ -174,14 +174,14 @@ template<typename T> bool MaxPool<T>::init(const std::vector<Tensor<T> *> &in)
   dim.resize(4);
   dim[0]                   = in[0]->dims()[0];
   constexpr int dilatation = 1;
-  dim[1]                   = (int) floor((in[0]->dims()[1] + pads_[0] + pads_[2] - ((kernel_[1] - 1) * dilatation + 1)) / (float) strides_[1] + 1);
-  dim[2]                   = (int) floor((in[0]->dims()[2] + pads_[1] + pads_[3] - ((kernel_[2] - 1) * dilatation + 1)) / (float) strides_[2] + 1);
+  dim[1]                   = (int) floor((in[0]->dims()[1] + m_pads[0] + m_pads[2] - ((m_kernel[1] - 1) * dilatation + 1)) / (float) m_strides[1] + 1);
+  dim[2]                   = (int) floor((in[0]->dims()[2] + m_pads[1] + m_pads[3] - ((m_kernel[2] - 1) * dilatation + 1)) / (float) m_strides[2] + 1);
   dim[3]                   = in[0]->dims()[3];
 
-  out_.resize(dim);
-  SADL_DBG(std::cout << "  - output: " << out_.dims() << std::endl);
+  m_out.resize(dim);
+  SADL_DBG(std::cout << "  - output: " << m_out.dims() << std::endl);
 
-  initDone_ = true;
+  m_initDone = true;
   return true;
 }
 
@@ -195,31 +195,31 @@ template<typename T> bool MaxPool<T>::loadInternal(std::istream &file, Version v
     std::cerr << "[ERROR] invalid nb of dimensions strides: " << x << std::endl;
     return false;
   }
-  strides_.resize(x);
-  for (int k = 0; k < strides_.size(); ++k)
+  m_strides.resize(x);
+  for (int k = 0; k < m_strides.size(); ++k)
   {
     file.read((char *) &x, sizeof(x));
-    strides_[k] = x;
+    m_strides[k] = x;
   }
-  SADL_DBG(std::cout << "  - strides: " << strides_ << std::endl);
-  if (strides_.size() != 4)
+  SADL_DBG(std::cout << "  - strides: " << m_strides << std::endl);
+  if (m_strides.size() != 4)
   {
-    std::cerr << "[ERROR] invalid strides: " << strides_.size() << std::endl;
+    std::cerr << "[ERROR] invalid strides: " << m_strides.size() << std::endl;
     return false;
   }
-  if (strides_[0] != 1)
+  if (m_strides[0] != 1)
   {
-    std::cerr << "[ERROR] invalid strides[0]: " << strides_[0] << std::endl;
+    std::cerr << "[ERROR] invalid strides[0]: " << m_strides[0] << std::endl;
     return false;
   }
-  if (strides_[3] != 1)
+  if (m_strides[3] != 1)
   {
-    std::cerr << "[ERROR] invalid strides[3]: " << strides_[3] << std::endl;
+    std::cerr << "[ERROR] invalid strides[3]: " << m_strides[3] << std::endl;
     return false;
   }
-  if (strides_[1] != strides_[2])
+  if (m_strides[1] != m_strides[2])
   {
-    std::cerr << "[ERROR] invalid stride H Vs: " << strides_ << std::endl;
+    std::cerr << "[ERROR] invalid stride H Vs: " << m_strides << std::endl;
     return false;
   }
 
@@ -230,31 +230,31 @@ template<typename T> bool MaxPool<T>::loadInternal(std::istream &file, Version v
     std::cerr << "[ERROR] invalid nb of dimensions kernel: " << x << std::endl;
     return false;
   }
-  kernel_.resize(x);
-  for (int k = 0; k < kernel_.size(); ++k)
+  m_kernel.resize(x);
+  for (int k = 0; k < m_kernel.size(); ++k)
   {
     file.read((char *) &x, sizeof(x));
-    kernel_[k] = x;
+    m_kernel[k] = x;
   }
-  SADL_DBG(std::cout << "  - kernel: " << kernel_ << std::endl);
-  if (kernel_.size() != 4)
+  SADL_DBG(std::cout << "  - kernel: " << m_kernel << std::endl);
+  if (m_kernel.size() != 4)
   {
-    std::cerr << "[ERROR] invalid kernel: " << kernel_.size() << std::endl;
+    std::cerr << "[ERROR] invalid kernel: " << m_kernel.size() << std::endl;
     return false;
   }
-  if (kernel_[0] != 1)
+  if (m_kernel[0] != 1)
   {
-    std::cerr << "[ERROR] invalid kernel[0]: " << kernel_[0] << std::endl;
+    std::cerr << "[ERROR] invalid kernel[0]: " << m_kernel[0] << std::endl;
     return false;
   }
-  if (kernel_[3] != 1)
+  if (m_kernel[3] != 1)
   {
-    std::cerr << "[ERROR] invalid kernel[3]: " << kernel_[3] << std::endl;
+    std::cerr << "[ERROR] invalid kernel[3]: " << m_kernel[3] << std::endl;
     return false;
   }
-  if (kernel_[1] != kernel_[2])
+  if (m_kernel[1] != m_kernel[2])
   {
-    std::cerr << "[ERROR] invalid kernel H V: " << kernel_ << std::endl;
+    std::cerr << "[ERROR] invalid kernel H V: " << m_kernel << std::endl;
     return false;
   }
   file.read((char *) &x, sizeof(x));
@@ -263,13 +263,13 @@ template<typename T> bool MaxPool<T>::loadInternal(std::istream &file, Version v
     std::cerr << "[ERROR] invalid nb of dimensions: " << x << std::endl;
     return false;
   }
-  pads_.resize(x);
-  for (int k = 0; k < pads_.size(); ++k)
+  m_pads.resize(x);
+  for (int k = 0; k < m_pads.size(); ++k)
   {
     file.read((char *) &x, sizeof(x));
-    pads_[k] = x;
+    m_pads[k] = x;
   }
-  SADL_DBG(std::cout << "  - pads: " << pads_ << std::endl);
+  SADL_DBG(std::cout << "  - pads: " << m_pads << std::endl);
   return true;
 }
 

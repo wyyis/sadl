@@ -43,25 +43,25 @@ namespace layers
 {
 template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_5x5_s(const Tensor<T> &A, const Tensor<T> &kernel)
 {
-  const int in_H{ A.dims()[1] };
-  const int in_W{ A.dims()[2] };
-  const int in_D{ A.dims()[3] };
-  const int nb_filters{ kernel.dims()[2] };
+  const int     in_H{ A.dims()[1] };
+  const int     in_W{ A.dims()[2] };
+  const int     in_D{ A.dims()[3] };
+  const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_i{ 5 / 2 };
   constexpr int half_size_j{ 5 / 2 };
-  assert(half_size_i == pads_[0]);
-  assert(half_size_j == pads_[1]);
+  assert(half_size_i == m_pads[0]);
+  assert(half_size_j == m_pads[1]);
   constexpr int start_h{ 0 };
   constexpr int start_w{ 0 };
 #if DEBUG_SIMD && __AVX2__
   std::cout << "\n[WARN] no SIMD version conv inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "] " << in_H << 'x' << in_W
-            << " groups=" << groups_ << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC"
+            << " groups=" << m_groups << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC"
             << std::endl;
 #endif
   constexpr int im_nb     = 0;
-  const int     shift     = kernel.quantizer + q_;
-  const int     cout_by_g = nb_filters / groups_;
-  const int     cin_by_g  = in_D / groups_;
+  const int     shift     = kernel.quantizer + m_q;
+  const int     cout_by_g = nb_filters / m_groups;
+  const int     cin_by_g  = in_D / m_groups;
   for (int filter = 0; filter < nb_filters; ++filter)
   {
     int offset = (filter / cout_by_g) * cin_by_g;
@@ -76,7 +76,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_5x5_s(con
           for (int filter_j = -half_size_j; filter_j <= half_size_j; ++filter_j)
           {
             // fixed
-            for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
+            for (int filter_d = 0; filter_d < in_D / m_groups; ++filter_d)
             {
               int ii = im_i + filter_i;
               int jj = im_j + filter_j;
@@ -93,7 +93,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_5x5_s(con
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        out_(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(x);
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(x);
       }
     }
   }

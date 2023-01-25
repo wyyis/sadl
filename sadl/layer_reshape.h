@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +41,8 @@ template<typename T> class Reshape : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
@@ -58,9 +58,9 @@ template<typename T> bool Reshape<T>::apply(std::vector<Tensor<T> *> &in)
   assert(in.size() == 2);
   // second layer is reshape prms
   // assert(in[1]->dims().size()==2);
-  assert(in[0]->size() == out_.size());
+  assert(in[0]->size() == m_out.size());
   // resize done at init
-  swapData(*in[0], out_);
+  swapData(*in[0], m_out);
 
   return true;
 }
@@ -102,15 +102,12 @@ template<typename T> bool Reshape<T>::init(const std::vector<Tensor<T> *> &in)
     return false;
   }
   SADL_DBG(std::cout << "  - new shape: " << dim << std::endl);
-  out_.resize(dim);
-  initDone_ = true;
+  m_out.resize(dim);
+  m_initDone = true;
   return true;
 }
 
-template<typename T> bool Reshape<T>::loadInternal(std::istream &, Version)
-{
-  return true;
-}
+template<typename T> bool Reshape<T>::loadInternal(std::istream &, Version) { return true; }
 
 }   // namespace layers
 }   // namespace sadl

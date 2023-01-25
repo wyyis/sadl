@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +41,8 @@ template<typename T> class Relu : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
@@ -55,9 +55,9 @@ protected:
 template<typename T> bool Relu<T>::apply(std::vector<Tensor<T> *> &in)
 {
   assert(in.size() == 1);
-  assert(in[0]->dims() == out_.dims());
-  swap(*in[0], out_);
-  for (auto &x: out_)
+  assert(in[0]->dims() == m_out.dims());
+  swap(*in[0], m_out);
+  for (auto &x: m_out)
     x = (x < 0) ? 0 : x;
   return true;
 }
@@ -66,15 +66,12 @@ template<typename T> bool Relu<T>::init(const std::vector<Tensor<T> *> &in)
 {
   if (in.size() != 1)
     return false;
-  out_.resize(in[0]->dims());
-  initDone_ = true;
+  m_out.resize(in[0]->dims());
+  m_initDone = true;
   return true;
 }
 
-template<typename T> bool Relu<T>::loadInternal(std::istream &, Version)
-{
-  return true;
-}
+template<typename T> bool Relu<T>::loadInternal(std::istream &, Version) { return true; }
 
 }   // namespace layers
 }   // namespace sadl
