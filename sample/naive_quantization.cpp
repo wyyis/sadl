@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -96,19 +96,19 @@ template<typename T> void quantize(sadl::layers::Layer<T> &layerQ, const sadl::l
 {
   // layers with internal quantizer
   if (layerQ.op() == sadl::layers::OperationType::Conv2D)
-    dynamic_cast<sadl::layers::Conv2D<T> &>(layerQ).q_ = quantizer;
+    dynamic_cast<sadl::layers::Conv2D<T> &>(layerQ).m_q = quantizer;
   else if (layerQ.op() == sadl::layers::OperationType::MatMul)
-    dynamic_cast<sadl::layers::MatMul<T> &>(layerQ).q_ = quantizer;
+    dynamic_cast<sadl::layers::MatMul<T> &>(layerQ).m_q = quantizer;
   else if (layerQ.op() == sadl::layers::OperationType::Conv2DTranspose)
-    dynamic_cast<sadl::layers::Conv2DTranspose<T> &>(layerQ).q_ = quantizer;
+    dynamic_cast<sadl::layers::Conv2DTranspose<T> &>(layerQ).m_q = quantizer;
   else if (layerQ.op() == sadl::layers::OperationType::Mul)
-    dynamic_cast<sadl::layers::Mul<T> &>(layerQ).q_ = quantizer;
+    dynamic_cast<sadl::layers::Mul<T> &>(layerQ).m_q = quantizer;
   else if (layerQ.op() == sadl::layers::OperationType::Placeholder)
-    dynamic_cast<sadl::layers::Placeholder<T> &>(layerQ).q_ = quantizer;
+    dynamic_cast<sadl::layers::Placeholder<T> &>(layerQ).m_q = quantizer;
   else if (layerQ.op() == sadl::layers::OperationType::Const)
   {
-    layerQ.out_.quantizer = quantizer;
-    quantizeTensor(layer_float.out_, layerQ.out_);
+    layerQ.m_out.quantizer = quantizer;
+    quantizeTensor(layer_float.m_out, layerQ.m_out);
   }
   else
   {
@@ -152,7 +152,7 @@ template<typename T> void quantize(const string &filename, const string &filenam
     inputsQ[s].resize(inputs[s].dims());
   }
   int cpt = 0;
-  for (auto &id_input: modelQ.ids_input)
+  for (auto &id_input: modelQ.m_ids_input)
   {
     auto &L = modelQ.getLayer(id_input);
     if (L.layer->op() == sadl::layers::OperationType::Placeholder)
@@ -164,9 +164,9 @@ template<typename T> void quantize(const string &filename, const string &filenam
     }
   }
   // quantize each layer + set quantizer
-  for (int k = 0; k < (int) modelQ.data_.size(); ++k)
+  for (int k = 0; k < (int) modelQ.m_data.size(); ++k)
   {   //
-    auto &layer = *modelQ.data_[k].layer;
+    auto &layer = *modelQ.m_data[k].layer;
     if (toQuantize(layer.op()))
     {
       if (layer.id() >= (int) quantizers.size() || quantizers[layer.id()] == kNoQValue)

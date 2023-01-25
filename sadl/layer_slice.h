@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,16 +41,16 @@ template<typename T> class Slice : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
 
 protected:
   virtual bool loadInternal(std::istream &file, Version v) override;
-  int32_t      start_d;
-  int32_t      end_d;
+  int32_t      m_start_d;
+  int32_t      m_end_d;
   DUMP_MODEL_EXT;
 };
 
@@ -64,20 +64,20 @@ template<typename T> bool Slice<T>::apply(std::vector<Tensor<T> *> &in)
   constexpr int    im_nb   = 0;
   constexpr int    pow2_31 = std::numeric_limits<int>::max();
   // ONNX is sending 2^31 - 1 as value if end index is last channel
-  if (end_d == pow2_31)
+  if (m_end_d == pow2_31)
   {
-    end_d = in_D;
+    m_end_d = in_D;
   }
 
-  out_.quantizer = A.quantizer;
+  m_out.quantizer = A.quantizer;
 
   for (int im_i = 0; im_i < in_H; im_i++)
   {
     for (int im_j = 0; im_j < in_W; im_j++)
     {
-      for (int im_d = start_d; im_d < end_d; im_d++)
+      for (int im_d = m_start_d; im_d < m_end_d; im_d++)
       {
-        out_(im_nb, im_i, im_j, im_d - start_d) = A(im_nb, im_i, im_j, im_d);
+        m_out(im_nb, im_i, im_j, im_d - m_start_d) = A(im_nb, im_i, im_j, im_d);
       }
     }
   }
@@ -100,25 +100,25 @@ template<typename T> bool Slice<T>::init(const std::vector<Tensor<T> *> &in)
   dim[1] = in[0]->dims()[1];
   dim[2] = in[0]->dims()[2];
   // ONNX is sending 2^31 - 1 as value if end index is last channel
-  if (end_d == pow2_31)
+  if (m_end_d == pow2_31)
   {
-    end_d = in[0]->dims()[3];
+    m_end_d = in[0]->dims()[3];
   }
-  dim[3] = end_d - start_d;
-  out_.resize(dim);
-  SADL_DBG(std::cout << "  - output Slice: " << out_.dims() << std::endl);
+  dim[3] = m_end_d - m_start_d;
+  m_out.resize(dim);
+  SADL_DBG(std::cout << "  - output Slice: " << m_out.dims() << std::endl);
 
-  initDone_ = true;
+  m_initDone = true;
   return true;
 }
 
 template<typename T> bool Slice<T>::loadInternal(std::istream &file, Version /*v*/)
 {
-  file.read((char *) &start_d, sizeof(start_d));
-  SADL_DBG(std::cout << "  - start_d: " << start_d << std::endl);
+  file.read((char *) &m_start_d, sizeof(m_start_d));
+  SADL_DBG(std::cout << "  - start_d: " << m_start_d << std::endl);
 
-  file.read((char *) &end_d, sizeof(end_d));
-  SADL_DBG(std::cout << "  - end_d: " << end_d << std::endl);
+  file.read((char *) &m_end_d, sizeof(m_end_d));
+  SADL_DBG(std::cout << "  - end_d: " << m_end_d << std::endl);
 
   return true;
 }

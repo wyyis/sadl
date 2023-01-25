@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -102,10 +102,18 @@ int main(int argc, char **argv)
   sadl::layers::TensorInternalType::Type type_model = getModelType(filename_model);
   switch (type_model)
   {
-  case sadl::layers::TensorInternalType::Float: infer<float>(filename_model); break;
-  case sadl::layers::TensorInternalType::Int32: infer<int32_t>(filename_model); break;
-  case sadl::layers::TensorInternalType::Int16: infer<int16_t>(filename_model); break;
-  default: cerr << "[ERROR] unsupported type" << endl; exit(-1);
+  case sadl::layers::TensorInternalType::Float:
+    infer<float>(filename_model);
+    break;
+  case sadl::layers::TensorInternalType::Int32:
+    infer<int32_t>(filename_model);
+    break;
+  case sadl::layers::TensorInternalType::Int16:
+    infer<int16_t>(filename_model);
+    break;
+  default:
+    cerr << "[ERROR] unsupported type" << endl;
+    exit(-1);
   }
 
   return 0;

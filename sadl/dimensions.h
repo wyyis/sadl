@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,32 +48,32 @@ struct Dimensions
   Dimensions(std::initializer_list<int> L)
   {
     assert((int) L.size() <= MaxDim);
-    s_ = (int) L.size();
-    std::copy(L.begin(), L.end(), v_);
+    m_s = (int) L.size();
+    std::copy(L.begin(), L.end(), m_v);
   }
 
   void resize(int s)
   {
     assert(s <= MaxDim);
-    s_ = s;
+    m_s = s;
   }
-  int     size() const { return s_; }
+  int     size() const { return m_s; }
   int64_t nbElements() const
   {
-    return std::accumulate(v_, v_ + s_, (int64_t) 1, [](int64_t a, int64_t b) { return a * b; });
+    return std::accumulate(m_v, m_v + m_s, (int64_t) 1, [](int64_t a, int64_t b) { return a * b; });
   }
-  int            operator[](int k) const { return v_[k]; }
-  int &          operator[](int k) { return v_[k]; }
-  iterator       begin() { return v_; }
-  iterator       end() { return v_ + s_; }
-  const_iterator begin() const { return v_; }
-  const_iterator end() const { return v_ + s_; }
-  bool           operator==(const Dimensions &d) const { return d.s_ == s_ && std::equal(v_, v_ + s_, d.v_); }
-  int            back() const { return v_[s_ - 1]; }
+  int            operator[](int k) const { return m_v[k]; }
+  int &          operator[](int k) { return m_v[k]; }
+  iterator       begin() { return m_v; }
+  iterator       end() { return m_v + m_s; }
+  const_iterator begin() const { return m_v; }
+  const_iterator end() const { return m_v + m_s; }
+  bool           operator==(const Dimensions &d) const { return d.m_s == m_s && std::equal(m_v, m_v + m_s, d.m_v); }
+  int            back() const { return m_v[m_s - 1]; }
 
 private:
-  int v_[MaxDim] = {};
-  int s_         = 0;
+  int m_v[MaxDim] = {};
+  int m_s         = 0;
 };
 
 }   // namespace sadl

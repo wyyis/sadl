@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +41,8 @@ template<typename T> class Mul : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
@@ -50,7 +50,7 @@ public:
 
 protected:
   virtual bool          loadInternal(std::istream &file, Version v) override;
-  int                   q_ = 0;
+  int                   m_q = 0;
   template<int NN> bool apply_same_dim(std::vector<Tensor<T> *> &in);
   template<int NN> bool apply_singleton(std::vector<Tensor<T> *> &in);
   template<int NN> bool apply_dim2(std::vector<Tensor<T> *> &in);
@@ -71,12 +71,12 @@ template<typename T> bool Mul<T>::apply(std::vector<Tensor<T> *> &in)
     std::cerr << "  input aliasing" << std::endl;
     return false;
   }
-  swap(*in[0], out_);
-  out_.border_skip = std::max(out_.border_skip, in[1]->border_skip);
+  swap(*in[0], m_out);
+  m_out.border_skip = std::max(m_out.border_skip, in[1]->border_skip);
 
-  out_.quantizer -= q_;   // q0-q
-  assert(out_.quantizer >= 0);
-  assert(in[1]->quantizer + q_ >= 0);
+  m_out.quantizer -= m_q;   // q0-q
+  assert(m_out.quantizer >= 0);
+  assert(in[1]->quantizer + m_q >= 0);
 
   const int last = in[0]->dims().back();
   if (last % 16 == 0)
@@ -163,53 +163,51 @@ template<typename T> bool Mul<T>::apply(std::vector<Tensor<T> *> &in)
 
 template<typename T> template<int NN> bool Mul<T>::apply_same_dim(std::vector<Tensor<T> *> &in)
 {
-  const int shift = in[1]->quantizer + q_;
+  const int shift = in[1]->quantizer + m_q;
 #if __AVX2__ && DEBUG_SIMD
   std::cout << "\n[WARN] generic version mul sameDim (but likely vectorized) " << in[0]->dims() << ' ' << in[1]->dims() << " "
             << in[0]->dims().nbElements() / 1000 << " kMAC" << std::endl;
 #endif   // SIMD
-  // for (auto it0 = out_.begin(), it1 = in[1]->begin(); it0 != out_.end(); ++it0, ++it1) {
   const auto &B = *in[1];
-  const auto  N = (out_.size() / NN) * NN;
+  const auto  N = (m_out.size() / NN) * NN;
   for (int k = 0; k < N; ++k)
   {
-    typename ComputationType<T>::type x = out_[k];
+    typename ComputationType<T>::type x = m_out[k];
     x *= B[k];
     COUNTERS_MAC(B[k]);
     ComputationType<T>::quantize(x, shift);
     COUNTERS(x);
     SATURATE(x);
-    out_[k] = (T) x;
+    m_out[k] = (T) x;
   }
   return true;
 }
 
 template<typename T> template<int NN> bool Mul<T>::apply_singleton(std::vector<Tensor<T> *> &in)
 {
-  const int        shift = in[1]->quantizer + q_;
+  const int        shift = in[1]->quantizer + m_q;
   const Tensor<T> &B     = *in[1];
 #if __AVX2__ && DEBUG_SIMD
   std::cout << "[WARN] generic version mul singleton (but likely vectorized) " << in[0]->dims() << ' ' << in[1]->dims() << std::endl;
 #endif   // SIMD
   const T    value{ B[0] };
-  const auto N = (out_.size() / NN) * NN;
-  //  for (auto it0 = out_.begin(); it0 != out_.end(); ++it0) {
+  const auto N = (m_out.size() / NN) * NN;
   for (int k = 0; k < N; ++k)
   {
-    typename ComputationType<T>::type x = out_[k];
+    typename ComputationType<T>::type x = m_out[k];
     x *= value;
     COUNTERS_MAC(value);
     ComputationType<T>::quantize(x, shift);
     COUNTERS(x);
     SATURATE(x);
-    out_[k] = (T) x;
+    m_out[k] = (T) x;
   }
   return true;
 }
 
 template<typename T> template<int NN> bool Mul<T>::apply_dim2(std::vector<Tensor<T> *> &in)
 {
-  const int shift = in[1]->quantizer + q_;
+  const int shift = in[1]->quantizer + m_q;
 
 #if __AVX2__ && DEBUG_SIMD
   std::cout << "[WARN] generic version mul singleton (but likely vectorized) " << in[0]->dims() << ' ' << in[1]->dims() << std::endl;
@@ -221,20 +219,20 @@ template<typename T> template<int NN> bool Mul<T>::apply_dim2(std::vector<Tensor
   for (int n = 0; n < N; ++n)
     for (int i = 0; i < H; ++i)
     {
-      typename ComputationType<T>::type x = out_(n, i);
+      typename ComputationType<T>::type x = m_out(n, i);
       x *= B[i];
       COUNTERS_MAC(B[i]);
       ComputationType<T>::quantize(x, shift);
       COUNTERS(x);
       SATURATE(x);
-      out_(n, i) = (T) x;
+      m_out(n, i) = (T) x;
     }
   return true;
 }
 
 template<typename T> template<int NN> bool Mul<T>::apply_dim3(std::vector<Tensor<T> *> &in)
 {
-  const int shift = in[1]->quantizer + q_;
+  const int shift = in[1]->quantizer + m_q;
 
 #if __AVX2__ && DEBUG_SIMD
   std::cout << "[WARN] generic version mul singleton " << in[0]->dims() << ' ' << in[1]->dims() << std::endl;
@@ -248,20 +246,20 @@ template<typename T> template<int NN> bool Mul<T>::apply_dim3(std::vector<Tensor
     for (int i = 0; i < H; ++i)
       for (int j = 0; j < W; ++j)
       {
-        typename ComputationType<T>::type x = out_(n, i, j);
+        typename ComputationType<T>::type x = m_out(n, i, j);
         x *= B[j];
         COUNTERS_MAC(B[j]);
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        out_(n, i, j) = (T) x;
+        m_out(n, i, j) = (T) x;
       }
   return true;
 }
 
 template<typename T> template<int NN> bool Mul<T>::apply_dim4(std::vector<Tensor<T> *> &in)
 {
-  const int shift = in[1]->quantizer + q_;
+  const int shift = in[1]->quantizer + m_q;
 
 #if __AVX2__ && DEBUG_SIMD
   std::cout << "[WARN] generic version mul singleton" << in[0]->dims() << ' ' << in[1]->dims() << std::endl;
@@ -278,13 +276,13 @@ template<typename T> template<int NN> bool Mul<T>::apply_dim4(std::vector<Tensor
       for (int j = 0; j < W; ++j)
         for (int k = 0; k < K; ++k)
         {
-          typename ComputationType<T>::type x = out_(n, i, j, k);
+          typename ComputationType<T>::type x = m_out(n, i, j, k);
           x *= B[k];
           COUNTERS_MAC(B[k]);
           ComputationType<T>::quantize(x, shift);
           COUNTERS(x);
           SATURATE(x);
-          out_(n, i, j, k) = (T) x;
+          m_out(n, i, j, k) = (T) x;
         }
 
   return true;
@@ -296,29 +294,20 @@ template<> inline bool Mul<float>::apply_singleton_simd8(std::vector<Tensor<floa
   using T                = float;
   const Tensor<T> &B     = *in[1];
   const __m256     value = _mm256_set1_ps(B[0]);
-  for (int k = 0; k < out_.size(); k += 8)
+  for (int k = 0; k < m_out.size(); k += 8)
   {
-    float *aptr = out_.data() + k;
+    float *aptr = m_out.data() + k;
     __m256 a    = _mm256_load_ps(aptr);
     __m256 v    = _mm256_mul_ps(a, value);
     _mm256_store_ps(aptr, v);
   }
   return true;
 }
-template<> inline bool Mul<float>::apply_singleton_simd16(std::vector<Tensor<float> *> &in)
-{
-  return apply_singleton_simd8(in);
-}
+template<> inline bool Mul<float>::apply_singleton_simd16(std::vector<Tensor<float> *> &in) { return apply_singleton_simd8(in); }
 
-template<typename T> bool Mul<T>::apply_singleton_simd8(std::vector<Tensor<T> *> &in)
-{
-  return apply_singleton<8>(in);
-}
+template<typename T> bool Mul<T>::apply_singleton_simd8(std::vector<Tensor<T> *> &in) { return apply_singleton<8>(in); }
 
-template<typename T> bool Mul<T>::apply_singleton_simd16(std::vector<Tensor<T> *> &in)
-{
-  return apply_singleton<16>(in);
-}
+template<typename T> bool Mul<T>::apply_singleton_simd16(std::vector<Tensor<T> *> &in) { return apply_singleton<16>(in); }
 #endif
 // data in in[0]
 // bias in in[1]
@@ -357,15 +346,15 @@ template<typename T> bool Mul<T>::init(const std::vector<Tensor<T> *> &in)
     if (!(in[0]->dims() == in[1]->dims()))
       return false;
   }
-  out_.resize(in[0]->dims());
-  initDone_ = true;
+  m_out.resize(in[0]->dims());
+  m_initDone = true;
   return true;
 }
 
 template<typename T> bool Mul<T>::loadInternal(std::istream &file, Version v)
 {
-  file.read((char *) &q_, sizeof(q_));
-  SADL_DBG(std::cout << "  - q: " << q_ << std::endl);
+  file.read((char *) &m_q, sizeof(m_q));
+  SADL_DBG(std::cout << "  - q: " << m_q << std::endl);
 
   return true;
 }

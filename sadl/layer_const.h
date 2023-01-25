@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,8 +43,8 @@ template<typename T> class Const : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
@@ -67,7 +67,7 @@ template<typename T> bool Const<T>::init(const std::vector<Tensor<T> *> &in)
 {
   if (in.size() != 0)
     return false;
-  initDone_ = true;
+  m_initDone = true;
   return true;
 }
 
@@ -107,8 +107,8 @@ template<typename T> bool Const<T>::loadInternal(std::istream &file, Version v)
     std::cerr << "[ERROR] tensor too large? " << d.nbElements() << std::endl;
     return false;
   }
-  out_.resize(d);
-  SADL_DBG(std::cout << "  - tensor: " << out_.dims() << std::endl);
+  m_out.resize(d);
+  SADL_DBG(std::cout << "  - tensor: " << m_out.dims() << std::endl);
 
   file.read((char *) &x, sizeof(x));
 
@@ -117,24 +117,26 @@ template<typename T> bool Const<T>::loadInternal(std::istream &file, Version v)
   {
   case TensorInternalType::Int32:
     // assert((std::is_same<T,int32_t>::value));
-    file.read((char *) &out_.quantizer, sizeof(out_.quantizer));
-    readTensor<int32_t>(file, out_);
+    file.read((char *) &m_out.quantizer, sizeof(m_out.quantizer));
+    readTensor<int32_t>(file, m_out);
     break;
   case TensorInternalType::Float:
     // assert((std::is_same<T, float>::value));
-    readTensor<float>(file, out_);
+    readTensor<float>(file, m_out);
     break;
   case TensorInternalType::Int16:
     // assert((std::is_same<T, int16_t>::value));
-    file.read((char *) &out_.quantizer, sizeof(out_.quantizer));
-    readTensor<int16_t>(file, out_);
+    file.read((char *) &m_out.quantizer, sizeof(m_out.quantizer));
+    readTensor<int16_t>(file, m_out);
     break;
-  default: std::cerr << "[ERROR] unknown internal type " << x << std::endl; return false;
+  default:
+    std::cerr << "[ERROR] unknown internal type " << x << std::endl;
+    return false;
   }
 
-  SADL_DBG(std::cout << "  - data: "; for (int k = 0; k < 4 && k < out_.size(); ++k) std::cout << out_[k] << ' '; std::cout << " ...\n");
-  SADL_DBG(std::cout << "  - quantizer: " << out_.quantizer << std::endl);
-  // SADL_DBG(std::cout<<out_<<std::endl;)
+  SADL_DBG(std::cout << "  - data: "; for (int k = 0; k < 4 && k < m_out.size(); ++k) std::cout << m_out[k] << ' '; std::cout << " ...\n");
+  SADL_DBG(std::cout << "  - quantizer: " << m_out.quantizer << std::endl);
+  // SADL_DBG(std::cout<<m_out<<std::endl;)
   return true;
 }
 

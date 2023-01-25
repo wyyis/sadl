@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +41,8 @@ template<typename T> class Shape : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
@@ -66,16 +66,13 @@ template<typename T> bool Shape<T>::init(const std::vector<Tensor<T> *> &in)
   Dimensions d;
   d.resize(1);
   d[0] = in[0]->dims().size();
-  out_.resize(d);
-  copy(in[0]->dims().begin(), in[0]->dims().end(), out_.begin());
-  initDone_ = true;
+  m_out.resize(d);
+  copy(in[0]->dims().begin(), in[0]->dims().end(), m_out.begin());
+  m_initDone = true;
   return true;
 }
 
-template<typename T> bool Shape<T>::loadInternal(std::istream &, Version)
-{
-  return true;
-}
+template<typename T> bool Shape<T>::loadInternal(std::istream &, Version) { return true; }
 
 }   // namespace layers
 }   // namespace sadl

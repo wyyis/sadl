@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +41,8 @@ template<typename T> class Transpose : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
@@ -50,28 +50,28 @@ public:
 
 protected:
   virtual bool                        loadInternal(std::istream &file, Version v) override;
-  std::array<int, Dimensions::MaxDim> perm_;
+  std::array<int, Dimensions::MaxDim> m_perm;
 };
 
 // assume data in in[0] and shape in in[1]
 template<typename T> bool Transpose<T>::apply(std::vector<Tensor<T> *> &in)
 {
-  Dimensions d = out_.dims();   // {in[0]->dims()[0], in[0]->dims()[3], in[0]->dims()[1], in[0]->dims()[2]};
+  Dimensions d = m_out.dims();   // {in[0]->dims()[0], in[0]->dims()[3], in[0]->dims()[1], in[0]->dims()[2]};
 
   const auto &A  = *in[0];
   Dimensions  Ad = A.dims();
   if (d.size() == 1)
   {
-    swapData(*in[0], out_);
+    swapData(*in[0], m_out);
   }
   else if (d.size() == 4)
   {
-    out_.quantizer = in[0]->quantizer;
+    m_out.quantizer = in[0]->quantizer;
     // border to skip??
     std::array<int, 4>   index;
     std::array<int *, 4> index_mapped;
     for (int k = 0; k < 4; ++k)
-      index_mapped[k] = &index[perm_[k]];
+      index_mapped[k] = &index[m_perm[k]];
 
     for (index[0] = 0; index[0] < Ad[0]; ++index[0])
       for (index[1] = 0; index[1] < Ad[1]; ++index[1])
@@ -80,17 +80,17 @@ template<typename T> bool Transpose<T>::apply(std::vector<Tensor<T> *> &in)
           {
             auto offsetA    = (Ad[3] * (Ad[2] * (Ad[1] * index[0] + index[1]) + index[2]) + index[3]);
             auto offsetOut  = (d[3] * (d[2] * (d[1] * *index_mapped[0] + *index_mapped[1]) + *index_mapped[2]) + *index_mapped[3]);
-            out_[offsetOut] = A[offsetA];
+            m_out[offsetOut] = A[offsetA];
           }
   }
   else if (d.size() == 6)
   {   // very naive version
-    out_.quantizer = in[0]->quantizer;
+    m_out.quantizer = in[0]->quantizer;
     // border to skip??
     std::array<int, 6>   index;
     std::array<int *, 6> index_mapped;
     for (int k = 0; k < 6; ++k)
-      index_mapped[k] = &index[perm_[k]];
+      index_mapped[k] = &index[m_perm[k]];
 
     for (index[0] = 0; index[0] < Ad[0]; ++index[0])
       for (index[1] = 0; index[1] < Ad[1]; ++index[1])
@@ -103,12 +103,12 @@ template<typename T> bool Transpose<T>::apply(std::vector<Tensor<T> *> &in)
                 auto offsetOut =
                   d[5] * (d[4] * (d[3] * (d[2] * (d[1] * *index_mapped[0] + *index_mapped[1]) + *index_mapped[2]) + *index_mapped[3]) + *index_mapped[4])
                   + *index_mapped[5];
-                out_[offsetOut] = A[offsetA];
+                m_out[offsetOut] = A[offsetA];
               }
   }
   else
   {
-    std::cerr << "\nTODO Transpose case: " << in[0]->dims() << " => " << out_.dims() << std::endl;
+    std::cerr << "\nTODO Transpose case: " << in[0]->dims() << " => " << m_out.dims() << std::endl;
     exit(-1);
   }
   //  }
@@ -135,12 +135,12 @@ template<typename T> bool Transpose<T>::init(const std::vector<Tensor<T> *> &in)
     if ((*in[1]) (k) == -1)
     {   // keep dim of org
       dim[k]   = in[0]->dims()[k];
-      perm_[k] = k;
+      m_perm[k] = k;
     }
     else
     {
       dim[k]   = in[0]->dims()[(int) ((*in[1]) (k))];
-      perm_[k] = (int) ((*in[1]) (k));
+      m_perm[k] = (int) ((*in[1]) (k));
     }
   }
   if (dim.nbElements() != in[0]->dims().nbElements())
@@ -149,15 +149,12 @@ template<typename T> bool Transpose<T>::init(const std::vector<Tensor<T> *> &in)
     return false;
   }
   SADL_DBG(std::cout << "  - new shape: " << dim << std::endl);
-  out_.resize(dim);
-  initDone_ = true;
+  m_out.resize(dim);
+  m_initDone = true;
   return true;
 }
 
-template<typename T> bool Transpose<T>::loadInternal(std::istream &, Version)
-{
-  return true;
-}
+template<typename T> bool Transpose<T>::loadInternal(std::istream &, Version) { return true; }
 
 }   // namespace layers
 }   // namespace sadl

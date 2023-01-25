@@ -58,25 +58,55 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s_dis
   const int in_D{ A.dims()[3] };
   switch (in_D)
   {
-  case 1: conv2d_1x1_s_d<1, s_h, s_w>(A, kernel); break;
-  case 2: conv2d_1x1_s_d<2, s_h, s_w>(A, kernel); break;
-  case 4: conv2d_1x1_s_d<4, s_h, s_w>(A, kernel); break;
-  case 8: CONV_MOD8<8, s_h, s_w>(A, kernel); break;
-  case 16: CONV_MOD16<16, s_h, s_w>(A, kernel); break;
-  case 24: CONV_MOD8<24, s_h, s_w>(A, kernel); break;
-  case 32: CONV_MOD32<32, s_h, s_w>(A, kernel); break;
-  case 48: CONV_MOD16<48, s_h, s_w>(A, kernel); break;
-  case 64: CONV_MOD32<64, s_h, s_w>(A, kernel); break;
+  case 1:
+    conv2d_1x1_s_d<1, s_h, s_w>(A, kernel);
+    break;
+  case 2:
+    conv2d_1x1_s_d<2, s_h, s_w>(A, kernel);
+    break;
+  case 4:
+    conv2d_1x1_s_d<4, s_h, s_w>(A, kernel);
+    break;
+  case 8:
+    CONV_MOD8<8, s_h, s_w>(A, kernel);
+    break;
+  case 16:
+    CONV_MOD16<16, s_h, s_w>(A, kernel);
+    break;
+  case 24:
+    CONV_MOD8<24, s_h, s_w>(A, kernel);
+    break;
+  case 32:
+    CONV_MOD32<32, s_h, s_w>(A, kernel);
+    break;
+  case 48:
+    CONV_MOD16<48, s_h, s_w>(A, kernel);
+    break;
+  case 64:
+    CONV_MOD32<64, s_h, s_w>(A, kernel);
+    break;
   case 72:
     // better do 64 and than 8
     CONV_MOD8<72, s_h, s_w>(A, kernel);
     break;
-  case 96: CONV_MOD32<96, s_h, s_w>(A, kernel); break;
-  case 128: CONV_MOD32<128, s_h, s_w>(A, kernel); break;
-  case 160: CONV_MOD32<160, s_h, s_w>(A, kernel); break;
-  case 384: CONV_MOD32<384, s_h, s_w>(A, kernel); break;
-  case 480: CONV_MOD32<480, s_h, s_w>(A, kernel); break;
-  default: conv2d_1x1_s<s_h, s_w>(A, kernel); break;
+  case 96:
+    CONV_MOD32<96, s_h, s_w>(A, kernel);
+    break;
+  case 128:
+    CONV_MOD32<128, s_h, s_w>(A, kernel);
+    break;
+  case 160:
+    CONV_MOD32<160, s_h, s_w>(A, kernel);
+    break;
+  case 384:
+    CONV_MOD32<384, s_h, s_w>(A, kernel);
+    break;
+  case 480:
+    CONV_MOD32<480, s_h, s_w>(A, kernel);
+    break;
+  default:
+    conv2d_1x1_s<s_h, s_w>(A, kernel);
+    break;
   }
 #undef CONV_MOD8
 #undef CONV_MOD16
@@ -91,8 +121,8 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s(con
   const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_h{ 0 };
   constexpr int half_size_w{ 0 };
-  const int     top{ pads_[0] };
-  const int     left{ pads_[1] };
+  const int     top{ m_pads[0] };
+  const int     left{ m_pads[1] };
   const int     start_h{ half_size_h - top };
   const int     start_w{ half_size_w - left };
 
@@ -101,7 +131,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s(con
             << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
 #endif
   constexpr int im_nb = 0;
-  const int     shift = kernel.quantizer + q_;
+  const int     shift = kernel.quantizer + m_q;
   for (int im_i = start_h; im_i < in_H; im_i += s_h)
   {
     for (int im_j = start_w; im_j < in_W; im_j += s_w)
@@ -119,7 +149,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s(con
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        out_(im_nb, im_i / s_w, im_j / s_h, filter_nb) = static_cast<T>(x);
+        m_out(im_nb, im_i / s_w, im_j / s_h, filter_nb) = static_cast<T>(x);
       }
     }
   }
@@ -132,8 +162,8 @@ template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d
   const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_h{ 0 };
   constexpr int half_size_w{ 0 };
-  const int     top{ pads_[0] };
-  const int     left{ pads_[1] };
+  const int     top{ m_pads[0] };
+  const int     left{ m_pads[1] };
   const int     start_h{ half_size_h - top };
   const int     start_w{ half_size_w - left };
 
@@ -143,7 +173,7 @@ template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d
 #endif
 
   constexpr int im_nb = 0;
-  const int     shift = kernel.quantizer + q_;
+  const int     shift = kernel.quantizer + m_q;
   for (int im_i = start_h; im_i < in_H; im_i += s_h)
   {
     for (int im_j = start_w; im_j < in_W; im_j += s_w)
@@ -159,7 +189,7 @@ template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        out_(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
       }
     }
   }
@@ -177,8 +207,8 @@ template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd8
   const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_h{ 0 };
   constexpr int half_size_w{ 0 };
-  const int     top{ pads_[0] };
-  const int     left{ pads_[1] };
+  const int     top{ m_pads[0] };
+  const int     left{ m_pads[1] };
   const int     start_h{ half_size_h - top };
   const int     start_w{ half_size_w - left };
 #if DEBUG_SIMD && __AVX512F__
@@ -209,7 +239,7 @@ template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd8
           // s + m0; // s = _mm256_hadd_ps(s, m0);
 #endif
         }
-        out_(im_nb, im_i / s_h, im_j / s_w, filter) = sum8_float(s);
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = sum8_float(s);
       }
     }
   }
@@ -225,8 +255,8 @@ template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd1
   const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_h{ 0 };
   constexpr int half_size_w{ 0 };
-  const int     top{ pads_[0] };
-  const int     left{ pads_[1] };
+  const int     top{ m_pads[0] };
+  const int     left{ m_pads[1] };
   const int     start_h{ half_size_h - top };
   const int     start_w{ half_size_w - left };
   for (int im_i = start_h; im_i < in_H; im_i += s_h)
@@ -248,7 +278,7 @@ template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd1
           s               = _mm512_add_ps(s, m0);
 #endif
         }
-        out_(im_nb, im_i / s_h, im_j / s_w, filter) = sum16_float(s);
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = sum16_float(s);
       }
     }
   }
@@ -266,8 +296,8 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd8_conv
   const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_h{ 0 };
   constexpr int half_size_w{ 0 };
-  const int     top{ pads_[0] };
-  const int     left{ pads_[1] };
+  const int     top{ m_pads[0] };
+  const int     left{ m_pads[1] };
   const int     start_h{ half_size_h - top };
   const int     start_w{ half_size_w - left };
   static_assert(in_D % 8 == 0, "Should be used with mod16 filters.");
@@ -279,7 +309,7 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd8_conv
   }
 #endif
   constexpr int im_nb = 0;
-  const int     shift = kernel.quantizer + q_;
+  const int     shift = kernel.quantizer + m_q;
   for (int im_i = start_h; im_i < in_H; im_i += s_h)
   {
     for (int im_j = start_w; im_j < in_W; im_j += s_w)
@@ -299,7 +329,7 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd8_conv
         }
         typename ComputationType<T>::type z = (sum32_int16(s) >> shift);
         SATURATE(z);
-        out_(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<int16_t>(z);
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<int16_t>(z);
       }
     }
   }
@@ -315,8 +345,8 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd16_con
   const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_h{ 0 };
   constexpr int half_size_w{ 0 };
-  const int     top{ pads_[0] };
-  const int     left{ pads_[1] };
+  const int     top{ m_pads[0] };
+  const int     left{ m_pads[1] };
   const int     start_h{ half_size_h - top };
   const int     start_w{ half_size_w - left };
   static_assert(in_D % 16 == 0, "Should be used with mod16 filters.");
@@ -328,7 +358,7 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd16_con
   }
 #endif
   constexpr int im_nb = 0;
-  const int     shift = kernel.quantizer + q_;
+  const int     shift = kernel.quantizer + m_q;
   for (int im_i = start_h; im_i < in_H; im_i += s_h)
   {
     for (int im_j = start_w; im_j < in_W; im_j += s_w)
@@ -348,7 +378,7 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd16_con
         }
         typename ComputationType<T>::type z = (sum32_int16(s) >> shift);
         SATURATE(z);
-        out_(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<int16_t>(z);
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<int16_t>(z);
       }
     }
   }
@@ -364,12 +394,12 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd32_con
   const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_h{ 0 };
   constexpr int half_size_w{ 0 };
-  const int     top{ pads_[0] };
-  const int     left{ pads_[1] };
+  const int     top{ m_pads[0] };
+  const int     left{ m_pads[1] };
   const int     start_h{ half_size_h - top };
   const int     start_w{ half_size_w - left };
   constexpr int im_nb = 0;
-  const int     shift = kernel.quantizer + q_;
+  const int     shift = kernel.quantizer + m_q;
   for (int im_i = start_h; im_i < in_H; im_i += s_h)
   {
     for (int im_j = start_w; im_j < in_W; im_j += s_w)
@@ -390,7 +420,7 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd32_con
         typename ComputationType<int32_t>::type z = (_mm512_reduce_add_epi32(s) >> shift);
         COUNTERS(z);
         SATURATE(z);
-        out_(im_nb, im_i / s_h, im_j / s_w, filter) = z;
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = z;
       }
     }
   }

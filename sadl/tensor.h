@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,6 +40,7 @@
 #endif
 #include <numeric>
 #include <vector>
+#include <limits>
 #include "options.h"
 
 #include "dimensions.h"
@@ -176,44 +177,44 @@ public:
   const Dimensions &dims() const;
   int64_t           size() const;
 
-  const value_type *data() const { return data_.data(); }
-  value_type *      data() { return data_.data(); }
+  const value_type *data() const { return m_data.data(); }
+  value_type *      data() { return m_data.data(); }
 
   iterator begin()
   {
 #if SPARSE_SUPPORT
     assert(!isSparse());
 #endif
-    return data_.begin();
+    return m_data.begin();
   }
-  const_iterator begin() const { return data_.begin(); }
+  const_iterator begin() const { return m_data.begin(); }
   iterator       end()
   {
 #if SPARSE_SUPPORT
     assert(!isSparse());
 #endif
-    return data_.end();
+    return m_data.end();
   }
-  const_iterator end() const { return data_.end(); }
+  const_iterator end() const { return m_data.end(); }
 
   int                      quantizer   = 0;   // for int
   int                      border_skip = 0;
   static constexpr int64_t kMaxSize    = 32LL * 1024 * 1024 * 1024;
 
-  Data &getData() { return data_; }
+  Data &getData() { return m_data; }
 #if SPARSE_SUPPORT
-  const std::vector<value_type> &getDataSparse() const { return data_sparse_; }
-  const std::vector<index> &     getIndices() const { return indices_; }
-  const std::vector<uint16_t> &  getNbNonzerosCol() const { return nb_nonzeros_col_; }
-  bool                           isSparse() const { return !data_sparse_.empty(); }
+  const std::vector<value_type> &getDataSparse() const { return m_data_sparse; }
+  const std::vector<index> &     getIndices() const { return m_indices; }
+  const std::vector<uint16_t> &  getNbNonzerosCol() const { return m_nb_nonzeros_col; }
+  bool                           isSparse() const { return !m_data_sparse.empty(); }
 #endif
 private:
-  Dimensions dims_;
-  Data       data_;
+  Dimensions m_dims;
+  Data       m_data;
 #if SPARSE_SUPPORT
-  std::vector<value_type> data_sparse_;
-  std::vector<index>      indices_;
-  std::vector<uint16_t>   nb_nonzeros_col_;
+  std::vector<value_type> m_data_sparse;
+  std::vector<index>      m_indices;
+  std::vector<uint16_t>   m_nb_nonzeros_col;
   friend void             sparsify<>(Tensor<T> &weights);
 #endif
 
@@ -221,7 +222,7 @@ private:
   friend void swapData<>(Tensor<T> &t0, Tensor<T> &t1);
 #if DEBUG_PRINT
 public:
-  static bool verbose_;
+  static bool m_verbose;
 #endif
 };
 
@@ -253,8 +254,8 @@ template<typename T> bool isFullMatrixSparse(const Tensor<T> &weights, float spa
 
 template<typename T> void sparsify(Tensor<T> &weights)
 {
-  weights.data_sparse_.clear();
-  weights.nb_nonzeros_col_.clear();
+  weights.m_data_sparse.clear();
+  weights.m_nb_nonzeros_col.clear();
 
   uint16_t N = weights.dims()[0], M = weights.dims()[1];
   assert(N < (1 << 16) && M < (1 << 16));
@@ -265,11 +266,11 @@ template<typename T> void sparsify(Tensor<T> &weights)
 
     for (uint16_t i = 0; i < N; ++i)
     {
-      auto val = weights.data_[N * j + i];
+      auto val = weights.m_data[N * j + i];
       if (val != 0)
       {
-        weights.data_sparse_.push_back(val);
-        weights.indices_.push_back(i);
+        weights.m_data_sparse.push_back(val);
+        weights.m_indices.push_back(i);
         cnt_non_zeros++;
       }
     }
@@ -285,14 +286,14 @@ template<typename T> void sparsify(Tensor<T> &weights)
       int tmp = cnt_non_zeros;
       while (tmp % pad != 0)
       {
-        weights.data_sparse_.push_back(0);
-        weights.indices_.push_back(0);
+        weights.m_data_sparse.push_back(0);
+        weights.m_indices.push_back(0);
         tmp++;
       }
     }
 #endif
 
-    weights.nb_nonzeros_col_.push_back(cnt_non_zeros);
+    weights.m_nb_nonzeros_col.push_back(cnt_non_zeros);
   }
 }
 #endif
@@ -331,23 +332,23 @@ template<typename T> bool Tensor<T>::skip_border = false;
 
 template<typename T> void swap(Tensor<T> &t0, Tensor<T> &t1)
 {
-  std::swap(t0.dims_, t1.dims_);
-  std::swap(t0.data_, t1.data_);
+  std::swap(t0.m_dims, t1.m_dims);
+  std::swap(t0.m_data, t1.m_data);
   std::swap(t0.quantizer, t1.quantizer);
   std::swap(t0.border_skip, t1.border_skip);
 #if SPARSE_SUPPORT
-  std::swap(t0.data_sparse_, t1.data_sparse_);
+  std::swap(t0.m_data_sparse, t1.m_data_sparse);
 #endif
 }
 
 template<typename T> void swapData(Tensor<T> &t0, Tensor<T> &t1)
 {
   assert(t0.size() == t1.size());
-  std::swap(t0.data_, t1.data_);
+  std::swap(t0.m_data, t1.m_data);
   std::swap(t0.quantizer, t1.quantizer);
   std::swap(t0.border_skip, t1.border_skip);
 #if SPARSE_SUPPORT
-  std::swap(t0.data_sparse_, t1.data_sparse_);
+  std::swap(t0.m_data_sparse, t1.m_data_sparse);
 #endif
 }
 
@@ -359,26 +360,19 @@ template<typename T> Tensor<T>::Tensor(Dimensions d)
   resize(d);
 }
 
-template<typename T> const Dimensions &Tensor<T>::dims() const
-{
-  return dims_;
-}
+template<typename T> const Dimensions &Tensor<T>::dims() const { return m_dims; }
 
-template<typename T> int64_t Tensor<T>::size() const
-{
-  return data_.size();
-}
+template<typename T> int64_t Tensor<T>::size() const { return m_data.size(); }
 
 template<typename T> void Tensor<T>::resize(Dimensions d)
 {
 #if SPARSE_SUPPORT
-  data_sparse_.clear();
+  m_data_sparse.clear();
 #endif
-  dims_     = d;
-  int64_t m = dims_.nbElements();
-  //    for(auto x: dims_) m*=x;
+  m_dims     = d;
+  int64_t m = m_dims.nbElements();
   assert(m < kMaxSize);
-  data_.resize(m);
+  m_data.resize(m);
 }
 
 // TODO: variadic template to define all accesors
@@ -387,7 +381,7 @@ template<typename T> T &Tensor<T>::operator[](int i)
 #if SPARSE_SUPPORT
   assert(!isSparse());
 #endif
-  return data_[i];
+  return m_data[i];
 }
 
 template<typename T> T &Tensor<T>::operator()(int i)
@@ -395,28 +389,22 @@ template<typename T> T &Tensor<T>::operator()(int i)
 #if SPARSE_SUPPORT
   assert(!isSparse());
 #endif
-  assert(dims_.size() == 1);
-  assert(i < dims_[0] && i >= 0);
+  assert(m_dims.size() == 1);
+  assert(i < m_dims[0] && i >= 0);
 
-  return data_[i];
+  return m_data[i];
 }
 
-template<typename T> bool Tensor<T>::in(int i) const
-{
-  return dims_.size() == 1 && i < dims_[0] && i >= 0;
-}
+template<typename T> bool Tensor<T>::in(int i) const { return m_dims.size() == 1 && i < m_dims[0] && i >= 0; }
 
-template<typename T> T Tensor<T>::operator[](int i) const
-{
-  return data_[i];
-}
+template<typename T> T Tensor<T>::operator[](int i) const { return m_data[i]; }
 
 template<typename T> T Tensor<T>::operator()(int i) const
 {
-  assert(dims_.size() == 1);
-  assert(i < dims_[0] && i >= 0);
+  assert(m_dims.size() == 1);
+  assert(i < m_dims[0] && i >= 0);
 
-  return data_[i];
+  return m_data[i];
 }
 
 template<typename T> T &Tensor<T>::operator()(int i, int j)
@@ -424,53 +412,50 @@ template<typename T> T &Tensor<T>::operator()(int i, int j)
 #if SPARSE_SUPPORT
   assert(!isSparse());
 #endif
-  assert(dims_.size() == 2);
-  assert(i < dims_[0] && i >= 0);
-  assert(j < dims_[1] && j >= 0);
+  assert(m_dims.size() == 2);
+  assert(i < m_dims[0] && i >= 0);
+  assert(j < m_dims[1] && j >= 0);
 
-  return data_[(int64_t) dims_[1] * i + j];
+  return m_data[(int64_t) m_dims[1] * i + j];
 }
 
 template<typename T> T Tensor<T>::operator()(int i, int j) const
 {
-  assert(dims_.size() == 2);
-  assert(i < dims_[0] && i >= 0);
-  assert(j < dims_[1] && j >= 0);
+  assert(m_dims.size() == 2);
+  assert(i < m_dims[0] && i >= 0);
+  assert(j < m_dims[1] && j >= 0);
 
-  return data_[(int64_t) dims_[1] * i + j];
+  return m_data[(int64_t) m_dims[1] * i + j];
 }
 
-template<typename T> bool Tensor<T>::in(int i, int j) const
-{
-  return dims_.size() == 2 && i < dims_[0] && i >= 0 && j < dims_[1] && j >= 0;
-}
+template<typename T> bool Tensor<T>::in(int i, int j) const { return m_dims.size() == 2 && i < m_dims[0] && i >= 0 && j < m_dims[1] && j >= 0; }
 
 template<typename T> T &Tensor<T>::operator()(int i, int j, int k)
 {
 #if SPARSE_SUPPORT
   assert(!isSparse());
 #endif
-  assert(dims_.size() == 3);
-  assert(i < dims_[0] && i >= 0);
-  assert(j < dims_[1] && j >= 0);
-  assert(k < dims_[2] && k >= 0);
+  assert(m_dims.size() == 3);
+  assert(i < m_dims[0] && i >= 0);
+  assert(j < m_dims[1] && j >= 0);
+  assert(k < m_dims[2] && k >= 0);
 
-  return data_[(int64_t) dims_[2] * (dims_[1] * i + j) + k];
+  return m_data[(int64_t) m_dims[2] * (m_dims[1] * i + j) + k];
 }
 
 template<typename T> T Tensor<T>::operator()(int i, int j, int k) const
 {
-  assert(dims_.size() == 3);
-  assert(i < dims_[0] && i >= 0);
-  assert(j < dims_[1] && j >= 0);
-  assert(k < dims_[2] && k >= 0);
+  assert(m_dims.size() == 3);
+  assert(i < m_dims[0] && i >= 0);
+  assert(j < m_dims[1] && j >= 0);
+  assert(k < m_dims[2] && k >= 0);
 
-  return data_[(int64_t) dims_[2] * (dims_[1] * i + j) + k];
+  return m_data[(int64_t) m_dims[2] * (m_dims[1] * i + j) + k];
 }
 
 template<typename T> bool Tensor<T>::in(int i, int j, int k) const
 {
-  return dims_.size() == 3 && i < dims_[0] && i >= 0 && j < dims_[1] && j >= 0 && k < dims_[2] && k >= 0;
+  return m_dims.size() == 3 && i < m_dims[0] && i >= 0 && j < m_dims[1] && j >= 0 && k < m_dims[2] && k >= 0;
 }
 
 template<typename T> T &Tensor<T>::operator()(int i, int j, int k, int l)
@@ -478,46 +463,46 @@ template<typename T> T &Tensor<T>::operator()(int i, int j, int k, int l)
 #if SPARSE_SUPPORT
   assert(!isSparse());
 #endif
-  assert(dims_.size() == 4);
-  assert(i < dims_[0] && i >= 0);
-  assert(j < dims_[1] && j >= 0);
-  assert(k < dims_[2] && k >= 0);
-  assert(l < dims_[3] && l >= 0);
+  assert(m_dims.size() == 4);
+  assert(i < m_dims[0] && i >= 0);
+  assert(j < m_dims[1] && j >= 0);
+  assert(k < m_dims[2] && k >= 0);
+  assert(l < m_dims[3] && l >= 0);
 
-  return data_[(int64_t) dims_[3] * (dims_[2] * (dims_[1] * i + j) + k) + l];
+  return m_data[(int64_t) m_dims[3] * (m_dims[2] * (m_dims[1] * i + j) + k) + l];
 }
 
 template<typename T> bool Tensor<T>::in(int i, int j, int k, int l) const
 {
-  return dims_.size() == 4 && i < dims_[0] && i >= 0 && j < dims_[1] && j >= 0 && k < dims_[2] && k >= 0 && l < dims_[3] && l >= 0;
+  return m_dims.size() == 4 && i < m_dims[0] && i >= 0 && j < m_dims[1] && j >= 0 && k < m_dims[2] && k >= 0 && l < m_dims[3] && l >= 0;
 }
 
 template<typename T> const T *Tensor<T>::addr(int i, int j, int k, int l) const
 {
-  assert(dims_.size() == 4);
-  assert(i < dims_[0] && i >= 0);
-  assert(j < dims_[1] && j >= 0);
-  assert(k < dims_[2] && k >= 0);
-  assert(l < dims_[3] && l >= 0);
-  return &data_[(int64_t) dims_[3] * (dims_[2] * (dims_[1] * i + j) + k) + l];
+  assert(m_dims.size() == 4);
+  assert(i < m_dims[0] && i >= 0);
+  assert(j < m_dims[1] && j >= 0);
+  assert(k < m_dims[2] && k >= 0);
+  assert(l < m_dims[3] && l >= 0);
+  return &m_data[(int64_t) m_dims[3] * (m_dims[2] * (m_dims[1] * i + j) + k) + l];
 }
 
 template<typename T> T Tensor<T>::operator()(int i, int j, int k, int l) const
 {
-  assert(dims_.size() == 4);
-  assert(i < dims_[0] && i >= 0);
-  assert(j < dims_[1] && j >= 0);
-  assert(k < dims_[2] && k >= 0);
-  assert(l < dims_[3] && l >= 0);
-  return data_[(int64_t) dims_[3] * (dims_[2] * (dims_[1] * i + j) + k) + l];
+  assert(m_dims.size() == 4);
+  assert(i < m_dims[0] && i >= 0);
+  assert(j < m_dims[1] && j >= 0);
+  assert(k < m_dims[2] && k >= 0);
+  assert(l < m_dims[3] && l >= 0);
+  return m_data[(int64_t) m_dims[3] * (m_dims[2] * (m_dims[1] * i + j) + k) + l];
 }
 
 template<typename T> void Tensor<T>::fill(value_type value)
 {
 #if SPARSE_SUPPORT
-  data_sparse_.clear();
+  m_data_sparse.clear();
 #endif
-  std::fill(data_.begin(), data_.end(), value);
+  std::fill(m_data.begin(), m_data.end(), value);
 }
 
 }   // namespace sadl
@@ -526,10 +511,10 @@ template<typename T> void Tensor<T>::fill(value_type value)
 #include <sstream>
 
 #if DEBUG_PRINT
-template<typename T> bool sadl::Tensor<T>::verbose_ = true;
+template<typename T> bool sadl::Tensor<T>::m_verbose = true;
 
 #define SADL_DBG(X)                                                                                                                                            \
-  if (sadl::Tensor<T>::verbose_)                                                                                                                               \
+  if (sadl::Tensor<T>::m_verbose)                                                                                                                              \
   {                                                                                                                                                            \
     X;                                                                                                                                                         \
   }
@@ -633,7 +618,7 @@ template<typename T> std::ostream &operator<<(std::ostream &out, const Tensor<T>
   {
     uint32_t offset_data = 0;
     int      i           = 0;
-    out << "data_sparse_ = [\n";
+    out << "data_sparse = [\n";
     for (const auto &nb_nonzero: t.getNbNonzerosCol())
     {
       for (auto k = 0; k < nb_nonzero; ++k, ++offset_data)

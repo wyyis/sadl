@@ -44,20 +44,20 @@ namespace layers
 template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_peel(const Tensor<T> &A, const Tensor<T> &kernel)
 {
   constexpr int im_nb = 0;
-  const int     shift = kernel.quantizer + q_;
+  const int     shift = kernel.quantizer + m_q;
   const int     ihalf_size{ kernel.dims()[0] / 2 };
   const int     jhalf_size{ kernel.dims()[1] / 2 };
   int           in_H{ A.dims()[1] };
   int           in_W{ A.dims()[2] };
   const int     in_D{ A.dims()[3] };
   const int     nb_filters{ kernel.dims()[2] };
-  const int     top{ pads_[0] };
-  const int     left{ pads_[1] };
+  const int     top{ m_pads[0] };
+  const int     left{ m_pads[1] };
   int           start_h{ ihalf_size - top };
   int           start_w{ jhalf_size - left };
 
-  const int cout_by_g = nb_filters / groups_;
-  const int cin_by_g  = in_D / groups_;
+  const int cout_by_g = nb_filters / m_groups;
+  const int cin_by_g  = in_D / m_groups;
   for (int filter_nb = 0; filter_nb < nb_filters; ++filter_nb)
   {
     int offset = (filter_nb / cout_by_g) * cin_by_g;
@@ -73,7 +73,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
         {
           for (int filter_j = j0; filter_j <= j1; ++filter_j)
           {
-            for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
+            for (int filter_d = 0; filter_d < in_D / m_groups; ++filter_d)
             {
               int ii = im_i + filter_i;
               int jj = im_j + filter_j;
@@ -87,7 +87,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        out_(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
       };
 
       im_j = start_w;
@@ -137,7 +137,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
           {
             for (int filter_j = -start_w; filter_j <= jhalf_size; ++filter_j)
             {
-              for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
+              for (int filter_d = 0; filter_d < in_D / m_groups; ++filter_d)
               {
                 int ii = im_i + filter_i;
                 int jj = im_j + filter_j;
@@ -151,7 +151,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
           ComputationType<T>::quantize(x, shift);
           COUNTERS(x);
           SATURATE(x);
-          out_(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
+          m_out(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
         }
 
         im_j = ((in_W - jhalf_size - start_w) / s_w) * s_w + start_w;
@@ -163,7 +163,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
           {
             for (int filter_j = -jhalf_size; filter_j <= end_filter; ++filter_j)
             {
-              for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
+              for (int filter_d = 0; filter_d < in_D / m_groups; ++filter_d)
               {
                 int ii = im_i + filter_i;
                 int jj = im_j + filter_j;
@@ -177,7 +177,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
           ComputationType<T>::quantize(x, shift);
           COUNTERS(x);
           SATURATE(x);
-          out_(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
+          m_out(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
         }
       }
     }
@@ -193,7 +193,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
           {
             for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
             {
-              for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
+              for (int filter_d = 0; filter_d < in_D / m_groups; ++filter_d)
               {
                 int ii = im_i + filter_i;
                 int jj = im_j + filter_j;
@@ -208,7 +208,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
           ComputationType<T>::quantize(x, shift);
           COUNTERS(x);
           SATURATE(x);
-          out_(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
+          m_out(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
         }
         im_i = ((in_H - ihalf_size - start_h) / s_h) * s_h + start_h;
         if (im_i > 0 && im_i < in_H && im_i != start_h)
@@ -219,7 +219,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
           {
             for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
             {
-              for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
+              for (int filter_d = 0; filter_d < in_D / m_groups; ++filter_d)
               {
                 int ii = im_i + filter_i;
                 int jj = im_j + filter_j;
@@ -233,7 +233,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
           ComputationType<T>::quantize(x, shift);
           COUNTERS(x);
           SATURATE(x);
-          out_(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
+          m_out(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
         }
       }
     }
@@ -247,17 +247,17 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
   const int     jhalf_size{ kernel.dims()[1] / 2 };
   const int     in_D{ A.dims()[3] };
   const int     nb_filters{ kernel.dims()[2] };
-  const int     shift     = kernel.quantizer + q_;
-  const int     cout_by_g = nb_filters / groups_;
-  const int     cin_by_g  = in_D / groups_;
-  const int     top{ pads_[0] };
-  const int     left{ pads_[1] };
+  const int     shift     = kernel.quantizer + m_q;
+  const int     cout_by_g = nb_filters / m_groups;
+  const int     cin_by_g  = in_D / m_groups;
+  const int     top{ m_pads[0] };
+  const int     left{ m_pads[1] };
   int           in_H{ A.dims()[1] };
   int           in_W{ A.dims()[2] };
   int           start_h{ ihalf_size - top };
   int           start_w{ jhalf_size - left };
 #if DEBUG_SIMD && __AVX2__
-  std::cout << "\n[WARN] generic version conv " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << groups_ << " inD=" << in_D << " outD=" << nb_filters
+  std::cout << "\n[WARN] generic version conv " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D << " outD=" << nb_filters
             << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << "?? kMAC" << std::endl;
 #endif
@@ -275,7 +275,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
         {   // fixed
           for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
           {   // fixed
-            for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
+            for (int filter_d = 0; filter_d < in_D / m_groups; ++filter_d)
             {
               int ii = im_i + filter_i;
               int jj = im_j + filter_j;
@@ -289,7 +289,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        out_(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(x);
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(x);
       }
     }
   }
@@ -301,15 +301,15 @@ template<typename T> template<int in_D, int ihalf_size, int jhalf_size> void Con
   constexpr int s_h        = 1;
   constexpr int s_w        = 1;
   constexpr int im_nb      = 0;
-  const int     shift      = kernel.quantizer + q_;
-  const int     top{ pads_[0] };
-  const int     left{ pads_[1] };
+  const int     shift      = kernel.quantizer + m_q;
+  const int     top{ m_pads[0] };
+  const int     left{ m_pads[1] };
   int           in_H{ A.dims()[1] };
   int           in_W{ A.dims()[2] };
   int           start_h{ ihalf_size - top };
   int           start_w{ jhalf_size - left };
 #if DEBUG_SIMD && __AVX2__
-  std::cout << "\n[WARN] partially generic version conv " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << groups_ << " inD=" << in_D
+  std::cout << "\n[WARN] partially generic version conv " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D
             << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << "?? kMAC" << std::endl;
 #endif
@@ -338,7 +338,7 @@ template<typename T> template<int in_D, int ihalf_size, int jhalf_size> void Con
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        out_(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(x);
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(x);
       }
     }
   }
@@ -348,7 +348,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
 {
   const int in_D{ A.dims()[3] };
   const int nb_filters{ kernel.dims()[2] };
-  if (in_D % 8 == 0 && in_D == groups_ && in_D == nb_filters && s_h == 1 && s_w == 1)
+  if (in_D % 8 == 0 && in_D == m_groups && in_D == nb_filters && s_h == 1 && s_w == 1)
   {
     if (kernel.dims()[0] / 2 == 0 && kernel.dims()[1] / 2 == 1)
     {

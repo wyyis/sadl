@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +41,8 @@ template<typename T> class Maximum : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
@@ -61,7 +61,7 @@ template<typename T> bool Maximum<T>::apply(std::vector<Tensor<T> *> &in)
     return false;
   }
   const int shift = -(in[1]->quantizer - in[0]->quantizer);
-  swap(*in[0], out_);
+  swap(*in[0], m_out);
 
   /*
   Looking at the initialization, if the condition
@@ -70,7 +70,7 @@ template<typename T> bool Maximum<T>::apply(std::vector<Tensor<T> *> &in)
   */
   if (in[0]->dims() == in[1]->dims())
   {
-    for (auto it0 = out_.begin(), it1 = in[1]->begin(); it0 != out_.end(); ++it0, ++it1)
+    for (auto it0 = m_out.begin(), it1 = in[1]->begin(); it0 != m_out.end(); ++it0, ++it1)
     {
       T z = *it1;
       ComputationType<T>::shift_left(z, shift);
@@ -84,7 +84,7 @@ template<typename T> bool Maximum<T>::apply(std::vector<Tensor<T> *> &in)
     {
       T value{ B[0] };
       ComputationType<T>::shift_left(value, shift);
-      for (auto it0 = out_.begin(); it0 != out_.end(); ++it0)
+      for (auto it0 = m_out.begin(); it0 != m_out.end(); ++it0)
       {
         *it0 = std::max(*it0, value);
       }
@@ -98,7 +98,7 @@ template<typename T> bool Maximum<T>::apply(std::vector<Tensor<T> *> &in)
         {
           T z = B[i];
           ComputationType<T>::shift_left(z, shift);
-          out_(n, i) = std::max(out_(n, i), z);
+          m_out(n, i) = std::max(m_out(n, i), z);
         }
     }
     else if (in[0]->dims().size() == 3)
@@ -112,7 +112,7 @@ template<typename T> bool Maximum<T>::apply(std::vector<Tensor<T> *> &in)
           {
             T z = B[j];
             ComputationType<T>::shift_left(z, shift);
-            out_(n, i, j) = std::max(out_(n, i, j), z);
+            m_out(n, i, j) = std::max(m_out(n, i, j), z);
           }
     }
     else if (in[0]->dims().size() == 4)
@@ -128,7 +128,7 @@ template<typename T> bool Maximum<T>::apply(std::vector<Tensor<T> *> &in)
             {
               T z = B[k];
               ComputationType<T>::shift_left(z, shift);
-              out_(n, i, j, k) = std::max(out_(n, i, j, k), z);
+              m_out(n, i, j, k) = std::max(m_out(n, i, j, k), z);
             }
     }
   }
@@ -169,15 +169,12 @@ template<typename T> bool Maximum<T>::init(const std::vector<Tensor<T> *> &in)
       return false;
     }
   }
-  out_.resize(in[0]->dims());
-  initDone_ = true;
+  m_out.resize(in[0]->dims());
+  m_initDone = true;
   return true;
 }
 
-template<typename T> bool Maximum<T>::loadInternal(std::istream &, Version)
-{
-  return true;
-}
+template<typename T> bool Maximum<T>::loadInternal(std::istream &, Version) { return true; }
 
 }   // namespace layers
 }   // namespace sadl

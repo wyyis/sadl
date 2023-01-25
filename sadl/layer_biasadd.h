@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +41,8 @@ template<typename T> class BiasAdd : public Add<T>
 {
 public:
   using Add<T>::Add;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
@@ -58,15 +58,15 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
   }
 
   const int shift = in[0]->quantizer - in[1]->quantizer;
-  swap(*in[0], out_);
+  swap(*in[0], m_out);
   // adapt output width to second input (which are the bias) in order to be able to rescale as desired the input
-  out_.quantizer = in[1]->quantizer;
+  m_out.quantizer = in[1]->quantizer;
 
   if (shift < 0)
   {
     if (in[0]->dims() == in[1]->dims())
     {
-      for (auto it0 = out_.begin(), it1 = in[1]->begin(); it0 != out_.end(); ++it0, ++it1)
+      for (auto it0 = m_out.begin(), it1 = in[1]->begin(); it0 != m_out.end(); ++it0, ++it1)
       {
         typename ComputationType<T>::type z = *it0;
         ComputationType<T>::shift_left(z, -shift);
@@ -83,7 +83,7 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
       {   // ie in[0]->dims().size() == 1? happen if in[1] is a Const
         const Tensor<T> &B     = *in[1];
         const T          value = B[0];
-        for (auto &x: out_)
+        for (auto &x: m_out)
         {
           typename ComputationType<T>::type z = x;
           ComputationType<T>::shift_left(z, -shift);
@@ -102,12 +102,12 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
         for (int n = 0; n < N; ++n)
           for (int i = 0; i < H; ++i)
           {
-            typename ComputationType<T>::type z = out_(n, i);
+            typename ComputationType<T>::type z = m_out(n, i);
             ComputationType<T>::shift_left(z, -shift);
             z += B[i];
             COUNTERS(z);
             SATURATE(z);
-            out_(n, i) = z;
+            m_out(n, i) = z;
           }
       }
       else if (in[0]->dims().size() == 3)
@@ -121,12 +121,12 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
           for (int i = 0; i < H; ++i)
             for (int j = 0; j < W; ++j)
             {
-              typename ComputationType<T>::type z = out_(n, i, j);
+              typename ComputationType<T>::type z = m_out(n, i, j);
               ComputationType<T>::shift_left(z, -shift);
               z += B[j];
               COUNTERS(z);
               SATURATE(z);
-              out_(n, i, j) = z;
+              m_out(n, i, j) = z;
             }
       }
       else if (in[0]->dims().size() == 4)
@@ -142,12 +142,12 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
             for (int j = 0; j < W; ++j)
               for (int k = 0; k < K; ++k)
               {
-                typename ComputationType<T>::type z = out_(n, i, j, k);
+                typename ComputationType<T>::type z = m_out(n, i, j, k);
                 ComputationType<T>::shift_left(z, -shift);
                 z += B[k];
                 COUNTERS(z);
                 SATURATE(z);
-                out_(n, i, j, k) = z;
+                m_out(n, i, j, k) = z;
               }
       }
     }
@@ -156,7 +156,7 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
   {
     if (in[0]->dims() == in[1]->dims())
     {
-      for (auto it0 = out_.begin(), it1 = in[1]->begin(); it0 != out_.end(); ++it0, ++it1)
+      for (auto it0 = m_out.begin(), it1 = in[1]->begin(); it0 != m_out.end(); ++it0, ++it1)
       {
         typename ComputationType<T>::type z = *it0;
         ComputationType<T>::quantize(z, shift);
@@ -172,7 +172,7 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
       {   // for constant
         const Tensor<T> &B     = *in[1];
         const T          value = B[0];
-        for (auto &x: out_)
+        for (auto &x: m_out)
         {
           typename ComputationType<T>::type z = x;
           ComputationType<T>::quantize(z, shift);
@@ -191,12 +191,12 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
         for (int n = 0; n < N; ++n)
           for (int i = 0; i < H; ++i)
           {
-            typename ComputationType<T>::type z = out_(n, i);
+            typename ComputationType<T>::type z = m_out(n, i);
             ComputationType<T>::quantize(z, shift);
             z += B[i];
             COUNTERS(z);
             SATURATE(z);
-            out_(n, i) = z;
+            m_out(n, i) = z;
           }
       }
       else if (in[0]->dims().size() == 3)
@@ -211,12 +211,12 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
           for (int i = 0; i < H; ++i)
             for (int j = 0; j < W; ++j)
             {
-              typename ComputationType<T>::type z = out_(n, i, j);
+              typename ComputationType<T>::type z = m_out(n, i, j);
               ComputationType<T>::quantize(z, shift);
               z += B[j];
               COUNTERS(z);
               SATURATE(z);
-              out_(n, i, j) = z;
+              m_out(n, i, j) = z;
             }
       }
       else if (in[0]->dims().size() == 4)
@@ -233,12 +233,12 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
             for (int j = 0; j < W; ++j)
               for (int k = 0; k < K; ++k)
               {
-                typename ComputationType<T>::type z = out_(n, i, j, k);
+                typename ComputationType<T>::type z = m_out(n, i, j, k);
                 ComputationType<T>::quantize(z, shift);
                 z += B[k];
                 COUNTERS(z);
                 SATURATE(z);
-                out_(n, i, j, k) = z;
+                m_out(n, i, j, k) = z;
               }
       }
     }
@@ -256,8 +256,8 @@ template<typename T> bool BiasAdd<T>::init(const std::vector<Tensor<T> *> &in)
   if (in[0]->dims()[in[0]->dims().size() - 1] != in[1]->dims()[0])
     return false;
 
-  out_.resize(in[0]->dims());
-  initDone_ = true;
+  m_out.resize(in[0]->dims());
+  m_initDone = true;
   return true;
 }
 

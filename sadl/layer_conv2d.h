@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,23 +46,23 @@ template<typename T> class Conv2D : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
 
 protected:
   virtual bool loadInternal(std::istream &file, Version /*v*/) override;
-  Dimensions   strides_;
-  Dimensions   pads_;
-  int          q_      = 0;
-  int          groups_ = 1;
+  Dimensions   m_strides;
+  Dimensions   m_pads;
+  int          m_q      = 0;
+  int          m_groups = 1;
 
   template<int s_h, int s_w> bool apply_s(const Tensor<T> &A, const Tensor<T> &kernel);
 
   // should never be used
-  void conv2d(Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
+  void conv2d(const Tensor<T> &A, const Tensor<T> &kernel);
 
   template<int s_h, int s_w> void conv2d_5x5_s(const Tensor<T> &A, const Tensor<T> &kernel);
 
@@ -133,37 +133,37 @@ template<typename T> bool Conv2D<T>::apply(std::vector<Tensor<T> *> &in)
   assert(in[1]->dims().size() == 4);
   const Tensor<T> &A      = *in[0];
   const Tensor<T> &kernel = *in[1];
-  out_.quantizer          = A.quantizer - q_;
-  out_.border_skip        = A.border_skip;
+  m_out.quantizer          = A.quantizer - m_q;
+  m_out.border_skip        = A.border_skip;
 
-  assert(out_.quantizer >= 0);
-  assert(kernel.quantizer + q_ >= 0);
+  assert(m_out.quantizer >= 0);
+  assert(kernel.quantizer + m_q >= 0);
 #define DEBUG_CONV2D 0
 #if DEBUG_CONV2D
   std::cout << "[WARNING] generic conv2d for debug" << std::endl;
-  conv2d(out_, A, kernel);
+  conv2d(A, kernel);
   return true;
 #endif
-  if (strides_[1] == 1 && strides_[2] == 1)
+  if (m_strides[1] == 1 && m_strides[2] == 1)
   {
     return apply_s<1, 1>(A, kernel);
   }
-  else if (strides_[1] == 1 && strides_[2] == 2 && groups_ == 1)
+  else if (m_strides[1] == 1 && m_strides[2] == 2 && m_groups == 1)
   {
     return apply_s<1, 2>(A, kernel);
   }
-  else if ((strides_[1] == 2 && strides_[2] == 1) && groups_ == 1)
+  else if ((m_strides[1] == 2 && m_strides[2] == 1) && m_groups == 1)
   {
     return apply_s<2, 1>(A, kernel);
   }
-  else if (strides_[1] == 2 && strides_[2] == 2 && groups_ == 1)
+  else if (m_strides[1] == 2 && m_strides[2] == 2 && m_groups == 1)
   {
     return apply_s<2, 2>(A, kernel);
     ;
   }
   else
   {
-    std::cerr << "[ERROR] stride = (" << strides_[1] << ", " << strides_[2] << ")" << std::endl;
+    std::cerr << "[ERROR] stride = (" << m_strides[1] << ", " << m_strides[2] << ")" << std::endl;
     assert(false);
     exit(-1);
   }
@@ -176,14 +176,14 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
   int       in_W{ A.dims()[2] };
   const int half_size_h{ kernel.dims()[0] / 2 };
   const int half_size_w{ kernel.dims()[1] / 2 };
-  const int top{ pads_[0] };
-  const int left{ pads_[1] };
+  const int top{ m_pads[0] };
+  const int left{ m_pads[1] };
   int       start_h{ half_size_h - top };
   int       start_w{ half_size_w - left };
   assert(in_H > 1);
   assert(in_W > 1);
 
-  if (groups_ == 1)
+  if (m_groups == 1)
   {
     if (half_size_h == 0 && half_size_w == 0)   // 1x1
     {
@@ -199,11 +199,11 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
       {   // skip border
         if (s_h == 1 && s_w == 1)
         {
-          start_h += out_.border_skip;
-          start_w += out_.border_skip;
-          in_H -= out_.border_skip;
-          in_W -= out_.border_skip;
-          out_.border_skip++;
+          start_h += m_out.border_skip;
+          start_w += m_out.border_skip;
+          in_H -= m_out.border_skip;
+          in_W -= m_out.border_skip;
+          m_out.border_skip++;
         }
       }
       conv2d_3x3_s_core_dispatch<s_h, s_w>(A, kernel);
@@ -257,7 +257,7 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
     }
     else
     {
-      conv2d(out_, A, kernel);
+      conv2d(A, kernel);
     }
   }
   return true;
@@ -285,10 +285,10 @@ template<typename T> bool Conv2D<T>::init(const std::vector<Tensor<T> *> &in)
   const int in_W{ in[0]->dims()[2] };
   const int k_h{ in[1]->dims()[0] };
   const int k_w{ in[1]->dims()[1] };
-  const int s_h   = strides_[1];
-  const int s_w   = strides_[2];
-  int       out_H = floor((float) (in_H + pads_[0] + pads_[2] - k_h) / s_h + 1);
-  int       out_W = floor((float) (in_W + pads_[1] + pads_[3] - k_w) / s_w + 1);
+  const int s_h   = m_strides[1];
+  const int s_w   = m_strides[2];
+  int       out_H = floor((float) (in_H + m_pads[0] + m_pads[2] - k_h) / s_h + 1);
+  int       out_W = floor((float) (in_W + m_pads[1] + m_pads[3] - k_w) / s_w + 1);
 
   // Hout=floor((H+2*p-k)/s+1)
   // assume p =k/2 (pad == same)
@@ -296,21 +296,21 @@ template<typename T> bool Conv2D<T>::init(const std::vector<Tensor<T> *> &in)
   Dimensions dim;
   dim.resize(4);
   dim[0] = in[0]->dims()[0];
-  dim[1] = (int) ceil(in[0]->dims()[1] / (float) strides_[1]);
-  dim[2] = (int) ceil(in[0]->dims()[2] / (float) strides_[2]);
+  dim[1] = (int) ceil(in[0]->dims()[1] / (float) m_strides[1]);
+  dim[2] = (int) ceil(in[0]->dims()[2] / (float) m_strides[2]);
   dim[3] = in[1]->dims()[2];
   if (out_H != dim[1] || out_W != dim[2])   // warning, fail with tf2 3x3s2 pad=same i=(5,4)
     return false;
-  out_.resize(dim);
-  if (groups_ != 1)
+  m_out.resize(dim);
+  if (m_groups != 1)
   {
     static bool once = true;
     if (once)
       std::cout << "[WARNING] generic support for groups !=1 only for debug, do not use" << std::endl;
     once = false;
   }
-  SADL_DBG(std::cout << "  - output Conv2D: " << out_.dims() << std::endl);
-  initDone_ = true;
+  SADL_DBG(std::cout << "  - output Conv2D: " << m_out.dims() << std::endl);
+  m_initDone = true;
   return true;
 }
 
@@ -323,41 +323,41 @@ template<typename T> bool Conv2D<T>::loadInternal(std::istream &file, Version v)
     std::cerr << "[ERROR] invalid nb of dimensions: " << x << std::endl;
     return false;
   }
-  strides_.resize(x);
-  for (int k = 0; k < strides_.size(); ++k)
+  m_strides.resize(x);
+  for (int k = 0; k < m_strides.size(); ++k)
   {
     file.read((char *) &x, sizeof(x));
-    strides_[k] = x;
+    m_strides[k] = x;
   }
-  if (strides_.size() == 2)
+  if (m_strides.size() == 2)
   {
-    strides_ = Dimensions({ 1, strides_[0], strides_[1], 1 });
+    m_strides = Dimensions({ 1, m_strides[0], m_strides[1], 1 });
   }
-  if (strides_.size() != 4)
+  if (m_strides.size() != 4)
   {
-    std::cerr << "[ERROR] invalid strides: " << strides_.size() << std::endl;
+    std::cerr << "[ERROR] invalid strides: " << m_strides.size() << std::endl;
     return false;
   }
-  if (strides_[0] != 1)
+  if (m_strides[0] != 1)
   {
-    std::cerr << "[ERROR] invalid strides[0]: " << strides_[0] << std::endl;
+    std::cerr << "[ERROR] invalid strides[0]: " << m_strides[0] << std::endl;
     return false;
   }
-  if (strides_[3] != 1)
+  if (m_strides[3] != 1)
   {
-    std::cerr << "[ERROR] invalid strides[3]: " << strides_[3] << std::endl;
+    std::cerr << "[ERROR] invalid strides[3]: " << m_strides[3] << std::endl;
     return false;
   }
-  if (strides_[1] != 1 && strides_[1] != 2)
+  if (m_strides[1] != 1 && m_strides[1] != 2)
   {
-    std::cerr << "[ERROR] not1 or 2: to check " << strides_ << std::endl;
+    std::cerr << "[ERROR] not1 or 2: to check " << m_strides << std::endl;
     return false;
   }
-  if (strides_[2] != 1 && strides_[2] != 2)
+  if (m_strides[2] != 1 && m_strides[2] != 2)
   {
-    std::cerr << "[ERROR] not1 or 2: to check " << strides_ << std::endl;
+    std::cerr << "[ERROR] not1 or 2: to check " << m_strides << std::endl;
   }
-  SADL_DBG(std::cout << "  - strides: " << strides_ << std::endl);
+  SADL_DBG(std::cout << "  - strides: " << m_strides << std::endl);
 
   file.read((char *) &x, sizeof(x));
   if (x <= 0 || x > Dimensions::MaxDim)
@@ -365,30 +365,30 @@ template<typename T> bool Conv2D<T>::loadInternal(std::istream &file, Version v)
     std::cerr << "[ERROR] invalid nb of dimensions: " << x << std::endl;
     return false;
   }
-  pads_.resize(x);
-  for (int k = 0; k < pads_.size(); ++k)
+  m_pads.resize(x);
+  for (int k = 0; k < m_pads.size(); ++k)
   {
     file.read((char *) &x, sizeof(x));
-    pads_[k] = x;
+    m_pads[k] = x;
   }
-  SADL_DBG(std::cout << "  - pads: " << pads_ << std::endl);
+  SADL_DBG(std::cout << "  - pads: " << m_pads << std::endl);
 
   if ((int) v > 2)
   {
-    file.read((char *) &groups_, sizeof(groups_));
-    SADL_DBG(std::cout << "  - groups: " << groups_ << std::endl);
+    file.read((char *) &m_groups, sizeof(m_groups));
+    SADL_DBG(std::cout << "  - groups: " << m_groups << std::endl);
   }
 
   {
-    file.read((char *) &q_, sizeof(q_));
-    SADL_DBG(std::cout << "  - q: " << q_ << std::endl);
+    file.read((char *) &m_q, sizeof(m_q));
+    SADL_DBG(std::cout << "  - q: " << m_q << std::endl);
   }
 
   return true;
 }
 
 // should never be used for perf reasons
-template<typename T> void Conv2D<T>::conv2d(Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel)
+template<typename T> void Conv2D<T>::conv2d(const Tensor<T> &A, const Tensor<T> &kernel)
 {
   const int in_H{ A.dims()[1] };
   const int in_W{ A.dims()[2] };
@@ -396,21 +396,21 @@ template<typename T> void Conv2D<T>::conv2d(Tensor<T> &out_, const Tensor<T> &A,
   const int nb_filters{ kernel.dims()[2] };
   const int half_size_i{ kernel.dims()[0] / 2 };
   const int half_size_j{ kernel.dims()[1] / 2 };
-  const int top{ pads_[0] };
-  const int left{ pads_[1] };
+  const int top{ m_pads[0] };
+  const int left{ m_pads[1] };
   const int start_h{ half_size_i - top };
   const int start_w{ half_size_j - left };
-  const int s_h = strides_[1];
-  const int s_w = strides_[2];
+  const int s_h = m_strides[1];
+  const int s_w = m_strides[2];
 #if DEBUG_SIMD && __AVX2__
   std::cout << "\n[WARN] debug generic version conv inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "] " << in_H << 'x' << in_W
-            << " groups=" << groups_ << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC"
+            << " groups=" << m_groups << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC"
             << std::endl;
 #endif
   constexpr int im_nb     = 0;
-  const int     shift     = kernel.quantizer + q_;
-  const int     cout_by_g = nb_filters / groups_;
-  const int     cin_by_g  = in_D / groups_;
+  const int     shift     = kernel.quantizer + m_q;
+  const int     cout_by_g = nb_filters / m_groups;
+  const int     cin_by_g  = in_D / m_groups;
   for (int filter = 0; filter < nb_filters; ++filter)
   {
     int offset = (filter / cout_by_g) * cin_by_g;
@@ -425,7 +425,7 @@ template<typename T> void Conv2D<T>::conv2d(Tensor<T> &out_, const Tensor<T> &A,
           for (int filter_j = -half_size_j; filter_j <= half_size_j; ++filter_j)
           {
             // fixed
-            for (int filter_d = 0; filter_d < in_D / groups_; ++filter_d)
+            for (int filter_d = 0; filter_d < in_D / m_groups; ++filter_d)
             {
               int ii = im_i + filter_i;
               int jj = im_j + filter_j;
@@ -442,7 +442,7 @@ template<typename T> void Conv2D<T>::conv2d(Tensor<T> &out_, const Tensor<T> &A,
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        out_(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(x);
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(x);
       }
     }
   }

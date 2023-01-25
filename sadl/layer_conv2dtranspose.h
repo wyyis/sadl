@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,25 +46,25 @@ template<typename T> class Conv2DTranspose : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
 
 protected:
   virtual bool loadInternal(std::istream &file, Version /*v*/) override;
-  Dimensions   strides_;
-  Dimensions   pads_;
-  Dimensions   out_pads_;
-  int          q_ = 0;
+  Dimensions   m_strides;
+  Dimensions   m_pads;
+  Dimensions   m_out_pads;
+  int          m_q = 0;
   // should never be used
-  void conv2dtranspose(int nb_filters, int in_D, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
+  void conv2dtranspose(int nb_filters, int in_D, const Tensor<T> &A, const Tensor<T> &kernel);
 #if __AVX512F__
-  template<int in_D> void conv2dtranspose_simd512(int nb_filters, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel);
+  template<int in_D> void conv2dtranspose_simd512(int nb_filters, const Tensor<T> &A, const Tensor<T> &kernel);
 #endif
   using T2 = typename ComputationType<T>::type;
-  Tensor<T2> tempo_;
+  Tensor<T2> m_tempo;
   DUMP_MODEL_EXT;
 };
 
@@ -78,34 +78,45 @@ template<typename T> bool Conv2DTranspose<T>::apply(std::vector<Tensor<T> *> &in
   assert(in[1]->dims().size() == 4);
   const Tensor<T> &A      = *in[0];
   const Tensor<T> &kernel = *in[1];
-  out_.quantizer          = A.quantizer - q_;
-  out_.border_skip        = A.border_skip;
+  m_out.quantizer          = A.quantizer - m_q;
+  m_out.border_skip        = A.border_skip;
 
-  assert(out_.quantizer >= 0);
-  assert(kernel.quantizer + q_ >= 0);
+  assert(m_out.quantizer >= 0);
+  assert(kernel.quantizer + m_q >= 0);
 
-  const int nb_filters{ out_.dims()[3] };   // kernel.dims()[2] };
+  const int nb_filters{ m_out.dims()[3] };   // kernel.dims()[2] };
                                             //   int       in_H{ A.dims()[1] };
                                             //   int       in_W{ A.dims()[2] };
   const int in_D{ A.dims()[3] };
   // const int half_size{ kernel.dims()[0] / 2 };
-  // const int top{ pads_[0] };
-  // const int left{ pads_[1] };
+  // const int top{ m_pads[0] };
+  // const int left{ m_pads[1] };
   // int       start_h{ half_size - top };
   // int       start_w{ half_size - left };
 
 #if __AVX512F__
   switch (in_D)
   {
-  case 32: conv2dtranspose_simd512<32>(nb_filters, out_, A, kernel); break;
-  case 64: conv2dtranspose_simd512<64>(nb_filters, out_, A, kernel); break;
-  case 128: conv2dtranspose_simd512<128>(nb_filters, out_, A, kernel); break;
-  case 192: conv2dtranspose_simd512<192>(nb_filters, out_, A, kernel); break;
-  case 256: conv2dtranspose_simd512<256>(nb_filters, out_, A, kernel); break;
-  default: conv2dtranspose(nb_filters, in_D, out_, A, kernel);
+  case 32:
+    conv2dtranspose_simd512<32>(nb_filters, A, kernel);
+    break;
+  case 64:
+    conv2dtranspose_simd512<64>(nb_filters, A, kernel);
+    break;
+  case 128:
+    conv2dtranspose_simd512<128>(nb_filters, A, kernel);
+    break;
+  case 192:
+    conv2dtranspose_simd512<192>(nb_filters, A, kernel);
+    break;
+  case 256:
+    conv2dtranspose_simd512<256>(nb_filters, A, kernel);
+    break;
+  default:
+    conv2dtranspose(nb_filters, in_D, A, kernel);
   }
 #else
-  conv2dtranspose(nb_filters, in_D, out_, A, kernel);
+  conv2dtranspose(nb_filters, in_D, A, kernel);
 #endif
   return true;
 }
@@ -130,24 +141,24 @@ template<typename T> bool Conv2DTranspose<T>::init(const std::vector<Tensor<T> *
   if ((in[1]->dims()[0] != 3) && (in[1]->dims()[0] != 5))
     return false;
 
-  if (!((in[1]->dims()[0] == 3 && pads_[1] == 1) || (in[1]->dims()[0] == 5 && pads_[1] == 2)))
+  if (!((in[1]->dims()[0] == 3 && m_pads[1] == 1) || (in[1]->dims()[0] == 5 && m_pads[1] == 2)))
   {
     return false;
   }
   Dimensions dim;
   dim.resize(4);
   dim[0] = in[0]->dims()[0];
-  dim[1] = (int) ceil(in[0]->dims()[1] * (float) strides_[1]);
-  dim[2] = (int) ceil(in[0]->dims()[2] * (float) strides_[2]);
+  dim[1] = (int) ceil(in[0]->dims()[1] * (float) m_strides[1]);
+  dim[2] = (int) ceil(in[0]->dims()[2] * (float) m_strides[2]);
   dim[3] = in[1]->dims()[2];
-  out_.resize(dim);
-  SADL_DBG(std::cout << "  - output Conv2DTranspose: " << out_.dims() << std::endl);
+  m_out.resize(dim);
+  SADL_DBG(std::cout << "  - output Conv2DTranspose: " << m_out.dims() << std::endl);
   // init tempo
   int half_size = in[1]->dims()[0] / 2;
   dim[1] += half_size * 2;
   dim[2] += half_size * 2;
-  tempo_.resize(dim);
-  initDone_ = true;
+  m_tempo.resize(dim);
+  m_initDone = true;
   return true;
 }
 
@@ -160,37 +171,37 @@ template<typename T> bool Conv2DTranspose<T>::loadInternal(std::istream &file, V
     std::cerr << "[ERROR] invalid nb of dimensions: " << x << std::endl;
     return false;
   }
-  strides_.resize(x);
-  for (int k = 0; k < strides_.size(); ++k)
+  m_strides.resize(x);
+  for (int k = 0; k < m_strides.size(); ++k)
   {
     file.read((char *) &x, sizeof(x));
-    strides_[k] = x;
+    m_strides[k] = x;
   }
-  if (strides_.size() == 2)
+  if (m_strides.size() == 2)
   {
-    strides_ = Dimensions({ 1, strides_[0], strides_[1], 1 });
+    m_strides = Dimensions({ 1, m_strides[0], m_strides[1], 1 });
   }
-  if (strides_.size() != 4)
+  if (m_strides.size() != 4)
   {
-    std::cerr << "[ERROR] invalid strides: " << strides_.size() << std::endl;
+    std::cerr << "[ERROR] invalid strides: " << m_strides.size() << std::endl;
     return false;
   }
-  if (strides_[0] != 1)
+  if (m_strides[0] != 1)
   {
-    std::cerr << "[ERROR] invalid strides[0]: " << strides_[0] << std::endl;
+    std::cerr << "[ERROR] invalid strides[0]: " << m_strides[0] << std::endl;
     return false;
   }
-  if (strides_[3] != 1)
+  if (m_strides[3] != 1)
   {
-    std::cerr << "[ERROR] invalid strides[3]: " << strides_[3] << std::endl;
+    std::cerr << "[ERROR] invalid strides[3]: " << m_strides[3] << std::endl;
     return false;
   }
-  if (strides_[1] != 2 || strides_[1] != 2)
+  if (m_strides[1] != 2 || m_strides[1] != 2)
   {
-    std::cerr << "[ERROR] stride not 2: to check " << strides_ << std::endl;
+    std::cerr << "[ERROR] stride not 2: to check " << m_strides << std::endl;
     return false;
   }
-  SADL_DBG(std::cout << "  - strides: " << strides_ << std::endl);
+  SADL_DBG(std::cout << "  - strides: " << m_strides << std::endl);
 
   file.read((char *) &x, sizeof(x));
   if (x <= 0 || x > Dimensions::MaxDim)
@@ -198,18 +209,18 @@ template<typename T> bool Conv2DTranspose<T>::loadInternal(std::istream &file, V
     std::cerr << "[ERROR] invalid nb of dimensions: " << x << std::endl;
     return false;
   }
-  pads_.resize(x);
-  for (int k = 0; k < pads_.size(); ++k)
+  m_pads.resize(x);
+  for (int k = 0; k < m_pads.size(); ++k)
   {
     file.read((char *) &x, sizeof(x));
-    pads_[k] = x;
+    m_pads[k] = x;
     if (x != 1 && x != 2)
     {
       std::cerr << "[ERROR] pads values not supported: " << x << std::endl;
       return false;
     }
   }
-  SADL_DBG(std::cout << "  - pads: " << pads_ << std::endl);
+  SADL_DBG(std::cout << "  - pads: " << m_pads << std::endl);
 
   file.read((char *) &x, sizeof(x));
   if (x <= 0 || x > Dimensions::MaxDim)
@@ -217,29 +228,29 @@ template<typename T> bool Conv2DTranspose<T>::loadInternal(std::istream &file, V
     std::cerr << "[ERROR] invalid nb of dimensions: " << x << std::endl;
     return false;
   }
-  out_pads_.resize(x);
-  for (int k = 0; k < out_pads_.size(); ++k)
+  m_out_pads.resize(x);
+  for (int k = 0; k < m_out_pads.size(); ++k)
   {
     file.read((char *) &x, sizeof(x));
-    out_pads_[k] = x;
+    m_out_pads[k] = x;
     if (x != 1)
     {
       std::cerr << "[ERROR] output pads !=1 " << x << std::endl;
       return false;
     }
   }
-  SADL_DBG(std::cout << "  - out_pads: " << out_pads_ << std::endl);
+  SADL_DBG(std::cout << "  - out_pads: " << m_out_pads << std::endl);
 
   {
-    file.read((char *) &q_, sizeof(q_));
-    SADL_DBG(std::cout << "  - q: " << q_ << std::endl);
+    file.read((char *) &m_q, sizeof(m_q));
+    SADL_DBG(std::cout << "  - q: " << m_q << std::endl);
   }
 
   return true;
 }
 
 // should never be used for perf reasons
-template<typename T> void Conv2DTranspose<T>::conv2dtranspose(int nb_filters, int in_D, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel)
+template<typename T> void Conv2DTranspose<T>::conv2dtranspose(int nb_filters, int in_D, const Tensor<T> &A, const Tensor<T> &kernel)
 {
 #if DEBUG_SIMD && __AVX2__
   const int in_H{ A.dims()[1] };
@@ -251,16 +262,16 @@ template<typename T> void Conv2DTranspose<T>::conv2dtranspose(int nb_filters, in
     std::endl;
 #endif
   constexpr int im_nb = 0;
-  assert(strides_[1] == 2);
-  assert(strides_[2] == 2);
+  assert(m_strides[1] == 2);
+  assert(m_strides[2] == 2);
   int           half_size = kernel.dims()[0] / 2;
   constexpr int sw        = 2;
   constexpr int sh        = 2;
 
-  const int shift = kernel.quantizer + q_;
-  const int out_h = out_.dims()[1];
-  const int out_w = out_.dims()[2];
-  tempo_.fill(T2{});
+  const int shift = kernel.quantizer + m_q;
+  const int out_h = m_out.dims()[1];
+  const int out_w = m_out.dims()[2];
+  m_tempo.fill(T2{});
 
   for (int filter = 0; filter < nb_filters; ++filter)
   {
@@ -287,7 +298,7 @@ template<typename T> void Conv2DTranspose<T>::conv2dtranspose(int nb_filters, in
               s += A(im_nb, i1, j1, filter_d) * kernel(ki, kj, filter, filter_d);
               COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
             }
-            tempo_(im_nb, ii, jj, filter) += s;
+            m_tempo(im_nb, ii, jj, filter) += s;
           }
         }
       }
@@ -296,11 +307,11 @@ template<typename T> void Conv2DTranspose<T>::conv2dtranspose(int nb_filters, in
     {
       for (int im_j = 0; im_j < out_w; ++im_j)
       {
-        auto x = tempo_(im_nb, im_i + half_size, im_j + half_size, filter);
+        auto x = m_tempo(im_nb, im_i + half_size, im_j + half_size, filter);
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        out_(im_nb, im_i, im_j, filter) = static_cast<T>(x);
+        m_out(im_nb, im_i, im_j, filter) = static_cast<T>(x);
       }
     }
   }
@@ -309,20 +320,20 @@ template<typename T> void Conv2DTranspose<T>::conv2dtranspose(int nb_filters, in
 #if __AVX512F__
 template<>
 template<int in_D>
-void Conv2DTranspose<float>::conv2dtranspose_simd512(int nb_filters, Tensor<float> &out_, const Tensor<float> &A, const Tensor<float> &kernel)
+void Conv2DTranspose<float>::conv2dtranspose_simd512(int nb_filters, const Tensor<float> &A, const Tensor<float> &kernel)
 {
   constexpr int im_nb = 0;
-  assert(strides_[1] == 2);
-  assert(strides_[2] == 2);
+  assert(m_strides[1] == 2);
+  assert(m_strides[2] == 2);
   assert(kernel.dims()[0] == kernel.dims()[1]);
   int half_size = kernel.dims()[0] / 2;
   static_assert(in_D % 16 == 0, "Should be used with mod16 filters.");
   constexpr int sw = 2;
   constexpr int sh = 2;
 
-  const int out_h = out_.dims()[1];
-  const int out_w = out_.dims()[2];
-  tempo_.fill(T2{});
+  const int out_h = m_out.dims()[1];
+  const int out_w = m_out.dims()[2];
+  m_tempo.fill(T2{});
 
   for (int filter = 0; filter < nb_filters; ++filter)
   {
@@ -356,7 +367,7 @@ void Conv2DTranspose<float>::conv2dtranspose_simd512(int nb_filters, Tensor<floa
               s               = _mm512_add_ps(s, m0);
 #endif
             }
-            tempo_(im_nb, ii, jj, filter) += sum16_float(s);
+            m_tempo(im_nb, ii, jj, filter) += sum16_float(s);
           }
         }
       }
@@ -365,8 +376,8 @@ void Conv2DTranspose<float>::conv2dtranspose_simd512(int nb_filters, Tensor<floa
     {
       for (int im_j = 0; im_j < out_w; ++im_j)
       {
-        auto x                          = tempo_(im_nb, im_i + half_size, im_j + half_size, filter);
-        out_(im_nb, im_i, im_j, filter) = x;
+        auto x                          = m_tempo(im_nb, im_i + half_size, im_j + half_size, filter);
+        m_out(im_nb, im_i, im_j, filter) = x;
       }
     }
   }
@@ -376,11 +387,11 @@ void Conv2DTranspose<float>::conv2dtranspose_simd512(int nb_filters, Tensor<floa
 #if __AVX512BW__
 template<>
 template<int in_D>
-void Conv2DTranspose<int16_t>::conv2dtranspose_simd512(int nb_filters, Tensor<int16_t> &out_, const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
+void Conv2DTranspose<int16_t>::conv2dtranspose_simd512(int nb_filters, const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
 {
   constexpr int im_nb = 0;
-  assert(strides_[1] == 2);
-  assert(strides_[2] == 2);
+  assert(m_strides[1] == 2);
+  assert(m_strides[2] == 2);
   static_assert(in_D % 32 == 0, "Should be used with mod32 filters.");
 #if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int16_t;
@@ -390,10 +401,10 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_simd512(int nb_filters, Tensor<in
   static_assert(in_D % 32 == 0, "Should be used with mod32 filters.");
   constexpr int sw    = 2;
   constexpr int sh    = 2;
-  const int     out_h = out_.dims()[1];
-  const int     out_w = out_.dims()[2];
-  tempo_.fill(T2{});
-  const int shift = kernel.quantizer + q_;
+  const int     out_h = m_out.dims()[1];
+  const int     out_w = m_out.dims()[2];
+  m_tempo.fill(T2{});
+  const int shift = kernel.quantizer + m_q;
 
   for (int filter = 0; filter < nb_filters; ++filter)
   {
@@ -424,7 +435,7 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_simd512(int nb_filters, Tensor<in
               const __m512i mad0 = _mm512_madd_epi16(k0, v0);   // res in si32
               s                  = _mm512_add_epi32(s, mad0);
             }
-            tempo_(im_nb, ii, jj, filter) += _mm512_reduce_add_epi32(s);
+            m_tempo(im_nb, ii, jj, filter) += _mm512_reduce_add_epi32(s);
           }
         }
       }
@@ -433,9 +444,9 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_simd512(int nb_filters, Tensor<in
     {
       for (int im_j = 0; im_j < out_w; ++im_j)
       {
-        auto z = tempo_(im_nb, im_i + half_size, im_j + half_size, filter) >> shift;
+        auto z = m_tempo(im_nb, im_i + half_size, im_j + half_size, filter) >> shift;
         SATURATE(z);
-        out_(im_nb, im_i, im_j, filter) = z;
+        m_out(im_nb, im_i, im_j, filter) = z;
       }
     }
   }
@@ -445,7 +456,7 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_simd512(int nb_filters, Tensor<in
 #if __AVX512BW__ || __AVX512F__
 template<typename T>
 template<int in_D>
-void Conv2DTranspose<T>::conv2dtranspose_simd512(int nb_filters, Tensor<T> &out_, const Tensor<T> &A, const Tensor<T> &kernel)
+void Conv2DTranspose<T>::conv2dtranspose_simd512(int nb_filters, const Tensor<T> &A, const Tensor<T> &kernel)
 {
   std::cerr << "TODO " << std::endl;
   exit(-1);

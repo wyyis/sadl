@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +41,8 @@ template<typename T> class Concat : public Layer<T>
 {
 public:
   using Layer<T>::Layer;
-  using Layer<T>::out_;   // to avoid this->
-  using Layer<T>::initDone_;
+  using Layer<T>::m_out;   // to avoid this->
+  using Layer<T>::m_initDone;
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
@@ -71,10 +71,10 @@ template<typename T> bool Concat<T>::apply(std::vector<Tensor<T> *> &in)
       shift[i] = in[i]->quantizer - qmin;
     }
   }
-  out_.quantizer   = qmin;   // adapt output width to last input
-  out_.border_skip = in[0]->border_skip;
+  m_out.quantizer   = qmin;   // adapt output width to last input
+  m_out.border_skip = in[0]->border_skip;
   for (int i = 1; i < nb_in; ++i)
-    out_.border_skip = std::max(out_.border_skip, in[i]->border_skip);
+    m_out.border_skip = std::max(m_out.border_skip, in[i]->border_skip);
 
   const Dimensions dim = in[0]->dims();
   if (dim.size() == 2)
@@ -89,7 +89,7 @@ template<typename T> bool Concat<T>::apply(std::vector<Tensor<T> *> &in)
         {
           T z = A(i, j);
           ComputationType<T>::quantize(z, shift[n]);
-          out_(i, offset) = z;
+          m_out(i, offset) = z;
         }
       }
     }
@@ -108,7 +108,7 @@ template<typename T> bool Concat<T>::apply(std::vector<Tensor<T> *> &in)
           {
             T z = A(i, j, k);
             ComputationType<T>::quantize(z, shift[n]);
-            out_(i, j, offset) = z;
+            m_out(i, j, offset) = z;
           }
         }
       }
@@ -130,7 +130,7 @@ template<typename T> bool Concat<T>::apply(std::vector<Tensor<T> *> &in)
             {
               T z = A(i, j, k, l);
               ComputationType<T>::quantize(z, shift[n]);
-              out_(i, j, k, offset) = z;
+              m_out(i, j, k, offset) = z;
             }
           }
         }
@@ -175,15 +175,12 @@ template<typename T> bool Concat<T>::init(const std::vector<Tensor<T> *> &in)
   }
   Dimensions dim = in[0]->dims();
   dim[last_axis] += sum_dim;
-  out_.resize(dim);
-  initDone_ = true;
+  m_out.resize(dim);
+  m_initDone = true;
   return true;
 }
 
-template<typename T> bool Concat<T>::loadInternal(std::istream &, Version)
-{
-  return true;
-}
+template<typename T> bool Concat<T>::loadInternal(std::istream &, Version) { return true; }
 
 }   // namespace layers
 }   // namespace sadl

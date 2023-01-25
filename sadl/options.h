@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,8 +40,8 @@
 
 #if SPARSE_SUPPORT
 // Sparse matmul threshold
-static constexpr float kSparsifyThreshold     = 0.8f;      // need at least 80% of sparsity
-static constexpr float kSparsifySizeThreshold = 1000.0f;   // need at least 1000 elements
+static constexpr float kSparsifyThreshold     = 0.8f;
+static constexpr float kSparsifySizeThreshold = 1000.0f;
 #endif
 
 // optimization
@@ -54,7 +54,7 @@ static constexpr float kSparsifySizeThreshold = 1000.0f;   // need at least 1000
 // debug
 // #define DEBUG_VALUES        1 // show values
 // #define DEBUG_MODEL         1 // show pb with model
-// #define DEBUG_COUNTERS      1 // print overflow etc.
+// #define DEBUG_COUNTERS      1 // print overflow, MAC etc.
 // #define DEBUG_PRINT         1 // print model info
 // #define DEBUG_SIMD          1 // tell about non simd version
 // #define DEBUG_KEEP_OUTPUT   1 // keep a copy of the output tensor
@@ -67,10 +67,7 @@ static constexpr float kSparsifySizeThreshold = 1000.0f;   // need at least 1000
 #endif
 
 #if DEBUG_COUNTERS
-template<typename T> T my_abs(T x)
-{
-  return x < T{} ? -x : x;
-}
+template<typename T> T my_abs(T x) { return x < T{} ? -x : x; }
 #define COUNTERS(X)                                                                                                                                            \
   ++this->cpt_op;                                                                                                                                              \
   if (my_abs(X) > ComputationType<T>::max)                                                                                                                     \
