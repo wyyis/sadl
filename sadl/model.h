@@ -47,12 +47,13 @@ namespace sadl
 
 template<typename T> class Model
 {
-private:
+public:
   struct LayerData
   {
     std::unique_ptr<layers::Layer<T>> layer;
     std::vector<Tensor<T> *>          inputs;
   };
+private:
   std::vector<LayerData>                     m_data;
   int32_t                                    m_nb_inputs       = 0;
   static constexpr int                       kMaxInputByLayer = 2;
@@ -61,7 +62,6 @@ private:
   void                                       insertCopyLayers();
   void                                       reshapeConv2DFilters();
   void                                       reshapeMatrix();
-  LayerData &                                getLayer(const typename layers::Layer<T>::Id &id);
   Version                                    m_version = Version::unknown;
   std::vector<typename layers::Layer<T>::Id> m_ids_input, m_ids_output;
   bool                                       m_initDone = false;
@@ -78,6 +78,7 @@ public:
   int                                               nbOutputs() const { return m_ids_output.size(); }
   std::vector<typename layers::Layer<T>::Id>        getLayersId() const;
   const LayerData &                                 getLayer(const typename layers::Layer<T>::Id &id) const;
+  LayerData &                                getLayer(const typename layers::Layer<T>::Id &id);
   Version                                           version() const { return m_version; }
 #if SPARSE_SUPPORT
   float sparsity_threshold      = kSparsifyThreshold;
