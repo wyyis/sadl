@@ -869,18 +869,19 @@ def parse_graph_node(
         myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]]
         # assume depth is the last one, assume axes are always 0, 1, 2, etc.
         start = getDims(getInitializer(node.input[1], model_onnx))
-        for i in range(len(start) - 1):
-            if start[i] != 0:
-                quit("[ERROR] currently slicing only supported for last channel")
+        if start[0] != 0:
+            quit("[ERROR] currently slicing not supported for first dimension")
         end = getDims(getInitializer(node.input[2], model_onnx))
-        for i in range(len(end) - 1):
-            if end[i] != 2147483647:
-                quit("[ERROR] currently slicing only supported for last channel")
-        start_d = getDims(getInitializer(node.input[1], model_onnx))[-1]
-        end_d = getDims(getInitializer(node.input[2], model_onnx))[-1]
+        if end[0] != 2147483647:
+            quit("[ERROR] currently slicing not supported for first dimension")
+
         additional = {}
-        additional["start_d"] = start_d
-        additional["end_d"] = end_d
+        dim_key = ["b", "h", "w", "c"]
+        for i in range(1, len(start)):
+            start_d = getDims(getInitializer(node.input[1], model_onnx))[i]
+            end_d = getDims(getInitializer(node.input[2], model_onnx))[i]
+            additional[f"start_{dim_key[i]}"] = start_d
+            additional[f"end_{dim_key[i]}"] = end_d
         myGraph[node.output[0]]["additional"] = additional
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
@@ -1034,18 +1035,21 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
             #        f.write(struct.pack('f', float(layer['additional']['alpha'])))
 
             elif node["op_type"] == OPTYPE.Slice:
-                if verbose:
-                    print(
-                        "#\t start_depth index for slicing",
-                        node["additional"]["start_d"],
-                    )
-                f.write(struct.pack("i", int(node["additional"]["start_d"])))
+                dim_keys = ["h", "w", "c"]
+                for dim in dim_keys:
+                    if verbose:
+                        print(
+                            f"#\t start_depth index for {dim} slicing",
+                            node["additional"][f"start_{dim}"],
+                        )
+                    f.write(struct.pack("i", int(node["additional"][f"start_{dim}"])))
 
-                if verbose:
-                    print(
-                        "#\t end_depth index for slicing", node["additional"]["end_d"]
-                    )
-                f.write(struct.pack("i", int(node["additional"]["end_d"])))
+                    if verbose:
+                        print(
+                            f"#\t end_depth index for {dim} slicing",
+                            node["additional"][f"end_{dim}"],
+                        )
+                    f.write(struct.pack("i", int(node["additional"][f"end_{dim}"])))
 
             elif node["op_type"] == OPTYPE.Conv2D:
                 if verbose:

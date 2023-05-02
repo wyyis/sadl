@@ -49,8 +49,12 @@ public:
 
 protected:
   virtual bool loadInternal(std::istream &file, Version v) override;
-  int32_t      m_start_d;
-  int32_t      m_end_d;
+  int32_t      m_start_h;
+  int32_t      m_end_h;
+  int32_t      m_start_w;
+  int32_t      m_end_w;
+  int32_t      m_start_c;
+  int32_t      m_end_c;
   DUMP_MODEL_EXT;
 };
 
@@ -64,20 +68,28 @@ template<typename T> bool Slice<T>::apply(std::vector<Tensor<T> *> &in)
   constexpr int    im_nb   = 0;
   constexpr int    pow2_31 = std::numeric_limits<int>::max();
   // ONNX is sending 2^31 - 1 as value if end index is last channel
-  if (m_end_d == pow2_31)
+  if (m_end_h == pow2_31)
   {
-    m_end_d = in_D;
+    m_end_h = in_H;
+  }
+  if (m_end_w == pow2_31)
+  {
+    m_end_w = in_W;
+  }
+  if (m_end_c == pow2_31)
+  {
+    m_end_c = in_D;
   }
 
   m_out.quantizer = A.quantizer;
 
-  for (int im_i = 0; im_i < in_H; im_i++)
+  for (int im_i = m_start_h; im_i < m_end_h; im_i++)
   {
-    for (int im_j = 0; im_j < in_W; im_j++)
+    for (int im_j = m_start_w; im_j < m_end_w; im_j++)
     {
-      for (int im_d = m_start_d; im_d < m_end_d; im_d++)
+      for (int im_d = m_start_c; im_d < m_end_c; im_d++)
       {
-        m_out(im_nb, im_i, im_j, im_d - m_start_d) = A(im_nb, im_i, im_j, im_d);
+        m_out(im_nb, im_i - m_start_h, im_j - m_start_w, im_d - m_start_c) = A(im_nb, im_i, im_j, im_d);
       }
     }
   }
@@ -97,14 +109,22 @@ template<typename T> bool Slice<T>::init(const std::vector<Tensor<T> *> &in)
   Dimensions dim;
   dim.resize(4);
   dim[0] = in[0]->dims()[0];
-  dim[1] = in[0]->dims()[1];
-  dim[2] = in[0]->dims()[2];
   // ONNX is sending 2^31 - 1 as value if end index is last channel
-  if (m_end_d == pow2_31)
+  if (m_end_h == pow2_31)
   {
-    m_end_d = in[0]->dims()[3];
+    m_end_h = in[0]->dims()[1];
   }
-  dim[3] = m_end_d - m_start_d;
+  dim[1] = m_end_h - m_start_h;
+  if (m_end_w == pow2_31)
+  {
+    m_end_w = in[0]->dims()[2];
+  }
+  dim[2] = m_end_w - m_start_w;
+  if (m_end_c == pow2_31)
+  {
+    m_end_c = in[0]->dims()[3];
+  }
+  dim[3] = m_end_c - m_start_c;
   m_out.resize(dim);
   SADL_DBG(std::cout << "  - output Slice: " << m_out.dims() << std::endl);
 
@@ -114,11 +134,23 @@ template<typename T> bool Slice<T>::init(const std::vector<Tensor<T> *> &in)
 
 template<typename T> bool Slice<T>::loadInternal(std::istream &file, Version /*v*/)
 {
-  file.read((char *) &m_start_d, sizeof(m_start_d));
-  SADL_DBG(std::cout << "  - start_d: " << m_start_d << std::endl);
+  file.read((char *) &m_start_h, sizeof(m_start_h));
+  SADL_DBG(std::cout << "  - start_h: " << m_start_h << std::endl);
 
-  file.read((char *) &m_end_d, sizeof(m_end_d));
-  SADL_DBG(std::cout << "  - end_d: " << m_end_d << std::endl);
+  file.read((char *) &m_end_h, sizeof(m_end_h));
+  SADL_DBG(std::cout << "  - end_h: " << m_end_h << std::endl);
+
+  file.read((char *) &m_start_w, sizeof(m_start_w));
+  SADL_DBG(std::cout << "  - start_w: " << m_start_w << std::endl);
+
+  file.read((char *) &m_end_w, sizeof(m_end_w));
+  SADL_DBG(std::cout << "  - end_w: " << m_end_w << std::endl);
+
+  file.read((char *) &m_start_c, sizeof(m_start_c));
+  SADL_DBG(std::cout << "  - start_c: " << m_start_c << std::endl);
+
+  file.read((char *) &m_end_c, sizeof(m_end_c));
+  SADL_DBG(std::cout << "  - end_c: " << m_end_c << std::endl);
 
   return true;
 }
