@@ -876,12 +876,12 @@ def parse_graph_node(
             quit("[ERROR] currently slicing not supported for first dimension")
 
         additional = {}
-        dim_key = ["b", "h", "w", "c"]
+        dim_keys = ["b", "h", "w", "c"]
         for i in range(1, len(start)):
             start_d = getDims(getInitializer(node.input[1], model_onnx))[i]
             end_d = getDims(getInitializer(node.input[2], model_onnx))[i]
-            additional[f"start_{dim_key[i]}"] = start_d
-            additional[f"end_{dim_key[i]}"] = end_d
+            additional[f"start_{dim_keys[i]}"] = start_d
+            additional[f"end_{dim_keys[i]}"] = end_d
         myGraph[node.output[0]]["additional"] = additional
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
