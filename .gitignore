@@ -7,3 +7,5 @@
 *.blg
 *.out
 */build
+.idea/
+cmake-build-*/
