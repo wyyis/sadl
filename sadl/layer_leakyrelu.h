@@ -69,6 +69,7 @@ template<typename T> bool LeakyRelu<T>::apply(std::vector<Tensor<T> *> &in)
       typename ComputationType<T>::type z = x * alpha;
       ComputationType<T>::quantize(z, alpha_q);
       COUNTERS(z);
+      COUNTERS_MAC(z);
       // do not saturate because alpha<1??
       x = z;
     }
