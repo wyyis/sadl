@@ -98,6 +98,12 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s_dis
   case 160:
     CONV_MOD32<160, s_h, s_w>(A, kernel);
     break;
+  case 192:
+    CONV_MOD32<192, s_h, s_w>(A, kernel);
+    break;
+  case 288:
+    CONV_MOD32<288, s_h, s_w>(A, kernel);
+    break;
   case 384:
     CONV_MOD32<384, s_h, s_w>(A, kernel);
     break;
