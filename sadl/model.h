@@ -749,6 +749,7 @@ template<typename T> void Model<T>::reshapeMatrix()
 
 template<typename T> void Model<T>::reshapeConv2DFilters()
 {
+  std::vector<int> diff_conv_ids;
   for (auto &v: m_data)
   {
     if (v.layer->op() == layers::OperationType::Conv2D)   //  || v.layer->op() == layers::OperationType::Conv2DTranspose )
@@ -758,6 +759,15 @@ template<typename T> void Model<T>::reshapeConv2DFilters()
         std::cerr << "[ERROR] cannot find input 2 for reshapeConv2DFilters" << std::endl;
         assert(false);
         exit(-1);
+      }
+      // avoid repeated reshape operations
+      if (std::find(diff_conv_ids.begin(), diff_conv_ids.end(), v.layer->inputsId()[1]) == diff_conv_ids.end())
+      {
+        diff_conv_ids.push_back(v.layer->inputsId()[1]);
+      }
+      else
+      {
+        continue;
       }
       auto &L = getLayer(v.layer->inputsId()[1]);
       auto &W = L.layer->output();
