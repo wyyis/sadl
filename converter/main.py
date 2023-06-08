@@ -1296,6 +1296,8 @@ def annotate_node(
                 a.i = 1
             elif a.i == 3:
                 a.i = 2
+            elif a.i == -3:
+                a.i = -1
 
     elif node.op_type == "Unsqueeze":
         node_annotation[node.name].to_remove = True

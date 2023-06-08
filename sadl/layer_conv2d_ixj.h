@@ -257,7 +257,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
   int           start_h{ ihalf_size - top };
   int           start_w{ jhalf_size - left };
 #if DEBUG_SIMD && __AVX2__
-  std::cout << "\n[WARN] generic version conv " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D << " outD=" << nb_filters
+  std::cout << "\n[WARN] generic version conv (stride known) " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D << " outD=" << nb_filters
             << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << "?? kMAC" << std::endl;
 #endif
@@ -272,9 +272,9 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
         int                               offset = (filter / cout_by_g) * cin_by_g;
         typename ComputationType<T>::type x      = 0;
         for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
-        {   // fixed
+        {
           for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
-          {   // fixed
+          {
             for (int filter_d = 0; filter_d < in_D / m_groups; ++filter_d)
             {
               int ii = im_i + filter_i;
@@ -282,6 +282,58 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
               int ki = ihalf_size + filter_i;
               int kj = jhalf_size + filter_j;
               x += (typename ComputationType<T>::type) A(im_nb, ii, jj, offset + filter_d) * kernel(ki, kj, filter, filter_d);
+              COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
+            }
+          }
+        }
+        ComputationType<T>::quantize(x, shift);
+        COUNTERS(x);
+        SATURATE(x);
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(x);
+      }
+    }
+  }
+}
+
+
+template<typename T> template<int in_D, int ihalf_size, int jhalf_size> void Conv2D<T>::conv2d_ixj_s11_g1_d_core(const Tensor<T> &A, const Tensor<T> &kernel)
+{
+  constexpr int im_nb = 0;
+  constexpr int s_h = 1;
+  constexpr int s_w = 1;
+  const int     nb_filters{ kernel.dims()[2] };
+  const int     shift     = kernel.quantizer + m_q;
+  const int     top{ m_pads[0] };
+  const int     left{ m_pads[1] };
+  int           in_H{ A.dims()[1] };
+  int           in_W{ A.dims()[2] };
+  int           start_h{ ihalf_size - top };
+  int           start_w{ jhalf_size - left };
+#if DEBUG_SIMD && __AVX2__
+  std::cout << "\n[WARN] generic version conv (s=1, g=1, known kernel)" << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D << " outD=" << nb_filters
+            << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
+            << "?? kMAC" << std::endl;
+#endif
+  assert(start_h + s_h - ihalf_size >= 0);
+  assert(start_w + s_w - jhalf_size >= 0);
+  for (int im_i = start_h + s_h; im_i < in_H - ihalf_size; im_i += s_h)
+  {
+    for (int im_j = start_w + s_w; im_j < in_W - jhalf_size; im_j += s_w)
+    {
+      for (int filter = 0; filter < nb_filters; ++filter)
+      {
+        typename ComputationType<T>::type x      = 0;
+        for (int filter_d = 0; filter_d < in_D ; ++filter_d)
+        { // fixed
+        for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
+        {   // fixed
+          for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
+          {   // fixed
+              int ii = im_i + filter_i;
+              int jj = im_j + filter_j;
+              int ki = ihalf_size + filter_i;
+              int kj = jhalf_size + filter_j;
+              x += (typename ComputationType<T>::type) A(im_nb, ii, jj, filter_d) * kernel(ki, kj, filter, filter_d);
               COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
             }
           }
@@ -319,7 +371,7 @@ template<typename T> template<int in_D, int ihalf_size, int jhalf_size> void Con
     for (int im_j = start_w + left; im_j < in_W - jhalf_size; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
-      {
+      { // fixed
         typename ComputationType<T>::type x = 0;
 
         for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
@@ -348,7 +400,9 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
 {
   const int in_D{ A.dims()[3] };
   const int nb_filters{ kernel.dims()[2] };
-  if (in_D % 8 == 0 && in_D == m_groups && in_D == nb_filters && s_h == 1 && s_w == 1)
+
+  // grouped conv with stride 1 and inD==outD
+  if (in_D == m_groups && in_D == nb_filters && s_h == 1 && s_w == 1)
   {
     if (kernel.dims()[0] / 2 == 0 && kernel.dims()[1] / 2 == 1)
     {
@@ -395,6 +449,48 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
       }
     }
   }
+#if 1
+  // no grouped conv with stride 1
+  else if (m_groups == 1 && s_h == 1 && s_w == 1)
+  {
+    if (kernel.dims()[0] / 2 == 0 && kernel.dims()[1] / 2 == 1)
+    {
+      constexpr int ki = 0;
+      constexpr int kj = 1;
+      switch (in_D)
+      {
+      case 32:
+        conv2d_ixj_s11_g1_d_core<32, ki, kj>(A, kernel);
+        return;
+        break;
+      case 64:
+        conv2d_ixj_s11_g1_d_core<64, ki, kj>(A, kernel);
+        return;
+        break;
+      default:   // do default
+        break;
+      }
+    }
+    else if (kernel.dims()[0] / 2 == 1 && kernel.dims()[1] / 2 == 0)
+    {
+      constexpr int ki = 1;
+      constexpr int kj = 0;
+      switch (in_D)
+      {
+      case 32:
+        conv2d_ixj_s11_g1_d_core<32, ki, kj>(A, kernel);
+        return;
+        break;
+      case 64:
+        conv2d_ixj_s11_g1_d_core<64, ki, kj>(A, kernel);
+        return;
+        break;
+      default:   // do default
+        break;
+      }
+    }
+  }
+#endif
   conv2d_ixj_s_core<s_h, s_w>(A, kernel);
 }
 
