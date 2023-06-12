@@ -9,10 +9,10 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 tensor_fmt = "channels_last"
 
-s = (16, 16,3)
+s = (16, 16, 3)
 inputs = tf.keras.Input(shape=s, name="input0", dtype=tf.float32)
 
-nbf = 8 
+nbf = 8
 x = tf.keras.layers.Conv2D(
     nbf,
     (3, 3),
@@ -22,7 +22,7 @@ x = tf.keras.layers.Conv2D(
     bias_initializer="glorot_uniform",
     padding="same",
 )(inputs)
-x = tf.keras.layers.MaxPool2D(2,data_format=tensor_fmt)(x)
+x = tf.keras.layers.MaxPool2D(2, data_format=tensor_fmt)(x)
 x = tf.keras.layers.Conv2D(
     nbf,
     (3, 3),
@@ -50,7 +50,7 @@ x0 = tf.keras.layers.Conv2D(
     padding="same",
 )(x0)
 x0 = x0 + x
-x0 = tf.keras.layers.MaxPool2D(2,data_format=tensor_fmt)(x0)
+x0 = tf.keras.layers.MaxPool2D(2, data_format=tensor_fmt)(x0)
 x0 = tf.keras.layers.Conv2D(
     2 * nbf,
     kernel_size=(3, 3),
@@ -77,7 +77,7 @@ x1 = tf.keras.layers.Conv2D(
     padding="same",
 )(x1)
 x1 = x1 + x0
-x1 = tf.keras.layers.MaxPool2D(2,data_format=tensor_fmt)(x1)
+x1 = tf.keras.layers.MaxPool2D(2, data_format=tensor_fmt)(x1)
 x1 = tf.keras.layers.Conv2D(
     4 * nbf,
     kernel_size=(3, 3),
@@ -87,9 +87,9 @@ x1 = tf.keras.layers.Conv2D(
     padding="same",
 )(x1)
 
-x2 = tf.keras.layers.Reshape((1,4*nbf*16//8*16//8))(x1)
+x2 = tf.keras.layers.Reshape((1, 4 * nbf * 16 // 8 * 16 // 8))(x1)
 y = tf.keras.layers.Dense(2)(x2)
-model = tf.keras.Model(inputs=[inputs],outputs=y,name="cat_classifier")
+model = tf.keras.Model(inputs=[inputs], outputs=y, name="cat_classifier")
 
 
 X = np.linspace(-1.0, 1, np.prod(s)).reshape((1,) + s)
@@ -100,6 +100,6 @@ model_onnx, _ = tf2onnx.convert.from_keras(
 )
 onnx.save(model_onnx, "./tf2.onnx")
 # print("Input\n",X)
-print("Output\n",Y)
+print("Output\n", Y)
 
 print("Model in tf2.onnx")

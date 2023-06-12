@@ -347,6 +347,114 @@ template<typename T> template<int in_D, int ihalf_size, int jhalf_size> void Con
   }
 }
 
+#if __AVX512F__
+template<> template<int in_D, int ihalf_size, int jhalf_size> void Conv2D<float>::simd16_conv2d_ixj_s11_g1_d_core(const Tensor<float> &A, const Tensor<float> &kernel)
+{
+  static_assert(in_D % 16 == 0, "Should be used with mod16 filters.");
+  constexpr int im_nb = 0;
+  constexpr int s_h = 1;
+  constexpr int s_w = 1;
+  const int     nb_filters{ kernel.dims()[2] };
+  const int     top{ m_pads[0] };
+  const int     left{ m_pads[1] };
+  int           in_H{ A.dims()[1] };
+  int           in_W{ A.dims()[2] };
+  int           start_h{ ihalf_size - top };
+  int           start_w{ jhalf_size - left };
+  assert(start_h + s_h - ihalf_size >= 0);
+  assert(start_w + s_w - jhalf_size >= 0);
+
+  for (int im_i = start_h + s_h; im_i < in_H - ihalf_size; im_i += s_h)
+  {
+    for (int im_j = start_w + s_w; im_j < in_W - jhalf_size; im_j += s_w)
+    {
+      for (int filter = 0; filter < nb_filters; ++filter)
+      {
+        __m512 s = _mm512_setzero_ps();
+        for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
+        {   // fixed
+          int ii = im_i + filter_i;
+          int ki = ihalf_size + filter_i;
+          for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
+          {   // fixed
+              int jj = im_j + filter_j;
+              int kj = jhalf_size + filter_j;
+              for (int filter_d = 0; filter_d < in_D; filter_d += 16)
+              {
+                const float *kptr = kernel.addr(ki, kj, filter, filter_d);
+                const __m512 k0   = _mm512_load_ps(kptr);
+                const float *aptr = A.addr(im_nb, ii, jj, filter_d);
+#if __FMA__
+                s = _mm512_fmadd_ps(k0, _mm512_load_ps(aptr), s);
+#else
+                const __m512 m0 = _mm512_mul_ps(k0, _mm512_load_ps(aptr));
+                s               = _mm512_add_ps(s, m0);
+#endif
+              }
+          }
+        }
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = sum16_float(s);
+      }
+    }
+  }
+}
+#endif
+
+#if __AVX512BW__
+template<> template<int in_D, int ihalf_size, int jhalf_size> void Conv2D<int16_t>::conv2d_ixj_s11_g1_d_core(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
+{
+  static_assert(in_D % 32 == 0, "Should be used with mod32 filters.");
+  using T=int16_t;
+  constexpr int im_nb = 0;
+  constexpr int s_h = 1;
+  constexpr int s_w = 1;
+  const int     nb_filters{ kernel.dims()[2] };
+  const int     shift     = kernel.quantizer + m_q;
+  const int     top{ m_pads[0] };
+  const int     left{ m_pads[1] };
+  int           in_H{ A.dims()[1] };
+  int           in_W{ A.dims()[2] };
+  int           start_h{ ihalf_size - top };
+  int           start_w{ jhalf_size - left };
+
+  assert(start_h + s_h - ihalf_size >= 0);
+  assert(start_w + s_w - jhalf_size >= 0);
+  for (int im_i = start_h + s_h; im_i < in_H - ihalf_size; im_i += s_h)
+  {
+    for (int im_j = start_w + s_w; im_j < in_W - jhalf_size; im_j += s_w)
+    {
+      for (int filter = 0; filter < nb_filters; ++filter)
+      {
+        __m512i s = _mm512_setzero_si512();
+        for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
+        {   // fixed
+          for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
+          {   // fixed
+            for (int filter_d = 0; filter_d < in_D; filter_d += 32)
+            {
+              const int      ii   = im_i + filter_i;
+              const int      jj   = im_j + filter_j;
+              const int      ki   = ihalf_size + filter_i;
+              const int      kj   = jhalf_size + filter_j;
+              const __m512i *kptr = (const __m512i *) kernel.addr(ki, kj, filter, filter_d);
+              const __m512i  k0   = _mm512_load_si512(kptr);
+              const __m512i *aptr = (const __m512i *) A.addr(im_nb, ii, jj, filter_d);
+              const __m512i  v0   = _mm512_load_si512(aptr);
+
+              const __m512i mad0 = _mm512_madd_epi16(k0, v0);   // res in si32
+              s                  = _mm512_add_epi32(s, mad0);
+            }
+          }
+        }
+        typename ComputationType<T>::type z = (_mm512_reduce_add_epi32(s) >> shift);
+        COUNTERS(z);
+        SATURATE(z);
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = z;
+      }
+    }
+  }
+}
+#endif
 template<typename T> template<int in_D, int ihalf_size, int jhalf_size> void Conv2D<T>::conv2d_ixj_s11_gD_d_core(const Tensor<T> &A, const Tensor<T> &kernel)
 {
   constexpr int nb_filters = in_D;
@@ -402,6 +510,11 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
   const int nb_filters{ kernel.dims()[2] };
 
   // grouped conv with stride 1 and inD==outD
+#if __AVX512F__ || __AVX512BW__
+#define CONV_MOD16 simd16_conv2d_ixj_s11_g1_d_core
+#else
+#define CONV_MOD16 conv2d_ixj_s11_g1_d_core
+#endif
   if (in_D == m_groups && in_D == nb_filters && s_h == 1 && s_w == 1)
   {
     if (kernel.dims()[0] / 2 == 0 && kernel.dims()[1] / 2 == 1)
@@ -449,7 +562,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
       }
     }
   }
-#if 1
+
   // no grouped conv with stride 1
   else if (m_groups == 1 && s_h == 1 && s_w == 1)
   {
@@ -460,11 +573,11 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
       switch (in_D)
       {
       case 32:
-        conv2d_ixj_s11_g1_d_core<32, ki, kj>(A, kernel);
+        CONV_MOD16<32, ki, kj>(A, kernel);
         return;
         break;
       case 64:
-        conv2d_ixj_s11_g1_d_core<64, ki, kj>(A, kernel);
+        CONV_MOD16<64, ki, kj>(A, kernel);
         return;
         break;
       default:   // do default
@@ -478,11 +591,11 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
       switch (in_D)
       {
       case 32:
-        conv2d_ixj_s11_g1_d_core<32, ki, kj>(A, kernel);
+        CONV_MOD16<32, ki, kj>(A, kernel);
         return;
         break;
       case 64:
-        conv2d_ixj_s11_g1_d_core<64, ki, kj>(A, kernel);
+        CONV_MOD16<64, ki, kj>(A, kernel);
         return;
         break;
       default:   // do default
@@ -490,7 +603,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
       }
     }
   }
-#endif
+#undef CONV_MOD16
   conv2d_ixj_s_core<s_h, s_w>(A, kernel);
 }
 

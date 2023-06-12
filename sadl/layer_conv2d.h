@@ -121,6 +121,11 @@ protected:
   {
     simd16_conv2d_3x3_s_d<in_D, s_h, s_w>(A, kernel);
   }
+  template<int in_D, int ihalf_size, int jhalf_size> void simd16_conv2d_ixj_s11_g1_d_core(const Tensor<T> &A, const Tensor<T> &kernel) {
+    conv2d_ixj_s11_g1_d_core<in_D,ihalf_size,jhalf_size>(A,kernel);
+
+  }
+
 #endif
   DUMP_MODEL_EXT;
 };
