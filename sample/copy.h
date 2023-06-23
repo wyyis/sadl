@@ -74,6 +74,8 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
     dynamic_cast<sadl::layers::Slice<T> &>(layerQ).m_start_d = dynamic_cast<const sadl::layers::Slice<float> &>(layer).m_start_d;
     dynamic_cast<sadl::layers::Slice<T> &>(layerQ).m_end_d   = dynamic_cast<const sadl::layers::Slice<float> &>(layer).m_end_d;
     break;
+  case sadl::layers::OperationType::PReLU:
+    break;
     // no default to get warning
   }
 

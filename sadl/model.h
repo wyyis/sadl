@@ -167,6 +167,9 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
   case layers::OperationType::Slice:
     return std::unique_ptr<layers::Layer<T>>(new layers::Slice<T>{ id, op });
     break;
+  case layers::OperationType::PReLU:
+    return std::unique_ptr<layers::Layer<T>>(new layers::PReLU<T>{ id, op });
+    break;
   case layers::OperationType::OperationTypeCount:
     break;   // no default on purpose
   }

@@ -118,6 +118,7 @@ class OPTYPE(IntEnum):
     Slice = (
         20,
     )  # Currently slicing across depth is supported with default step size of 1
+    PReLU = (21,)
     # In "tf2cpp", the same layer performs the matrix multiplication
     # and the matrix multiplication by batches.
     BatchMatMul = (6,)
@@ -708,32 +709,27 @@ def parse_graph_node(
         myGraph[node.output[0]]["additional"]["data"] = node
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
-    elif node.op_type == "PRelu":  # map to leakyrelu because no training
-        # coef
+    elif node.op_type == "PRelu":
         additional = {}
         additional["data"] = node
-        additional["dims"] = [1]
-        dims, data, dtype = extract_additional_data(
-            node.input[1], False, model_onnx.graph, verbose
+        n2 = getNodesWithOutput(node.input[1], model_onnx)
+        additional["dims"], additional["raw_data"], additional[
+            "dtype"
+        ] = extract_additional_data(
+            node.input[1],
+            False, 
+            model_onnx.graph,
+            verbose,
         )
-        if np.prod(dims) != 1:
-            quit("[ERROR] PRelu slope not scalar:", dims)
-        f = np.frombuffer(data, dtype=np.float32)
-        additional["raw_data"] = np.array(float(f), dtype=np.float32).tobytes()
-        additional["dtype"] = DTYPE_SADL.FLOAT
-        map_onnx_to_myGraph[node.output[0] + "_COEF_NOT_IN_GRAPH"] = None
-
-        myGraph[node.output[0] + "_NOT_IN_GRAPH"] = {}
-        myGraph[node.output[0] + "_NOT_IN_GRAPH"]["inputs"] = []
-        myGraph[node.output[0] + "_NOT_IN_GRAPH"]["additional"] = additional
-        myGraph[node.output[0] + "_NOT_IN_GRAPH"]["op_type"] = OPTYPE.Const
-
+        myGraph[node.input[1]] = {}
+        myGraph[node.input[1]]["op_type"] = OPTYPE.Const
+        myGraph[node.input[1]]["inputs"] = []
+        myGraph[node.input[1]]["additional"] = additional
+        map_onnx_to_myGraph[node.input[1]] = node.input[1]
+        
         myGraph[node.output[0]] = {}
-        myGraph[node.output[0]]["op_type"] = OPTYPE.LeakyReLU
-        myGraph[node.output[0]]["inputs"] = [
-            map_onnx_to_myGraph[n0name],
-            node.output[0] + "_NOT_IN_GRAPH",
-        ]
+        myGraph[node.output[0]]["op_type"] = OPTYPE.PReLU
+        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [map_onnx_to_myGraph[node.input[1]]]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
