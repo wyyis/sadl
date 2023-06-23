@@ -857,8 +857,13 @@ def parse_graph_node(
 
     elif node.op_type == "Slice":
         # Slice
-        if len(node.input) != 4:
-            quit("[ERROR] currently pytorch slicing not supported")
+        if len(node.input) == 5: # PyTorch
+            axes = getDims(getInitializer(node.input[3], model_onnx))
+            steps= getDims(getInitializer(node.input[4], model_onnx))
+            if not (len(axes) == 1 and axes[0] == 1):
+                quit("[ERROR] currently pytorch slicing only supports in depth")
+            if not (len(steps) == 1 and steps[0] == 1):
+                quit("[ERROR] currently step has to be default one")
         # Currently slicing support only across width is added
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Slice
@@ -874,6 +879,8 @@ def parse_graph_node(
                 quit("[ERROR] currently slicing only supported for last channel")
         start_d = getDims(getInitializer(node.input[1], model_onnx))[-1]
         end_d = getDims(getInitializer(node.input[2], model_onnx))[-1]
+        if len(node.input) == 5 and end_d > 2147483647: # The default infinity number in PyTorch INT64 ONNX is 9223372036854775807.
+            end_d = 2147483647
         additional = {}
         additional["start_d"] = start_d
         additional["end_d"] = end_d
