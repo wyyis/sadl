@@ -76,6 +76,8 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
     break;
   case sadl::layers::OperationType::PReLU:
     break;
+  case sadl::layers::OperationType::ScatterND:
+    break;
     // no default to get warning
   }
 

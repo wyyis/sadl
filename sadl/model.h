@@ -170,6 +170,9 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
   case layers::OperationType::PReLU:
     return std::unique_ptr<layers::Layer<T>>(new layers::PReLU<T>{ id, op });
     break;
+  case layers::OperationType::ScatterND:
+    return std::unique_ptr<layers::Layer<T>>(new layers::ScatterND<T>{id, op});
+    break;
   case layers::OperationType::OperationTypeCount:
     break;   // no default on purpose
   }

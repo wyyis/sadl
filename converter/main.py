@@ -122,6 +122,7 @@ class OPTYPE(IntEnum):
     # In "tf2cpp", the same layer performs the matrix multiplication
     # and the matrix multiplication by batches.
     BatchMatMul = (6,)
+    ScatterND = (22,)
 
     # "BatchMatMulV2" did not exist in Tensorflow 1.9. It exists in
     # Tensorflow 1.15.
@@ -887,6 +888,47 @@ def parse_graph_node(
         myGraph[node.output[0]]["additional"] = additional
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
+    elif node.op_type == "ScatterND":
+        # The default input order for the ScatterND is data, indices, and updates.
+        if not is_constant(node.input[1], model_onnx.graph.initializer):
+            quit("[ERROR] The second input of the ScatterND must be indices.")
+        # indices
+        additional = {}
+        additional["data"] = node
+        additional["dims"], additional["raw_data"], additional[
+            "dtype"
+        ] = extract_additional_data(node.input[1], False, model_onnx.graph, verbose)
+        if len(additional["dims"]) == 5:
+            # When the tensor format is specified as NCHW4 (or NHWC4) and the value of N is 1, the format is transformed 
+            # to CHW4 (or HWC4). Here, the "4" indicates the position index within a 4-dimensional tensor.
+            additional["dims"] = additional["dims"][1:]
+            # transpose CHW4 to HWC4
+            if node_annotation[node.input[1]].to_transpose:
+                tmp = [additional["dims"][1], additional["dims"][2], additional["dims"][0], additional["dims"][3]]
+                x = np.frombuffer(additional["raw_data"], dtype=np.int32).reshape(additional["dims"]).transpose(1, 2, 0, 3)
+                indices = x.copy()
+                for i in np.ndindex(indices.shape[:-1]):
+                    indices[i] = [indices[i][0], indices[i][2], indices[i][3], indices[i][1]]
+                additional["dims"] = tmp
+                additional["raw_data"] = indices.flatten().tobytes()
+        else:
+            quit("[ERROR] Currently, ScatterND only supports indices of length 5.")
+        map_onnx_to_myGraph[node.input[1]] = node.input[1]
+        myGraph[node.input[1]] = {}
+        myGraph[node.input[1]]["inputs"] = []
+        myGraph[node.input[1]]["additional"] = additional
+        myGraph[node.input[1]]["op_type"] = OPTYPE.Const
+        
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.ScatterND
+        myGraph[node.output[0]]["inputs"] = [
+                                            map_onnx_to_myGraph[n0name],            # data
+                                            map_onnx_to_myGraph[node.input[2]],     # updates
+                                            map_onnx_to_myGraph[node.input[1]]]     # indices
+        myGraph[node.output[0]]["additional"] = {}
+        myGraph[node.output[0]]["additional"]["data"] = node
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+
     else:
         raise Exception("[ERROR] node not supported:\n{})".format(node))
 
@@ -1316,6 +1358,11 @@ def annotate_node(
         if global_data_layout == "nchw":
             node_annotation[n2.name].to_transpose = True
         #    node_annotation[n2.name].layout_onnx = 'nhwc'
+
+    elif node.op_type == "ScatterND":
+        n2 = getInitializer(node.input[1], model_onnx)
+        if global_data_layout == "nchw":
+            node_annotation[n2.name].to_transpose = True
 
     nexts = getNodesWithInput(node.output[0], model_onnx)
     for n in nexts:
