@@ -92,5 +92,6 @@ enum class Version
   sadl01  = 1,
   sadl02  = 2,
   sadl03  = 3,
+  sadl04  = 4,
 };
 }

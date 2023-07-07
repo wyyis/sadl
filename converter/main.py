@@ -716,21 +716,18 @@ def parse_graph_node(
         n2 = getNodesWithOutput(node.input[1], model_onnx)
         additional["dims"], additional["raw_data"], additional[
             "dtype"
-        ] = extract_additional_data(
-            node.input[1],
-            False, 
-            model_onnx.graph,
-            verbose,
-        )
+        ] = extract_additional_data(node.input[1], False, model_onnx.graph, verbose)
         myGraph[node.input[1]] = {}
         myGraph[node.input[1]]["op_type"] = OPTYPE.Const
         myGraph[node.input[1]]["inputs"] = []
         myGraph[node.input[1]]["additional"] = additional
         map_onnx_to_myGraph[node.input[1]] = node.input[1]
-        
+
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.PReLU
-        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [map_onnx_to_myGraph[node.input[1]]]
+        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [
+            map_onnx_to_myGraph[node.input[1]]
+        ]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
@@ -858,9 +855,9 @@ def parse_graph_node(
 
     elif node.op_type == "Slice":
         # Slice
-        if len(node.input) == 5: # PyTorch
+        if len(node.input) == 5:  # PyTorch
             axes = getDims(getInitializer(node.input[3], model_onnx))
-            steps= getDims(getInitializer(node.input[4], model_onnx))
+            steps = getDims(getInitializer(node.input[4], model_onnx))
             if not (len(axes) == 1 and axes[0] == 1):
                 quit("[ERROR] currently pytorch slicing only supports in depth")
             if not (len(steps) == 1 and steps[0] == 1):
@@ -881,7 +878,9 @@ def parse_graph_node(
         for i in range(1, len(start)):
             start_d = getDims(getInitializer(node.input[1], model_onnx))[i]
             end_d = getDims(getInitializer(node.input[2], model_onnx))[i]
-            if len(node.input) == 5 and end_d > 2147483647: # The default infinity number in PyTorch INT64 ONNX is 9223372036854775807.
+            if (
+                len(node.input) == 5 and end_d > 2147483647
+            ):  # The default infinity number in PyTorch INT64 ONNX is 9223372036854775807.
                 end_d = 2147483647
             additional[f"start_{dim_keys[i]}"] = start_d
             additional[f"end_{dim_keys[i]}"] = end_d
@@ -899,16 +898,30 @@ def parse_graph_node(
             "dtype"
         ] = extract_additional_data(node.input[1], False, model_onnx.graph, verbose)
         if len(additional["dims"]) == 5:
-            # When the tensor format is specified as NCHW4 (or NHWC4) and the value of N is 1, the format is transformed 
+            # When the tensor format is specified as NCHW4 (or NHWC4) and the value of N is 1, the format is transformed
             # to CHW4 (or HWC4). Here, the "4" indicates the position index within a 4-dimensional tensor.
             additional["dims"] = additional["dims"][1:]
             # transpose CHW4 to HWC4
             if node_annotation[node.input[1]].to_transpose:
-                tmp = [additional["dims"][1], additional["dims"][2], additional["dims"][0], additional["dims"][3]]
-                x = np.frombuffer(additional["raw_data"], dtype=np.int32).reshape(additional["dims"]).transpose(1, 2, 0, 3)
+                tmp = [
+                    additional["dims"][1],
+                    additional["dims"][2],
+                    additional["dims"][0],
+                    additional["dims"][3],
+                ]
+                x = (
+                    np.frombuffer(additional["raw_data"], dtype=np.int32)
+                    .reshape(additional["dims"])
+                    .transpose(1, 2, 0, 3)
+                )
                 indices = x.copy()
                 for i in np.ndindex(indices.shape[:-1]):
-                    indices[i] = [indices[i][0], indices[i][2], indices[i][3], indices[i][1]]
+                    indices[i] = [
+                        indices[i][0],
+                        indices[i][2],
+                        indices[i][3],
+                        indices[i][1],
+                    ]
                 additional["dims"] = tmp
                 additional["raw_data"] = indices.flatten().tobytes()
         else:
@@ -918,13 +931,14 @@ def parse_graph_node(
         myGraph[node.input[1]]["inputs"] = []
         myGraph[node.input[1]]["additional"] = additional
         myGraph[node.input[1]]["op_type"] = OPTYPE.Const
-        
+
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.ScatterND
         myGraph[node.output[0]]["inputs"] = [
-                                            map_onnx_to_myGraph[n0name],            # data
-                                            map_onnx_to_myGraph[node.input[2]],     # updates
-                                            map_onnx_to_myGraph[node.input[1]]]     # indices
+            map_onnx_to_myGraph[n0name],  # data
+            map_onnx_to_myGraph[node.input[2]],  # updates
+            map_onnx_to_myGraph[node.input[1]],
+        ]  # indices
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
@@ -1064,10 +1078,9 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
                     if verbose:
                         print(f"#\t\t {dim}")
                     f.write(struct.pack("i", int(dim)))
-
-                if verbose:
-                    print(f"#\t dtype {node['additional']['dtype']}")
-                f.write(struct.pack("i", int(node["additional"]["dtype"])))
+                    if verbose:
+                        print(f"#\t dtype {node['additional']['dtype']}")
+                    f.write(struct.pack("i", int(node["additional"]["dtype"])))
 
                 if node["additional"]["dtype"] != DTYPE_SADL.FLOAT:  # not float
                     if verbose:
@@ -1081,18 +1094,18 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
             elif node["op_type"] == OPTYPE.Slice:
                 dim_keys = ["h", "w", "c"]
                 for dim in dim_keys:
-                if verbose:
-                    print(
+                    if verbose:
+                        print(
                             f"#\t start_depth index for {dim} slicing",
                             node["additional"][f"start_{dim}"],
-                    )
+                        )
                     f.write(struct.pack("i", int(node["additional"][f"start_{dim}"])))
 
-                if verbose:
-                    print(
+                    if verbose:
+                        print(
                             f"#\t end_depth index for {dim} slicing",
                             node["additional"][f"end_{dim}"],
-                    )
+                        )
                     f.write(struct.pack("i", int(node["additional"][f"end_{dim}"])))
 
             elif node["op_type"] == OPTYPE.Conv2D:

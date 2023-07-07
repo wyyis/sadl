@@ -98,9 +98,6 @@ template<typename T> bool Slice<T>::apply(std::vector<Tensor<T> *> &in)
 
 template<typename T> bool Slice<T>::init(const std::vector<Tensor<T> *> &in)
 {
-  /*
-  Right now slicing only across the depth
-  */
   constexpr int pow2_31 = std::numeric_limits<int>::max();
   if (in.size() != 1)
     return false;
@@ -132,8 +129,19 @@ template<typename T> bool Slice<T>::init(const std::vector<Tensor<T> *> &in)
   return true;
 }
 
-template<typename T> bool Slice<T>::loadInternal(std::istream &file, Version /*v*/)
+template<typename T> bool Slice<T>::loadInternal(std::istream &file, Version v)
 {
+  if ((int)v <= (int)Version::sadl03 ) {
+  constexpr int pow2_31 = std::numeric_limits<int>::max();
+  m_start_h=m_start_w=m_start_c=0;
+  m_end_h=m_end_w=m_end_c=pow2_31;
+
+  file.read((char *) &m_start_c, sizeof(m_start_c));
+  SADL_DBG(std::cout << "  - start_c: " << m_start_c << std::endl);
+  file.read((char *) &m_end_c, sizeof(m_end_c));
+  SADL_DBG(std::cout << "  - end_c: " << m_end_c << std::endl);
+  return true;
+  }
   file.read((char *) &m_start_h, sizeof(m_start_h));
   SADL_DBG(std::cout << "  - start_h: " << m_start_h << std::endl);
 

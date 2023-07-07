@@ -210,6 +210,10 @@ template<typename T> bool Model<T>::load(std::istream &file)
   {
     m_version = Version::sadl03;
   }
+  else if (magic_s == "SADL0004")
+  {
+    m_version = Version::sadl04;
+  }
   else
   {
     if (!file)
