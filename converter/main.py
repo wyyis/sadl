@@ -44,7 +44,7 @@ import numpy as np
 import onnx
 
 # file format:
-# MAGIC: SADL0003 [char[8]]
+# MAGIC: SADL0004 [char[8]]
 # type_model [int32_t] 0:int32, 1:float, 2:int16
 # nb_layers [int32_t]
 # nb_inputs [int32_t]
@@ -871,20 +871,20 @@ def parse_graph_node(
         myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]]
         # assume depth is the last one, assume axes are always 0, 1, 2, etc.
         start = getDims(getInitializer(node.input[1], model_onnx))
-        for i in range(len(start) - 1):
-            if start[i] != 0:
-                quit("[ERROR] currently slicing only supported for last channel")
+        if start[0] != 0:
+            quit("[ERROR] currently slicing not supported for first dimension")
         end = getDims(getInitializer(node.input[2], model_onnx))
-        for i in range(len(end) - 1):
-            if end[i] != 2147483647:
-                quit("[ERROR] currently slicing only supported for last channel")
-        start_d = getDims(getInitializer(node.input[1], model_onnx))[-1]
-        end_d = getDims(getInitializer(node.input[2], model_onnx))[-1]
-        if len(node.input) == 5 and end_d > 2147483647: # The default infinity number in PyTorch INT64 ONNX is 9223372036854775807.
-            end_d = 2147483647
+        if end[0] != 2147483647:
+            quit("[ERROR] currently slicing not supported for first dimension")
         additional = {}
-        additional["start_d"] = start_d
-        additional["end_d"] = end_d
+        dim_keys = ["b", "h", "w", "c"]
+        for i in range(1, len(start)):
+            start_d = getDims(getInitializer(node.input[1], model_onnx))[i]
+            end_d = getDims(getInitializer(node.input[2], model_onnx))[i]
+            if len(node.input) == 5 and end_d > 2147483647: # The default infinity number in PyTorch INT64 ONNX is 9223372036854775807.
+                end_d = 2147483647
+            additional[f"start_{dim_keys[i]}"] = start_d
+            additional[f"end_{dim_keys[i]}"] = end_d
         myGraph[node.output[0]]["additional"] = additional
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
@@ -994,7 +994,7 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
 
     # dbg print(map_name_to_idx)
     with open(output_filename, "wb") as f:
-        f.write(str.encode("SADL0003"))
+        f.write(str.encode("SADL0004"))
         # output of the network type 0: int32 | 1: float | 2: int16 | default: float(1)
         f.write(struct.pack("i", int(DTYPE_SADL.FLOAT)))
 
@@ -1079,18 +1079,21 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
             #        f.write(struct.pack('f', float(layer['additional']['alpha'])))
 
             elif node["op_type"] == OPTYPE.Slice:
+                dim_keys = ["h", "w", "c"]
+                for dim in dim_keys:
                 if verbose:
                     print(
-                        "#\t start_depth index for slicing",
-                        node["additional"]["start_d"],
+                            f"#\t start_depth index for {dim} slicing",
+                            node["additional"][f"start_{dim}"],
                     )
-                f.write(struct.pack("i", int(node["additional"]["start_d"])))
+                    f.write(struct.pack("i", int(node["additional"][f"start_{dim}"])))
 
                 if verbose:
                     print(
-                        "#\t end_depth index for slicing", node["additional"]["end_d"]
+                            f"#\t end_depth index for {dim} slicing",
+                            node["additional"][f"end_{dim}"],
                     )
-                f.write(struct.pack("i", int(node["additional"]["end_d"])))
+                    f.write(struct.pack("i", int(node["additional"][f"end_{dim}"])))
 
             elif node["op_type"] == OPTYPE.Conv2D:
                 if verbose:

@@ -13,7 +13,7 @@ mkdir -p results;
 cd results;
 
 # no transpose
-L="EE1-1.10_model0 slice scatternd_c_tf2 scatternd_hwc_with_conv_tf2";
+L="EE1-1.10_model0 slice scatternd_c_tf2 scatternd_hwc_with_conv_tf2 slice_hwc";
 for F in $L; do
   ../utest.sh ../models/${F}.onnx --no_transpose;
 done
