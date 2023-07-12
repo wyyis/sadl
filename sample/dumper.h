@@ -126,7 +126,7 @@ template<typename T> bool sadl::Model<T>::dump(std::ostream &file)
     return false;
   }
 
-  char magic[9] = "SADL0003";
+  char magic[9] = "SADL0004";
   file.write(magic, 8);
   int32_t x = 0;
   if (std::is_same<T, float>::value)
