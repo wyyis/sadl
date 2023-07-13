@@ -44,7 +44,7 @@ import numpy as np
 import onnx
 
 # file format:
-# MAGIC: SADL0003 [char[8]]
+# MAGIC: SADL0004 [char[8]]
 # type_model [int32_t] 0:int32, 1:float, 2:int16
 # nb_layers [int32_t]
 # nb_inputs [int32_t]
@@ -118,9 +118,11 @@ class OPTYPE(IntEnum):
     Slice = (
         20,
     )  # Currently slicing across depth is supported with default step size of 1
+    PReLU = (21,)
     # In "tf2cpp", the same layer performs the matrix multiplication
     # and the matrix multiplication by batches.
     BatchMatMul = (6,)
+    ScatterND = (22,)
 
     # "BatchMatMulV2" did not exist in Tensorflow 1.9. It exists in
     # Tensorflow 1.15.
@@ -708,31 +710,23 @@ def parse_graph_node(
         myGraph[node.output[0]]["additional"]["data"] = node
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
-    elif node.op_type == "PRelu":  # map to leakyrelu because no training
-        # coef
+    elif node.op_type == "PRelu":
         additional = {}
         additional["data"] = node
-        additional["dims"] = [1]
-        dims, data, dtype = extract_additional_data(
-            node.input[1], False, model_onnx.graph, verbose
-        )
-        if np.prod(dims) != 1:
-            quit("[ERROR] PRelu slope not scalar:", dims)
-        f = np.frombuffer(data, dtype=np.float32)
-        additional["raw_data"] = np.array(float(f), dtype=np.float32).tobytes()
-        additional["dtype"] = DTYPE_SADL.FLOAT
-        map_onnx_to_myGraph[node.output[0] + "_COEF_NOT_IN_GRAPH"] = None
-
-        myGraph[node.output[0] + "_NOT_IN_GRAPH"] = {}
-        myGraph[node.output[0] + "_NOT_IN_GRAPH"]["inputs"] = []
-        myGraph[node.output[0] + "_NOT_IN_GRAPH"]["additional"] = additional
-        myGraph[node.output[0] + "_NOT_IN_GRAPH"]["op_type"] = OPTYPE.Const
+        n2 = getNodesWithOutput(node.input[1], model_onnx)
+        additional["dims"], additional["raw_data"], additional[
+            "dtype"
+        ] = extract_additional_data(node.input[1], False, model_onnx.graph, verbose)
+        myGraph[node.input[1]] = {}
+        myGraph[node.input[1]]["op_type"] = OPTYPE.Const
+        myGraph[node.input[1]]["inputs"] = []
+        myGraph[node.input[1]]["additional"] = additional
+        map_onnx_to_myGraph[node.input[1]] = node.input[1]
 
         myGraph[node.output[0]] = {}
-        myGraph[node.output[0]]["op_type"] = OPTYPE.LeakyReLU
-        myGraph[node.output[0]]["inputs"] = [
-            map_onnx_to_myGraph[n0name],
-            node.output[0] + "_NOT_IN_GRAPH",
+        myGraph[node.output[0]]["op_type"] = OPTYPE.PReLU
+        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [
+            map_onnx_to_myGraph[node.input[1]]
         ]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
@@ -861,27 +855,107 @@ def parse_graph_node(
 
     elif node.op_type == "Slice":
         # Slice
-        if len(node.input) != 4:
-            quit("[ERROR] currently pytorch slicing not supported")
+        if len(node.input) == 5:  # PyTorch
+            axes = getDims(getInitializer(node.input[3], model_onnx))
+            steps = getDims(getInitializer(node.input[4], model_onnx))
+            if not (len(axes) == 1 and axes[0] == 1):
+                quit("[ERROR] currently sadl slicing only supports in depth")
+            if not (len(steps) == 1 and steps[0] == 1):
+                quit("[ERROR] currently step has to be default one")
+        
         # Currently slicing support only across width is added
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Slice
         myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]]
         # assume depth is the last one, assume axes are always 0, 1, 2, etc.
         start = getDims(getInitializer(node.input[1], model_onnx))
-        for i in range(len(start) - 1):
-            if start[i] != 0:
-                quit("[ERROR] currently slicing only supported for last channel")
         end = getDims(getInitializer(node.input[2], model_onnx))
-        for i in range(len(end) - 1):
-            if end[i] != 2147483647:
-                quit("[ERROR] currently slicing only supported for last channel")
-        start_d = getDims(getInitializer(node.input[1], model_onnx))[-1]
-        end_d = getDims(getInitializer(node.input[2], model_onnx))[-1]
         additional = {}
-        additional["start_d"] = start_d
-        additional["end_d"] = end_d
+        dim_keys = ["b", "h", "w", "c"]
+        for i in range(1, len(dim_keys)):
+          additional[f"start_{dim_keys[i]}"] = 0
+          additional[f"end_{dim_keys[i]}"] = 2147483647
+        if len(start) > 1:
+           if start[0] != 0:            
+             quit("[ERROR] currently slicing not supported for first dimension")
+           if end[0] != 2147483647:
+             quit("[ERROR] currently slicing not supported for first dimension")
+           for i in range(1, len(start)):
+               start_d = getDims(getInitializer(node.input[1], model_onnx))[i]
+               end_d = getDims(getInitializer(node.input[2], model_onnx))[i]
+               if (end_d > 2147483647):  # The default infinity number in PyTorch INT64 ONNX is 9223372036854775807.
+                   end_d = 2147483647
+               additional[f"start_{dim_keys[i]}"] = start_d
+               additional[f"end_{dim_keys[i]}"] = end_d
+        else:  # last channel mode
+           for i in range(len(end) - 1):
+              if start[i] != 0:            
+                 quit("[ERROR] currently slicing not supported for first dimension")
+              if end[i] < 2147483647:
+                 quit("[ERROR] currently slicing only supported for last channel")
+           start_d = getDims(getInitializer(node.input[1], model_onnx))[-1]
+           end_d = getDims(getInitializer(node.input[2], model_onnx))[-1]
+           if (end_d > 2147483647):  # The default infinity number in PyTorch INT64 ONNX is 9223372036854775807.
+               end_d = 2147483647
+           additional[f"start_c"] = start_d
+           additional[f"end_c"] = end_d
         myGraph[node.output[0]]["additional"] = additional
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+
+    elif node.op_type == "ScatterND":
+        # The default input order for the ScatterND is data, indices, and updates.
+        if not is_constant(node.input[1], model_onnx.graph.initializer):
+            quit("[ERROR] The second input of the ScatterND must be indices.")
+        # indices
+        additional = {}
+        additional["data"] = node
+        additional["dims"], additional["raw_data"], additional[
+            "dtype"
+        ] = extract_additional_data(node.input[1], False, model_onnx.graph, verbose)
+        if len(additional["dims"]) == 5:
+            # When the tensor format is specified as NCHW4 (or NHWC4) and the value of N is 1, the format is transformed
+            # to CHW4 (or HWC4). Here, the "4" indicates the position index within a 4-dimensional tensor.
+            additional["dims"] = additional["dims"][1:]
+            # transpose CHW4 to HWC4
+            if node_annotation[node.input[1]].to_transpose:
+                tmp = [
+                    additional["dims"][1],
+                    additional["dims"][2],
+                    additional["dims"][0],
+                    additional["dims"][3],
+                ]
+                x = (
+                    np.frombuffer(additional["raw_data"], dtype=np.int32)
+                    .reshape(additional["dims"])
+                    .transpose(1, 2, 0, 3)
+                )
+                indices = x.copy()
+                for i in np.ndindex(indices.shape[:-1]):
+                    indices[i] = [
+                        indices[i][0],
+                        indices[i][2],
+                        indices[i][3],
+                        indices[i][1],
+                    ]
+                additional["dims"] = tmp
+                additional["raw_data"] = indices.flatten().tobytes()
+        else:
+            quit("[ERROR] Currently, ScatterND only supports indices of length 5.")
+        map_onnx_to_myGraph[node.input[1]] = node.input[1]
+        myGraph[node.input[1]] = {}
+        myGraph[node.input[1]]["inputs"] = []
+        myGraph[node.input[1]]["additional"] = additional
+        myGraph[node.input[1]]["op_type"] = OPTYPE.Const
+
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.ScatterND
+        myGraph[node.output[0]]["inputs"] = [
+            map_onnx_to_myGraph[n0name],  # data
+            map_onnx_to_myGraph[node.input[2]],  # updates
+            map_onnx_to_myGraph[node.input[1]],
+        ]  # indices
+        myGraph[node.output[0]]["additional"] = {}
+        myGraph[node.output[0]]["additional"]["data"] = node
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
     else:
@@ -949,7 +1023,7 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
 
     # dbg print(map_name_to_idx)
     with open(output_filename, "wb") as f:
-        f.write(str.encode("SADL0003"))
+        f.write(str.encode("SADL0004"))
         # output of the network type 0: int32 | 1: float | 2: int16 | default: float(1)
         f.write(struct.pack("i", int(DTYPE_SADL.FLOAT)))
 
@@ -1034,18 +1108,19 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
             #        f.write(struct.pack('f', float(layer['additional']['alpha'])))
 
             elif node["op_type"] == OPTYPE.Slice:
-                if verbose:
-                    print(
-                        "#\t start_depth index for slicing",
-                        node["additional"]["start_d"],
-                    )
-                f.write(struct.pack("i", int(node["additional"]["start_d"])))
-
-                if verbose:
-                    print(
-                        "#\t end_depth index for slicing", node["additional"]["end_d"]
-                    )
-                f.write(struct.pack("i", int(node["additional"]["end_d"])))
+                dim_keys = ["h", "w", "c"]
+                for dim in dim_keys:
+                    if verbose:
+                        print(
+                            f"#\t start_depth index for {dim} slicing",
+                            node["additional"][f"start_{dim}"],
+                        )
+                        print(
+                            f"#\t end_depth index for {dim} slicing",
+                            node["additional"][f"end_{dim}"],
+                        )
+                    f.write(struct.pack("i", int(node["additional"][f"start_{dim}"])))
+                    f.write(struct.pack("i", int(node["additional"][f"end_{dim}"])))
 
             elif node["op_type"] == OPTYPE.Conv2D:
                 if verbose:
@@ -1313,6 +1388,11 @@ def annotate_node(
         if global_data_layout == "nchw":
             node_annotation[n2.name].to_transpose = True
         #    node_annotation[n2.name].layout_onnx = 'nhwc'
+
+    elif node.op_type == "ScatterND":
+        n2 = getInitializer(node.input[1], model_onnx)
+        if global_data_layout == "nchw":
+            node_annotation[n2.name].to_transpose = True
 
     nexts = getNodesWithInput(node.output[0], model_onnx)
     for n in nexts:

@@ -68,7 +68,9 @@ struct OperationType
     Expand             = 18,
     Conv2DTranspose    = 19,
     Slice              = 20,
-    OperationTypeCount = 21
+    PReLU              = 21,
+    ScatterND          = 22,
+    OperationTypeCount = 23
   };
 };
 

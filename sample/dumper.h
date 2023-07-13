@@ -30,8 +30,12 @@ template<typename T> bool sadl::layers::Conv2DTranspose<T>::dump(std::ostream &f
 
 template<typename T> bool sadl::layers::Slice<T>::dump(std::ostream &file)
 {
-  file.write((const char *) &m_start_d, sizeof(m_start_d));
-  file.write((const char *) &m_end_d, sizeof(m_end_d));
+  file.write((const char *) &m_start_h, sizeof(m_start_h));
+  file.write((const char *) &m_end_h, sizeof(m_end_h));
+  file.write((const char *) &m_start_w, sizeof(m_start_w));
+  file.write((const char *) &m_end_w, sizeof(m_end_w));
+  file.write((const char *) &m_start_c, sizeof(m_start_c));
+  file.write((const char *) &m_end_c, sizeof(m_end_c));
   return true;
 }
 
@@ -122,7 +126,7 @@ template<typename T> bool sadl::Model<T>::dump(std::ostream &file)
     return false;
   }
 
-  char magic[9] = "SADL0003";
+  char magic[9] = "SADL0004";
   file.write(magic, 8);
   int32_t x = 0;
   if (std::is_same<T, float>::value)

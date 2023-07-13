@@ -71,8 +71,16 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
   case sadl::layers::OperationType::Expand:
     break;
   case sadl::layers::OperationType::Slice:
-    dynamic_cast<sadl::layers::Slice<T> &>(layerQ).m_start_d = dynamic_cast<const sadl::layers::Slice<float> &>(layer).m_start_d;
-    dynamic_cast<sadl::layers::Slice<T> &>(layerQ).m_end_d   = dynamic_cast<const sadl::layers::Slice<float> &>(layer).m_end_d;
+    dynamic_cast<sadl::layers::Slice<T> &>(layerQ).m_start_h = dynamic_cast<const sadl::layers::Slice<float> &>(layer).m_start_h;
+    dynamic_cast<sadl::layers::Slice<T> &>(layerQ).m_end_h   = dynamic_cast<const sadl::layers::Slice<float> &>(layer).m_end_h;
+    dynamic_cast<sadl::layers::Slice<T> &>(layerQ).m_start_w = dynamic_cast<const sadl::layers::Slice<float> &>(layer).m_start_w;
+    dynamic_cast<sadl::layers::Slice<T> &>(layerQ).m_end_w   = dynamic_cast<const sadl::layers::Slice<float> &>(layer).m_end_w;
+    dynamic_cast<sadl::layers::Slice<T> &>(layerQ).m_start_c = dynamic_cast<const sadl::layers::Slice<float> &>(layer).m_start_c;
+    dynamic_cast<sadl::layers::Slice<T> &>(layerQ).m_end_c   = dynamic_cast<const sadl::layers::Slice<float> &>(layer).m_end_c;
+    break;
+  case sadl::layers::OperationType::PReLU:
+    break;
+  case sadl::layers::OperationType::ScatterND:
     break;
     // no default to get warning
   }

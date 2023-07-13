@@ -53,6 +53,8 @@
 #include "layer_shape.h"
 #include "layer_expand.h"
 #include "layer_slice.h"
+#include "layer_prelu.h"
+#include "layer_scatternd.h"
 
 namespace sadl
 {
@@ -88,6 +90,8 @@ inline std::string opName(const OperationType::Type op)
     DIRTYCASEPRINT(Shape);
     DIRTYCASEPRINT(Expand);
     DIRTYCASEPRINT(Slice);
+    DIRTYCASEPRINT(PReLU);
+    DIRTYCASEPRINT(ScatterND);
   default:
     oss << "??";
     break;

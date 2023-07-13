@@ -5,7 +5,7 @@
 
 inline sadl::layers::TensorInternalType::Type getModelType(const std::string &filename)
 {
-  const std::string MAGICNUMBER = "SADL0003";
+  const std::string MAGICNUMBER = "SADL0004";
   std::ifstream     file(filename, std::ios::binary);
   if (!file)
   {

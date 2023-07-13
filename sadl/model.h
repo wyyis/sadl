@@ -167,6 +167,12 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
   case layers::OperationType::Slice:
     return std::unique_ptr<layers::Layer<T>>(new layers::Slice<T>{ id, op });
     break;
+  case layers::OperationType::PReLU:
+    return std::unique_ptr<layers::Layer<T>>(new layers::PReLU<T>{ id, op });
+    break;
+  case layers::OperationType::ScatterND:
+    return std::unique_ptr<layers::Layer<T>>(new layers::ScatterND<T>{id, op});
+    break;
   case layers::OperationType::OperationTypeCount:
     break;   // no default on purpose
   }
@@ -203,6 +209,10 @@ template<typename T> bool Model<T>::load(std::istream &file)
   else if (magic_s == "SADL0003")
   {
     m_version = Version::sadl03;
+  }
+  else if (magic_s == "SADL0004")
+  {
+    m_version = Version::sadl04;
   }
   else
   {
