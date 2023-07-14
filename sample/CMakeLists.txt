@@ -28,6 +28,9 @@ add_executable(debug_model   debug_model.cpp ${HEADER_FILES})
 
 add_executable(naive_quantization   naive_quantization.cpp ${HEADER_FILES} dumper.h)
 
+add_executable(update_model_version update_model_version.cpp ${HEADER_FILES} dumper.h)
+
+
 if( UNIX OR MINGW )
  set(CMAKE_CXX_FLAGS "-ffast-math -Wall -fstrict-aliasing") 
  set_target_properties(sample_simd256  PROPERTIES COMPILE_FLAGS "-mavx2" )

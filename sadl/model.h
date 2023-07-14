@@ -203,12 +203,15 @@ template<typename T> bool Model<T>::load(std::istream &file)
   {
     m_version = Version::sadl02;
 #if DEBUG_PRINT
-    std::cout << "[WARNING] SADL02 version model, please upgrade to SADL03" << std::endl;
+    std::cout << "[WARNING] SADL02 version model, please upgrade to SADL04" << std::endl;
 #endif
   }
   else if (magic_s == "SADL0003")
   {
     m_version = Version::sadl03;
+#if DEBUG_PRINT
+    std::cout << "[WARNING] SADL03 version model, please upgrade to SADL04" << std::endl;
+#endif
   }
   else if (magic_s == "SADL0004")
   {
