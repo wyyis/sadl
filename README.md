@@ -117,7 +117,12 @@ A script test is available to test all programs:
 ./sample/sample_test.sh
 ```
 
-
+## Convert old model
+A simple program is provided in sample which can convert old SADL models  to current version.
+```shell
+./sample/update_model_version old_model.sadl new_mdeol.sadl
+```
+ 
 ## Validation instruction
 
 
