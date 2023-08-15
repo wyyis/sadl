@@ -67,27 +67,30 @@ template<typename T> bool Slice<T>::apply(std::vector<Tensor<T> *> &in)
   const int        in_D{ A.dims()[3] };
   constexpr int    im_nb   = 0;
   constexpr int    pow2_31 = std::numeric_limits<int>::max();
+  int              end_h = m_end_h;
+  int              end_w = m_end_w;
+  int              end_c = m_end_c;
   // ONNX is sending 2^31 - 1 as value if end index is last channel
-  if (m_end_h == pow2_31)
+  if (end_h == pow2_31)
   {
-    m_end_h = in_H;
+    end_h = in_H;
   }
-  if (m_end_w == pow2_31)
+  if (end_w == pow2_31)
   {
-    m_end_w = in_W;
+    end_w = in_W;
   }
-  if (m_end_c == pow2_31)
+  if (end_c == pow2_31)
   {
-    m_end_c = in_D;
+    end_c = in_D;
   }
 
   m_out.quantizer = A.quantizer;
 
-  for (int im_i = m_start_h; im_i < m_end_h; im_i++)
+  for (int im_i = m_start_h; im_i < end_h; im_i++)
   {
-    for (int im_j = m_start_w; im_j < m_end_w; im_j++)
+    for (int im_j = m_start_w; im_j < end_w; im_j++)
     {
-      for (int im_d = m_start_c; im_d < m_end_c; im_d++)
+      for (int im_d = m_start_c; im_d < end_c; im_d++)
       {
         m_out(im_nb, im_i - m_start_h, im_j - m_start_w, im_d - m_start_c) = A(im_nb, im_i, im_j, im_d);
       }
@@ -106,22 +109,27 @@ template<typename T> bool Slice<T>::init(const std::vector<Tensor<T> *> &in)
   Dimensions dim;
   dim.resize(4);
   dim[0] = in[0]->dims()[0];
+
+  int end_h = m_end_h;
+  int end_w = m_end_w;
+  int end_c = m_end_c;
   // ONNX is sending 2^31 - 1 as value if end index is last channel
-  if (m_end_h == pow2_31)
+  if (end_h == pow2_31)
   {
-    m_end_h = in[0]->dims()[1];
+    end_h = in[0]->dims()[1];
   }
-  dim[1] = m_end_h - m_start_h;
-  if (m_end_w == pow2_31)
+  dim[1] = end_h - m_start_h;
+  if (end_w == pow2_31)
   {
-    m_end_w = in[0]->dims()[2];
+    end_w = in[0]->dims()[2];
   }
-  dim[2] = m_end_w - m_start_w;
-  if (m_end_c == pow2_31)
+  dim[2] = end_w - m_start_w;
+  if (end_c == pow2_31)
   {
-    m_end_c = in[0]->dims()[3];
+    end_c = in[0]->dims()[3];
   }
-  dim[3] = m_end_c - m_start_c;
+  dim[3] = end_c - m_start_c;
+
   m_out.resize(dim);
   SADL_DBG(std::cout << "  - output Slice: " << m_out.dims() << std::endl);
 

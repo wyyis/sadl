@@ -543,13 +543,11 @@ def parse_graph_node(
         myGraph[node.output[0]]["additional"]["data"] = node
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
+    #Constant node value has to be skipped for slicing
+    #This node is not used by any other onnx model in utests/models directory
+    #Const value of slice is taken care inside "Slice" condition 
     elif node.op_type == "Constant":  # ~ like an initializer
-        myGraph[node.output[0]] = {}
-        myGraph[node.output[0]]["op_type"] = OPTYPE.Const
-        myGraph[node.output[0]]["inputs"] = []
-        myGraph[node.output[0]]["additional"] = {}
-        myGraph[node.output[0]]["additional"]["data"] = node
-        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+        pass
 
     elif node.op_type == "Add":
         swap_inputs = False
@@ -856,49 +854,97 @@ def parse_graph_node(
     elif node.op_type == "Slice":
         # Slice
         if len(node.input) == 5:  # PyTorch
-            axes = getDims(getInitializer(node.input[3], model_onnx))
-            steps = getDims(getInitializer(node.input[4], model_onnx))
-            if not (len(axes) == 1 and axes[0] == 1):
-                quit("[ERROR] currently sadl slicing only supports in depth")
+            initializer = getInitializer(node.input[3], model_onnx)
+            # Case: In pytorch, Slice is not in model_onnx.graph.initializer but in model_onnx.graph.node
+            if initializer is None:
+                attribute = getAttribute(getNodesWithOutput(node.input[3], model_onnx), "value")
+                initializer = attribute.t
+            axes = getDims(initializer)
+
+            initializer = getInitializer(node.input[4], model_onnx)
+            # Case: In pytorch, Slice is not in model_onnx.graph.initializer but in model_onnx.graph.node
+            if initializer is None:
+                attribute = getAttribute(getNodesWithOutput(node.input[4], model_onnx), "value")
+                initializer = attribute.t
+            steps = getDims(initializer)
+
+            if (len(axes) != 1):
+                quit("[ERROR] currently sadl slicing support lenght of axes equal to one")
+            if (axes[0] == 0):
+                quit("[ERROR] currently slicing not supported for first dimension")
             if not (len(steps) == 1 and steps[0] == 1):
                 quit("[ERROR] currently step has to be default one")
-        
+
         # Currently slicing support only across width is added
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Slice
         myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]]
         # assume depth is the last one, assume axes are always 0, 1, 2, etc.
-        start = getDims(getInitializer(node.input[1], model_onnx))
-        end = getDims(getInitializer(node.input[2], model_onnx))
+
+        initializer = getInitializer(node.input[1], model_onnx)
+        if initializer is None:
+            attribute = getAttribute(getNodesWithOutput(node.input[1], model_onnx), "value")
+            initializer = attribute.t
+        start = getDims(initializer)
+
+        initializer = getInitializer(node.input[2], model_onnx)
+        if initializer is None:
+            attribute = getAttribute(getNodesWithOutput(node.input[2], model_onnx), "value")
+            initializer = attribute.t
+        end = getDims(initializer)
         additional = {}
         dim_keys = ["b", "h", "w", "c"]
         for i in range(1, len(dim_keys)):
           additional[f"start_{dim_keys[i]}"] = 0
           additional[f"end_{dim_keys[i]}"] = 2147483647
-        if len(start) > 1:
+        
+        #model_onnx got from tensorflow has length of start and end equal to 4
+        #model_onnx got from pytorch has length of start and end equal to 1. The dimension of slicing
+        #i.e., if slicing is done across C or H or W is controlled by axes
+        if len(start) > 1: #TensorFlow to onnx models
            if start[0] != 0:            
              quit("[ERROR] currently slicing not supported for first dimension")
            if end[0] != 2147483647:
              quit("[ERROR] currently slicing not supported for first dimension")
            for i in range(1, len(start)):
-               start_d = getDims(getInitializer(node.input[1], model_onnx))[i]
-               end_d = getDims(getInitializer(node.input[2], model_onnx))[i]
+               initializer = getInitializer(node.input[1], model_onnx)
+               if initializer is None:
+                   attribute = getAttribute(getNodesWithOutput(node.input[1], model_onnx), "value")
+                   initializer = attribute.t
+               start_d = getDims(initializer)[i]
+
+               initializer = getInitializer(node.input[2], model_onnx)
+               if initializer is None:
+                   attribute = getAttribute(getNodesWithOutput(node.input[2], model_onnx), "value")
+                   initializer = attribute.t
+               end_d = getDims(initializer)[i]
                if (end_d > 2147483647):  # The default infinity number in PyTorch INT64 ONNX is 9223372036854775807.
                    end_d = 2147483647
                additional[f"start_{dim_keys[i]}"] = start_d
                additional[f"end_{dim_keys[i]}"] = end_d
-        else:  # last channel mode
+        else:  # PyTorch to onnx models
+           dim_keys_torch = ["b", "c", "h", "w"]
            for i in range(len(end) - 1):
               if start[i] != 0:            
                  quit("[ERROR] currently slicing not supported for first dimension")
               if end[i] < 2147483647:
                  quit("[ERROR] currently slicing only supported for last channel")
-           start_d = getDims(getInitializer(node.input[1], model_onnx))[-1]
-           end_d = getDims(getInitializer(node.input[2], model_onnx))[-1]
+
+           initializer = getInitializer(node.input[1], model_onnx)
+           if initializer is None:
+               attribute = getAttribute(getNodesWithOutput(node.input[1], model_onnx), "value")
+               initializer = attribute.t
+           start_d = getDims(initializer)[-1]
+
+           initializer = getInitializer(node.input[2], model_onnx)
+           if initializer is None:
+               attribute = getAttribute(getNodesWithOutput(node.input[2], model_onnx), "value")
+               initializer = attribute.t
+           end_d = getDims(initializer)[-1]
            if (end_d > 2147483647):  # The default infinity number in PyTorch INT64 ONNX is 9223372036854775807.
                end_d = 2147483647
-           additional[f"start_c"] = start_d
-           additional[f"end_c"] = end_d
+           additional[f"start_{dim_keys_torch[axes[0]]}"] = start_d
+           additional[f"end_{dim_keys_torch[axes[0]]}"] = end_d
         myGraph[node.output[0]]["additional"] = additional
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
