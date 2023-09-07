@@ -70,7 +70,8 @@ struct OperationType
     Slice              = 20,
     PReLU              = 21,
     ScatterND          = 22,
-    OperationTypeCount = 23
+    GridSample         = 23,
+    OperationTypeCount = 24
   };
 };
 

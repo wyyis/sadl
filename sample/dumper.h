@@ -112,6 +112,14 @@ template<typename T> bool sadl::layers::Const<T>::dump(std::ostream &file)
   return true;
 }
 
+template<typename T> bool sadl::layers::GridSample<T>::dump(std::ostream &file)
+{
+  file.write((const char *) &m_align_corners, sizeof(m_align_corners));
+  file.write((const char *) &m_mode, sizeof(m_mode));
+  file.write((const char *) &m_padding_mode, sizeof(m_padding_mode));
+  return true;
+}
+
 template<typename T> bool sadl::layers::Layer<T>::dump(std::ostream &file)
 {
   // std::cout<<"todo? "<<opName(op_)<<std::endl;
