@@ -82,6 +82,11 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
     break;
   case sadl::layers::OperationType::ScatterND:
     break;
+  case sadl::layers::OperationType::GridSample:
+    dynamic_cast<sadl::layers::GridSample<T> &>(layerQ).m_align_corners = dynamic_cast<const sadl::layers::GridSample<float> &>(layer).m_align_corners;
+    dynamic_cast<sadl::layers::GridSample<T> &>(layerQ).m_mode          = dynamic_cast<const sadl::layers::GridSample<float> &>(layer).m_mode;
+    dynamic_cast<sadl::layers::GridSample<T> &>(layerQ).m_padding_mode  = dynamic_cast<const sadl::layers::GridSample<float> &>(layer).m_padding_mode;
+    break;
     // no default to get warning
   }
 

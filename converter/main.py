@@ -123,6 +123,7 @@ class OPTYPE(IntEnum):
     # and the matrix multiplication by batches.
     BatchMatMul = (6,)
     ScatterND = (22,)
+    GridSample = (23,)
 
     # "BatchMatMulV2" did not exist in Tensorflow 1.9. It exists in
     # Tensorflow 1.15.
@@ -1004,6 +1005,37 @@ def parse_graph_node(
         myGraph[node.output[0]]["additional"]["data"] = node
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
+    elif node.op_type == "GridSample":
+        # Currently, the official TensorFlow does not have an implementation for GridSample.
+        align_corners = getAttribute(node, "align_corners").i
+        mode = getAttribute(node, "mode").s.decode('utf-8')
+        padding_mode = getAttribute(node, "padding_mode").s.decode('utf-8')
+
+        mode_list = ["nearest", "bilinear"]
+        if not mode in mode_list:
+            quit("[ERROR] Currently, the mode of GridSample must in", mode_list, node)
+        else:
+            mode = mode_list.index(mode)
+        padding_mode_list = ["border"]
+        if not padding_mode in padding_mode_list:
+            quit("[ERROR] Currently, the padding_mode of GridSample must in",
+                 padding_mode_list, node)
+        else:
+            padding_mode = padding_mode_list.index(padding_mode)
+
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.GridSample
+        myGraph[node.output[0]]["inputs"] = [
+            map_onnx_to_myGraph[n0name],
+            map_onnx_to_myGraph[node.input[1]],
+        ]
+        myGraph[node.output[0]]["additional"] = {}
+        myGraph[node.output[0]]["additional"]["data"] = node
+        myGraph[node.output[0]]["additional"]["align_corners"] = align_corners
+        myGraph[node.output[0]]["additional"]["mode"] = mode
+        myGraph[node.output[0]]["additional"]["padding_mode"] = padding_mode
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+
     else:
         raise Exception("[ERROR] node not supported:\n{})".format(node))
 
@@ -1272,6 +1304,23 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
                     print("#\t axis", node["additional"]["axis"])
                 f.write(struct.pack("i", int(node["additional"]["axis"])))
 
+            elif node["op_type"] == OPTYPE.GridSample:
+                if verbose:
+                    print("#\t align_corners",
+                          node["additional"]["align_corners"])
+                f.write(struct.pack(
+                    "i", int(node["additional"]["align_corners"])))
+
+                if verbose:
+                    print("#\t mode", node["additional"]["mode"])
+                f.write(struct.pack("i", int(node["additional"]["mode"])))
+
+                if verbose:
+                    print("#\t padding_mode",
+                          node["additional"]["padding_mode"])
+                f.write(struct.pack(
+                    "i", int(node["additional"]["padding_mode"])))
+
             if (
                 node["op_type"] == OPTYPE.Conv2D
                 or node["op_type"] == OPTYPE.Conv2DTranspose
@@ -1347,6 +1396,19 @@ def annotate_node(
             else:
                 if verbose > 1:
                     print("[WARNING] transpose not for NCHW handling in\n", node)
+
+            if node_annotation[node.name].to_remove:
+                # The GridSample is usually used with Transpose. Cause the optical-flow will be
+                # transposed from (N,2,H,W) to (N,H,W,2) and this operation should not be removed.
+                # Meanwhile there will not have other operations after transposed feature with
+                # shape (N,H,W,2) in PyTorch, so the code in this IF statement will not influnce
+                # other situations.
+                nexts = getNodesWithInput(node.output[0], model_onnx)
+                for n in nexts:
+                    if n.op_type == "GridSample":
+                        node_annotation[node.name].to_remove = False
+                        node_annotation[node.name].layout_onnx = "nchw"
+                        break
 
     elif node.op_type == "Reshape":
         initializer = getInitializer(node.input[1], model_onnx)
