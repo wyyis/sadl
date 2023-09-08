@@ -497,7 +497,10 @@ def parse_graph_node(
                 additional["pads"] = [0, 0, 0, 0]
         if node.op_type == "ConvTranspose":
             a = getAttribute(node, "output_padding")
-            additional["output_padding"] = a.ints
+            if a:
+                additional["output_padding"] = a.ints
+            else:
+                additional["output_padding"] = [0, 0]
 
         if nb_inputs == 2:
             map_onnx_to_myGraph[node.output[0]] = node.output[0]
