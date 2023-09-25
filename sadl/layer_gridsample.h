@@ -48,25 +48,32 @@ public:
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
 
 protected:
-  virtual bool loadInternal(std::istream &file, Version) override;
-  void         gs_denormalize(float &x, int length);
-  void         pixel_addr_at_grid(int &addr, int H, int W, int C, int i, int j, int c);
-  void         atomic_bilinear(const Tensor<T> &X, float x, float y, int shift, int addr_out);
-  int          m_align_corners;   // 0: False, 1: True
-  int          m_mode;            // 0: "nearest", 1: "bilinear"
-  int          m_padding_mode;    // 0: "border"
   using T2 = typename ComputationType<T>::type;
+  virtual bool loadInternal(std::istream &file, Version) override;
+  bool         gridsample_nearest(std::vector<Tensor<T> *> &in);
+  bool         gridsample_bilinear(std::vector<Tensor<T> *> &in);
+  void         get_bilinear_coeffs(T2 x, T2 y, int pos[], T2 coeffs[]);
+  void         gs_denormalize(T2 &x, int length);
+  void         pixel_addr_at_grid(int H, int W, int &i, int &j);
+
+  enum gridsample_mode
+  {
+    gridsample_mode_nearest  = 0,
+    gridsample_mode_bilinear = 1
+  };
+  enum gridsample_paddingmode
+  {
+    gridsample_paddingmode_border = 0
+  };
+  int m_align_corners;   // 0: False, 1: True
+  int m_mode;            // 0: "nearest", 1: "bilinear"
+  int m_padding_mode;    // 0: "border"
+  int m_grid_quantizer;
   DUMP_MODEL_EXT;
 };
 
 template<typename T> bool GridSample<T>::loadInternal(std::istream &file, Version)
 {
-  if (!std::is_same<T, float>::value)
-  {
-    std::cerr << "[ERROR] Currently, GridSample only supports float data type." << std::endl;
-    return false;
-  }
-
   int32_t x = 0;
   file.read((char *) &x, sizeof(x));
   m_align_corners = x;
@@ -77,6 +84,11 @@ template<typename T> bool GridSample<T>::loadInternal(std::istream &file, Versio
   file.read((char *) &x, sizeof(x));
   m_padding_mode = x;
   SADL_DBG(std::cout << "  - padding_mode: " << m_padding_mode << std::endl);
+  if (m_align_corners != 1)
+  {
+    std::cerr << "[ERROR] invalid align corners: " << m_align_corners << std::endl;
+    return false;
+  }
   if (m_mode != 0 && m_mode != 1)
   {
     std::cerr << "[ERROR] invalid mode: " << m_mode << std::endl;
@@ -107,141 +119,189 @@ template<typename T> bool GridSample<T>::init(const std::vector<Tensor<T> *> &in
 
 template<typename T> bool GridSample<T>::apply(std::vector<Tensor<T> *> &in)
 {
+  if (m_mode == gridsample_mode_nearest)
+    return gridsample_nearest(in);
+  else if (m_mode == gridsample_mode_bilinear)
+    return gridsample_bilinear(in);
+
+  return false;
+}
+
+template<typename T> bool GridSample<T>::gridsample_nearest(std::vector<Tensor<T> *> &in)
+{
+  // Given an input X and a flow-field grid, computes the output Y using X
+  // values and pixel locations from the grid.
   const Tensor<T> &X    = *in[0];   // (1,H_in,W_in,C)
   const Tensor<T> &grid = *in[1];   // (1,W_out,2,H_out)
   m_out.quantizer       = X.quantizer;
+  m_grid_quantizer      = grid.quantizer;
   assert(X.dims()[0] == 1 && grid.dims()[0] == 1 && grid.dims()[2] == 2);
 
-  int   C                    = X.dims()[3];
-  int   H_in                 = X.dims()[1];
-  int   W_in                 = X.dims()[2];
-  int   H_out                = grid.dims()[3];
-  int   W_out                = grid.dims()[1];
-  float x_min                = (m_align_corners) ? 0 : -0.5;
-  float x_max                = (m_align_corners) ? W_in - 1 : W_in - 0.5;
-  float y_min                = (m_align_corners) ? 0 : -0.5;
-  float y_max                = (m_align_corners) ? H_in - 1 : H_in - 0.5;
-  bool  normalize_grid_flag  = !std::is_same<T, float>::value;
-  float normalize_grid_coeff = 2 << (grid.quantizer - 1);
-  int   shift                = grid.quantizer;
+  constexpr int im_nb = 0;
+  int           C     = X.dims()[3];
+  int           H_in  = X.dims()[1];
+  int           W_in  = X.dims()[2];
+  int           H_out = grid.dims()[3];
+  int           W_out = grid.dims()[1];
 
-  // Given an input X and a flow-field grid, computes the output Y using X values and pixel locations from the grid.
-  int addr_grid_x = -W_out, addr_grid_y = -W_out + H_out;
   for (int im_j = 0; im_j < W_out; im_j++)
   {
-    addr_grid_x += H_out;
-    addr_grid_y += H_out;
     for (int im_i = 0; im_i < H_out; im_i++)
     {
       // compute pixel locations from the grid
-      float x = grid[addr_grid_x++];
-      float y = grid[addr_grid_y++];
-      if (normalize_grid_flag)
-      {
-        x = x / normalize_grid_coeff;
-        y = y / normalize_grid_coeff;
-      }
+      T2 x = grid(im_nb, im_j, 0, im_i);
+      T2 y = grid(im_nb, im_j, 1, im_i);
       gs_denormalize(x, W_in);
       gs_denormalize(y, H_in);
-      if (m_mode == 0)   // nearest
-      {
-        x = round(x);
-        y = round(y);
-      }
-      if (x < x_min || x > x_max || y < y_min || y > y_max)
-      {
-        if (m_padding_mode == 0)   // border
-        {
-          x = (x < 0) ? 0 : ((x > W_in - 1) ? W_in - 1 : x);
-          y = (y < 0) ? 0 : ((y > H_in - 1) ? H_in - 1 : y);
-        }
-      }
+
       // compute the output Y using X values and pixel locations
-      int addr_out = (im_i * W_out + im_j) * C;
-      if (m_mode == 0)   // nearest
+      int x_int = int(x);
+      int y_int = int(y);
+      pixel_addr_at_grid(H_in, W_in, y_int, x_int);
+
+      for (int im_c = 0; im_c < C; im_c++)
       {
-        int addr_grid = 0;
-        pixel_addr_at_grid(addr_grid, H_in, W_in, C, int(y), int(x), 0);
-        for (int im_c = 0; im_c < C; im_c++)
-        {
-          m_out[addr_out++] = X[addr_grid];   // same data type
-          COUNTERS(X[addr_grid++]);
-        }
-      }
-      else if (m_mode == 1)   // bilinear
-      {
-        atomic_bilinear(X, x, y, shift, addr_out);
+        m_out(im_nb, im_i, im_j, im_c) = X(im_nb, y_int, x_int, im_c);
+        COUNTERS(X(im_nb, y_int, x_int, im_c));
       }
     }
   }
   return true;
 }
 
-template<typename T> void GridSample<T>::gs_denormalize(float &x, int length)
+template<typename T> bool GridSample<T>::gridsample_bilinear(std::vector<Tensor<T> *> &in)
 {
-  if (m_align_corners)
-  {
-    x = (x + 1) / 2.0 * (length - 1);
-  }
-  else
-  {
-    x = ((x + 1) * length - 1) / 2.0;
-  }
-}
+  // Given an input X and a flow-field grid, computes the output Y using X
+  // values and pixel locations from the grid.
+  const Tensor<T> &X    = *in[0];   // (1,H_in,W_in,C)
+  const Tensor<T> &grid = *in[1];   // (1,W_out,2,H_out)
+  m_out.quantizer       = X.quantizer;
+  m_grid_quantizer      = grid.quantizer;
+  assert(X.dims()[0] == 1 && grid.dims()[0] == 1 && grid.dims()[2] == 2);
 
-template<typename T> void GridSample<T>::pixel_addr_at_grid(int &addr, int H, int W, int C, int i, int j, int c)
-{
-  if (m_padding_mode == 0)   // border
-  {
-    i    = (i < 0) ? 0 : ((i > H - 1) ? H - 1 : i);
-    j    = (j < 0) ? 0 : ((j > W - 1) ? W - 1 : j);
-    addr = C * (W * i + j) + c;   // (0, i, j, c)
-  }
-}
+  constexpr int im_nb = 0;
+  int           shift = m_grid_quantizer + 1;
+  int           C     = X.dims()[3];
+  int           H_in  = X.dims()[1];
+  int           W_in  = X.dims()[2];
+  int           H_out = grid.dims()[3];
+  int           W_out = grid.dims()[1];
 
-template<typename T> void GridSample<T>::atomic_bilinear(const Tensor<T> &X, float x, float y, int shift, int addr_out)
-{
-  int H_in = X.dims()[1];
-  int W_in = X.dims()[2];
-  int C    = X.dims()[3];
-
-  T2    num{};
-  T     coeff11{}, coeff12{}, coeff21{}, coeff22{};
-  float x1 = floor(x), y1 = floor(y), x2 = x1 + 1, y2 = y1 + 1;
-  float normalize_grid_coeff = 2 << (shift - 1);
-  if (std::is_same<T2, float>::value)
+  for (int im_j = 0; im_j < W_out; im_j++)
   {
-    coeff11 = (y2 - y) * (x2 - x);   // dy2 * dx2
-    coeff12 = (y2 - y) * (x - x1);   // dy2 * dx1
-    coeff21 = (y - y1) * (x2 - x);   // dy1 * dx2
-    coeff22 = (y - y1) * (x - x1);   // dy1 * dx1
-  }
-  else
-  {
-    coeff11 = (y2 - y) * (x2 - x) * normalize_grid_coeff;
-    coeff12 = (y2 - y) * (x - x1) * normalize_grid_coeff;
-    coeff21 = (y - y1) * (x2 - x) * normalize_grid_coeff;
-    coeff22 = (y - y1) * (x - x1) * normalize_grid_coeff;
-  }
-
-  int addr_grid11 = 0, addr_grid12 = 0, addr_grid21 = 0, addr_grid22 = 0;
-  pixel_addr_at_grid(addr_grid11, H_in, W_in, C, y1, x1, 0);
-  pixel_addr_at_grid(addr_grid12, H_in, W_in, C, y1, x2, 0);
-  pixel_addr_at_grid(addr_grid21, H_in, W_in, C, y2, x1, 0);
-  pixel_addr_at_grid(addr_grid22, H_in, W_in, C, y2, x2, 0);
-  for (int im_c = 0; im_c < C; im_c++)
-  {
-    num = coeff11 * X[addr_grid11++] + coeff12 * X[addr_grid12++] + coeff21 * X[addr_grid21++] + coeff22 * X[addr_grid22++];
-    ComputationType<T>::quantize(num, shift);
+    for (int im_i = 0; im_i < H_out; im_i++)
     {
-      COUNTERS_MAC(coeff11);
-      COUNTERS_MAC(coeff12);
-      COUNTERS_MAC(coeff21);
-      COUNTERS_MAC(coeff22);
+      // compute pixel locations from the grid
+      T2 x = grid(im_nb, im_j, 0, im_i);
+      T2 y = grid(im_nb, im_j, 1, im_i);
+      gs_denormalize(x, W_in);
+      gs_denormalize(y, H_in);
+
+      // compute the output Y using X values and pixel locations
+      T2   coeffs[4];
+      int  pos[4];
+      T2  &coeff11 = coeffs[0], &coeff12 = coeffs[1], &coeff21 = coeffs[2], &coeff22 = coeffs[3];
+      int &x1 = pos[0], &y1 = pos[1], &x2 = pos[2], &y2 = pos[3];
+
+      get_bilinear_coeffs(x, y, pos, coeffs);
+      pixel_addr_at_grid(H_in, W_in, y1, x1);
+      pixel_addr_at_grid(H_in, W_in, y1, x2);
+      pixel_addr_at_grid(H_in, W_in, y2, x1);
+      pixel_addr_at_grid(H_in, W_in, y2, x2);
+
+      for (int im_c = 0; im_c < C; im_c++)
+      {
+        T2 num = coeff11 * X(im_nb, y1, x1, im_c) + coeff12 * X(im_nb, y1, x2, im_c) + coeff21 * X(im_nb, y2, x1, im_c) + coeff22 * X(im_nb, y2, x2, im_c);
+        ComputationType<T>::quantize(num, shift);
+        {
+          COUNTERS_MAC(coeff11);
+          COUNTERS_MAC(coeff12);
+          COUNTERS_MAC(coeff21);
+          COUNTERS_MAC(coeff22);
+        }
+        COUNTERS(num);
+        SATURATE(num);
+        m_out(im_nb, im_i, im_j, im_c) = num;
+      }
     }
-    COUNTERS(num);
-    SATURATE(num);
-    m_out[addr_out++] = static_cast<T>(num);
+  }
+  return true;
+}
+
+template<> void GridSample<float>::gs_denormalize(float &x, int length)
+{
+  if (m_mode == gridsample_mode_nearest)
+  {
+    x = (x + 1) * (length - 1) / 2.0;
+    x = round(x);
+  }
+  else if (m_mode == gridsample_mode_bilinear)
+  {
+    x = (x + 1) * (length - 1) / 2.0;
+  }
+}
+
+template<typename T> void GridSample<T>::gs_denormalize(T2 &x, int length)
+{
+  int shift = m_grid_quantizer;
+  if (m_mode == gridsample_mode_nearest)
+  {
+    T2 normalize_bias = 1 << shift;
+    x                 = (x + normalize_bias) * (length - 1);
+    x                 = (x + normalize_bias) >> (shift + 1);   // round
+  }
+  else if (m_mode == gridsample_mode_bilinear)
+  {
+    T2 normalize_bias = 1 << shift;
+    x                 = (x + normalize_bias) * (length - 1);   // shift later to to maintain precision in higher-order bits during computation
+  }
+}
+
+template<> void GridSample<float>::get_bilinear_coeffs(float x, float y, int pos[], float coeffs[])
+{
+  float &coeff11 = coeffs[0], &coeff12 = coeffs[1], &coeff21 = coeffs[2], &coeff22 = coeffs[3];
+  int   &x1 = pos[0], &y1 = pos[1], &x2 = pos[2], &y2 = pos[3];
+
+  x1        = floor(x);
+  y1        = floor(y);
+  x2        = x1 + 1;
+  y2        = y1 + 1;
+  float dy2 = y2 - y;
+  float dy1 = y - y1;
+  float dx2 = x2 - x;
+  float dx1 = x - x1;
+  coeff11   = dy2 * dx2;
+  coeff12   = dy2 * dx1;
+  coeff21   = dy1 * dx2;
+  coeff22   = dy1 * dx1;
+}
+
+template<typename T> void GridSample<T>::get_bilinear_coeffs(T2 x, T2 y, int pos[], T2 coeffs[])
+{
+  T2  &coeff11 = coeffs[0], &coeff12 = coeffs[1], &coeff21 = coeffs[2], &coeff22 = coeffs[3];
+  int &x1 = pos[0], &y1 = pos[1], &x2 = pos[2], &y2 = pos[3];
+
+  int shift = m_grid_quantizer + 1;
+  x1        = x >> shift;   // floor
+  y1        = y >> shift;
+  x2        = x1 + 1;
+  y2        = y1 + 1;
+  T2 dy2    = (y2 << shift) - y;
+  T2 dy1    = y - (y1 << shift);
+  T2 dx2    = (x2 << shift) - x;
+  T2 dx1    = x - (x1 << shift);
+  coeff11   = (dy2 * dx2) >> shift;
+  coeff12   = (dy2 * dx1) >> shift;
+  coeff21   = (dy1 * dx2) >> shift;
+  coeff22   = (dy1 * dx1) >> shift;
+}
+
+template<typename T> void GridSample<T>::pixel_addr_at_grid(int H, int W, int &i, int &j)
+{
+  if (m_padding_mode == gridsample_paddingmode_border)
+  {
+    i = (i < 0) ? 0 : ((i > H - 1) ? H - 1 : i);
+    j = (j < 0) ? 0 : ((j > W - 1) ? W - 1 : j);
   }
 }
 
