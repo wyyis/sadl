@@ -30,6 +30,7 @@ add_executable(naive_quantization   naive_quantization.cpp ${HEADER_FILES} dumpe
 
 add_executable(update_model_version update_model_version.cpp ${HEADER_FILES} dumper.h)
 
+add_executable(quantization_test quantization_test.cpp ${HEADER_FILES})
 
 if( UNIX OR MINGW )
  set(CMAKE_CXX_FLAGS "-ffast-math -Wall -fstrict-aliasing") 
