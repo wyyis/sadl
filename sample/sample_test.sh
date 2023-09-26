@@ -32,7 +32,7 @@ echo "[INFO] COUNT MAC"
 ./count_mac pytorch.sadl
 
 echo "[INFO] WRITE INT16 MODEL"
-echo  "0 15    1 8 2 0 3 8   6 8 7 0 8 8    10 9 11 0 12 8   14 8 15 1 16 8    20 8 21 0 22 9   24 8 25 0 26 8     28 8 29 0 30 8  34 8 35 0 36 8  38 0 39 0 42 8  43 0 44 8" | ./naive_quantization pytorch.sadl pytorch_int16.sadl;
+echo  "0 15    1 8 2 0 3 8   6 8 7 0 8 8    10 9 11 0 12 8   14 8 15 1 16 8    20 8 21 0 22 9   24 8 25 0 26 8     28 8 29 0 30 8  34 8 35 0 36 8  38 0 39 40 0 0 42 8  43 0 44 8" | ./naive_quantization pytorch.sadl pytorch_int16.sadl;
 
 echo "[INFO] QUANTIZATION CONSISTENCY"
 # Usage: quantization_test model_float.sadl model_int16.sadl inputs_range shift max_error
@@ -48,7 +48,7 @@ echo "[INFO] BUILD SADL SAMPLE SPARSE"
 mkdir -p sparse;
 cd sparse;
 cmake -DCMAKE_BUILD_TYPE=Release -DSPARSE_MATMULT_SUPPORT=1 ../../sample
-make sample_simd512
+make sample_simd512 debug_model
 echo ""
 
 echo "[INFO] PYTORCH -> ONNX -> SADL"
@@ -62,7 +62,7 @@ echo "[INFO] CHECK sparsity"
 echo ""
 
 echo "[INFO] INFERENCE not sparse"
-../sample_simd512 pytorch_matmult.sadl 
+./sample_simd512 pytorch_matmult.sadl 
 echo ""
 
 echo "[INFO] INFERENCE sparse"
@@ -78,6 +78,7 @@ if [ -f tf2.sadl -a -f pytorch.sadl \
      -a -f naive_quantization \
      -a -f quantization_test \
      -a -f sparse/pytorch_matmult.sadl ]; then
+ echo "[INFO] all build OK"
  exit 0;
 else
  exit 1;

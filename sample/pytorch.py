@@ -6,7 +6,7 @@ import torch.nn as nn
 def weights_init(m):
     if isinstance(m, nn.Conv2d):
         torch.nn.init.xavier_uniform_(m.weight)
-        torch.nn.init.zeros_(m.bias)
+        torch.nn.init.uniform_(m.bias)
 
 
 h = 16
