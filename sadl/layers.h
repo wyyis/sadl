@@ -56,6 +56,7 @@
 #include "layer_prelu.h"
 #include "layer_scatternd.h"
 #include "layer_gridsample.h"
+#include "layer_resize.h"
 
 namespace sadl
 {
@@ -94,6 +95,7 @@ inline std::string opName(const OperationType::Type op)
     DIRTYCASEPRINT(PReLU);
     DIRTYCASEPRINT(ScatterND);
     DIRTYCASEPRINT(GridSample);
+    DIRTYCASEPRINT(Resize);
   default:
     oss << "??";
     break;

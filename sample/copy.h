@@ -87,6 +87,13 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
     dynamic_cast<sadl::layers::GridSample<T> &>(layerQ).m_mode          = dynamic_cast<const sadl::layers::GridSample<float> &>(layer).m_mode;
     dynamic_cast<sadl::layers::GridSample<T> &>(layerQ).m_padding_mode  = dynamic_cast<const sadl::layers::GridSample<float> &>(layer).m_padding_mode;
     break;
+  case sadl::layers::OperationType::Resize:
+    dynamic_cast<sadl::layers::Resize<T> &>(layerQ).m_input_label = dynamic_cast<const sadl::layers::Resize<float> &>(layer).m_input_label;
+    dynamic_cast<sadl::layers::Resize<T> &>(layerQ).m_coordinate_transformation_mode =
+      dynamic_cast<const sadl::layers::Resize<float> &>(layer).m_coordinate_transformation_mode;
+    dynamic_cast<sadl::layers::Resize<T> &>(layerQ).m_mode            = dynamic_cast<const sadl::layers::Resize<float> &>(layer).m_mode;
+    dynamic_cast<sadl::layers::Resize<T> &>(layerQ).m_nearest_mode    = dynamic_cast<const sadl::layers::Resize<float> &>(layer).m_nearest_mode;
+    break;
     // no default to get warning
   }
 

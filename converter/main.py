@@ -124,6 +124,7 @@ class OPTYPE(IntEnum):
     BatchMatMul = (6,)
     ScatterND = (22,)
     GridSample = (23,)
+    Resize = (24,)
 
     # "BatchMatMulV2" did not exist in Tensorflow 1.9. It exists in
     # Tensorflow 1.15.
@@ -1039,6 +1040,76 @@ def parse_graph_node(
         myGraph[node.output[0]]["additional"]["padding_mode"] = padding_mode
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
+    elif node.op_type == "Resize":
+        # Between 2 and 4 inputs. The default input order for the Resize is X, roi, scales, and sizes.
+        input_label = 0
+        input_list = [map_onnx_to_myGraph[n0name]]
+        for input_index, input_name in enumerate(node.input):
+            if is_constant(input_name, model_onnx.graph.initializer):
+                additional = {}
+                additional["data"] = node
+                additional["dims"], additional["raw_data"], additional[
+                    "dtype"
+                ] = extract_additional_data(input_name, False, model_onnx.graph, verbose)
+                if additional["raw_data"] == b"": # When tensor data is empty, just ignore it.
+                    continue
+
+                map_onnx_to_myGraph[input_name] = input_name
+                myGraph[input_name] = {}
+                myGraph[input_name]["inputs"] = []
+                myGraph[input_name]["additional"] = additional
+                myGraph[input_name]["op_type"] = OPTYPE.Const
+                input_list.append(map_onnx_to_myGraph[input_name])
+                input_label = input_label + (1 << (3 - input_index))
+        if input_label != 1 and input_label != 2:
+            quit("[ERROR] Currently, the inputs of Resize have to be X and sizes, or X and scales.")
+
+        # attribute (str -> int)
+        coordinate_transformation_mode = getAttribute(node, "coordinate_transformation_mode").s.decode("utf-8")
+        cubic_coeff_a = getAttribute(node, "cubic_coeff_a")
+        exclude_outside = getAttribute(node, "exclude_outside")
+        mode = getAttribute(node, "mode").s.decode("utf-8")
+        nearest_mode = getAttribute(node, "nearest_mode").s.decode("utf-8")
+
+        coordinate_transformation_mode_list = ["half_pixel", "asymmetric"]
+        if not coordinate_transformation_mode in coordinate_transformation_mode_list:
+            quit("[ERROR] Currently, the coordinate_transformation_mode of Resize must in", coordinate_transformation_mode_list, node)
+        else:
+            coordinate_transformation_mode = coordinate_transformation_mode_list.index(coordinate_transformation_mode)
+        if cubic_coeff_a is None:
+            cubic_coeff_a = -0.75
+        else:
+            cubic_coeff_a = cubic_coeff_a.f
+        if not cubic_coeff_a == -0.75:
+            quit("[ERROR] Currently, the cubic_coeff_a of Resize must be default -0.75.", node)
+        if exclude_outside is None:
+            exclude_outside = 0
+        else:
+            exclude_outside =  exclude_outside.i
+        if not exclude_outside == 0:
+            quit("[ERROR] Currently, the exclude_outside of Resize must be default 0.", node)
+        mode_list = ["linear", "nearest"]
+        if not mode in mode_list:
+            quit("[ERROR] Currently, the mode of Resize must in", mode_list, node)
+        else:
+            mode = mode_list.index(mode)
+        nearest_mode_list = ["floor", "round_prefer_ceil"]
+        if not nearest_mode in nearest_mode_list:
+            quit("[ERROR] Currently, the nearest_mode of Resize must in", nearest_mode_list, node)
+        else:
+            nearest_mode = nearest_mode_list.index(nearest_mode)
+        
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.Resize
+        myGraph[node.output[0]]["inputs"] = input_list
+        myGraph[node.output[0]]["additional"] = {}
+        myGraph[node.output[0]]["additional"]["data"] = node
+        myGraph[node.output[0]]["additional"]["input_label"] = input_label
+        myGraph[node.output[0]]["additional"]["coordinate_transformation_mode"] = coordinate_transformation_mode
+        myGraph[node.output[0]]["additional"]["mode"] = mode
+        myGraph[node.output[0]]["additional"]["nearest_mode"] = nearest_mode
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+
     else:
         raise Exception("[ERROR] node not supported:\n{})".format(node))
 
@@ -1323,6 +1394,23 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
                           node["additional"]["padding_mode"])
                 f.write(struct.pack(
                     "i", int(node["additional"]["padding_mode"])))
+
+            elif node["op_type"] == OPTYPE.Resize:
+                if verbose:
+                    print("#\t input_label", node["additional"]["input_label"])
+                f.write(struct.pack("i", int(node["additional"]["input_label"])))
+
+                if verbose:
+                    print("#\t coordinate_transformation_mode", node["additional"]["coordinate_transformation_mode"])
+                f.write(struct.pack("i", int(node["additional"]["coordinate_transformation_mode"])))
+                
+                if verbose:
+                    print("#\t mode", node["additional"]["mode"])
+                f.write(struct.pack("i", int(node["additional"]["mode"])))
+                
+                if verbose:
+                    print("#\t nearest_mode", node["additional"]["nearest_mode"])
+                f.write(struct.pack("i", int(node["additional"]["nearest_mode"])))
 
             if (
                 node["op_type"] == OPTYPE.Conv2D
