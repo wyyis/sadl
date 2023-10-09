@@ -176,6 +176,9 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
   case layers::OperationType::GridSample:
     return std::unique_ptr<layers::Layer<T>>(new layers::GridSample<T>{ id, op });
     break;
+  case layers::OperationType::Resize:
+    return std::unique_ptr<layers::Layer<T>>(new layers::Resize<T>{ id, op });
+    break;
   case layers::OperationType::OperationTypeCount:
     break;   // no default on purpose
   }

@@ -71,7 +71,8 @@ struct OperationType
     PReLU              = 21,
     ScatterND          = 22,
     GridSample         = 23,
-    OperationTypeCount = 24
+    Resize             = 24,
+    OperationTypeCount = 25
   };
 };
 

@@ -120,6 +120,15 @@ template<typename T> bool sadl::layers::GridSample<T>::dump(std::ostream &file)
   return true;
 }
 
+template<typename T> bool sadl::layers::Resize<T>::dump(std::ostream &file)
+{
+  file.write((const char *) &m_input_label, sizeof(m_input_label));
+  file.write((const char *) &m_coordinate_transformation_mode, sizeof(m_coordinate_transformation_mode));
+  file.write((const char *) &m_mode, sizeof(m_mode));
+  file.write((const char *) &m_nearest_mode, sizeof(m_nearest_mode));
+  return true;
+}
+
 template<typename T> bool sadl::layers::Layer<T>::dump(std::ostream &file)
 {
   // std::cout<<"todo? "<<opName(op_)<<std::endl;
