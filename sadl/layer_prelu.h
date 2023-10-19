@@ -81,6 +81,7 @@ template<typename T> bool PReLU<T>::apply(std::vector<Tensor<T> *> &in)
             ComputationType<T>::quantize(z, alpha_q);
             COUNTERS(z);
             COUNTERS_MAC(z);
+            SATURATE(z);
             m_out(n_nb, h_nb, w_nb, c_nb) = z;
           }
         }
