@@ -133,7 +133,7 @@ void bilinear_in_channels_wo_simd(const Tensor<T> &data, const T2 coeffs[], cons
 
 #if __AVX2__
 template<>
-void bilinear_in_channels_simd256(const Tensor<float> &data, const float coeffs[], const int pos[], const int shift, const int im_i, const int im_j,
+inline void bilinear_in_channels_simd256(const Tensor<float> &data, const float coeffs[], const int pos[], const int shift, const int im_i, const int im_j,
                                     Tensor<float> &out)
 {
   constexpr int im_nb = 0;
@@ -169,7 +169,7 @@ void bilinear_in_channels_simd256(const Tensor<float> &data, const float coeffs[
 }
 
 template<>
-void bilinear_in_channels_simd256(const Tensor<int16_t> &data, const int32_t coeffs[], const int pos[], const int shift, const int im_i, const int im_j,
+inline void bilinear_in_channels_simd256(const Tensor<int16_t> &data, const int32_t coeffs[], const int pos[], const int shift, const int im_i, const int im_j,
                                     Tensor<int16_t> &out)
 {
   constexpr int im_nb = 0;
@@ -216,7 +216,7 @@ void bilinear_in_channels_simd256(const Tensor<T> &data, const T2 coeffs[], cons
 
 #if __AVX512F__
 template<>
-void bilinear_in_channels_simd512(const Tensor<float> &data, const float coeffs[], const int pos[], const int shift, const int im_i, const int im_j,
+inline void bilinear_in_channels_simd512(const Tensor<float> &data, const float coeffs[], const int pos[], const int shift, const int im_i, const int im_j,
                                     Tensor<float> &out)
 {
   constexpr int im_nb = 0;
@@ -254,7 +254,7 @@ void bilinear_in_channels_simd512(const Tensor<float> &data, const float coeffs[
 
 #if __AVX512BW__
 template<>
-void bilinear_in_channels_simd512(const Tensor<int16_t> &data, const int32_t coeffs[], const int pos[], const int shift, const int im_i, const int im_j,
+inline void bilinear_in_channels_simd512(const Tensor<int16_t> &data, const int32_t coeffs[], const int pos[], const int shift, const int im_i, const int im_j,
                                     Tensor<int16_t> &out)
 {
   constexpr int im_nb = 0;
