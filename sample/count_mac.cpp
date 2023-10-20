@@ -84,7 +84,7 @@ template<typename T> void infer(const string &filename)
   cout << "[INFO] " << stat.op << " OPs" << endl;
   cout << "[INFO] " << stat.mac << " MACs" << endl;
   cout << "[INFO] " << stat.overflow << " overflow" << endl;
-  // cout << "[INFO] " << stat.mac_nz << " MACs non 0" << endl;
+  cout << "[INFO] " << stat.mac_nz << " MACs non 0" << endl;
   cout << "[INFO] ---------------------------------" << endl;
 }
 

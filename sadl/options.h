@@ -76,9 +76,11 @@ template<typename T> T my_abs(T x) { return x < T{} ? -x : x; }
   ++this->cpt_mac;                                                                                                                                             \
   if (X != 0)                                                                                                                                                  \
   ++this->cpt_mac_nz
+#define COUNTERS_MAC_NOP(X) this->cpt_mac+=X
 #else
 #define COUNTERS(X) (void) X
 #define COUNTERS_MAC(X) (void) X
+#define COUNTERS_MAC_NOP(X) (void) (X)  
 #endif
 
 #ifndef DUMP_MODEL_EXT
