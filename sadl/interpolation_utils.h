@@ -109,8 +109,10 @@ void bilinear_in_channels_wo_simd(const Tensor<T> &data, const T2 coeffs[], cons
   const int    &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
   const int     pos_table[4][2] = { y_ori_top, x_ori_left, y_ori_top, x_ori_right, y_ori_bottom, x_ori_left, y_ori_bottom, x_ori_right };
 
-  T2 temp_buffer[in_D];
-  memset(temp_buffer, 0, sizeof(T2) * in_D);
+  static std::vector<T2> temp_buffer;
+  temp_buffer.resize(in_D);
+  std::fill(temp_buffer.begin(),temp_buffer.end(),(T2)0);
+
 
   for (int coeff_i = 0; coeff_i < 4; coeff_i++)
   {
@@ -142,8 +144,9 @@ inline void bilinear_in_channels_simd256(const Tensor<float> &data, const float 
   const int &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
   const int  pos_table[4][2] = { y_ori_top, x_ori_left, y_ori_top, x_ori_right, y_ori_bottom, x_ori_left, y_ori_bottom, x_ori_right };
 
-  float temp_buffer[in_D];
-  memset(temp_buffer, 0, sizeof(float) * in_D);
+  static std::vector<float> temp_buffer;
+  temp_buffer.resize(in_D);
+  std::fill(temp_buffer.begin(),temp_buffer.end(),0.f);
 
   for (int coeff_i = 0; coeff_i < 4; coeff_i++)
   {
@@ -181,8 +184,9 @@ inline void bilinear_in_channels_simd256(const Tensor<int16_t> &data, const int3
   const int &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
   const int  pos_table[4][2] = { y_ori_top, x_ori_left, y_ori_top, x_ori_right, y_ori_bottom, x_ori_left, y_ori_bottom, x_ori_right };
 
-  int32_t temp_buffer[in_D];
-  memset(temp_buffer, 0, sizeof(int32_t) * in_D);
+  static std::vector<int32_t> temp_buffer;
+  temp_buffer.resize(in_D);
+  std::fill(temp_buffer.begin(),temp_buffer.end(),0);
 
   for (int coeff_i = 0; coeff_i < 4; coeff_i++)
   {
@@ -225,8 +229,9 @@ inline void bilinear_in_channels_simd512(const Tensor<float> &data, const float 
   const int &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
   const int  pos_table[4][2] = { y_ori_top, x_ori_left, y_ori_top, x_ori_right, y_ori_bottom, x_ori_left, y_ori_bottom, x_ori_right };
 
-  float temp_buffer[in_D];
-  memset(temp_buffer, 0, sizeof(float) * in_D);
+  static std::vector<float> temp_buffer;
+  temp_buffer.resize(in_D);
+  std::fill(temp_buffer.begin(),temp_buffer.end(),0.f);
 
   for (int coeff_i = 0; coeff_i < 4; coeff_i++)
   {
@@ -266,8 +271,9 @@ inline void bilinear_in_channels_simd512(const Tensor<int16_t> &data, const int3
   const int &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
   const int  pos_table[4][2] = { y_ori_top, x_ori_left, y_ori_top, x_ori_right, y_ori_bottom, x_ori_left, y_ori_bottom, x_ori_right };
 
-  int32_t temp_buffer[in_D];
-  memset(temp_buffer, 0, sizeof(int32_t) * in_D);
+  static std::vector<int32_t> temp_buffer;
+  temp_buffer.resize(in_D);
+  std::fill(temp_buffer.begin(),temp_buffer.end(),0);
 
   for (int coeff_i = 0; coeff_i < 4; coeff_i++)
   {
