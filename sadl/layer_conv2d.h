@@ -442,6 +442,8 @@ template<typename T> void Conv2D<T>::conv2d(const Tensor<T> &A, const Tensor<T> 
               {
                 x += (typename ComputationType<T>::type) A(im_nb, ii, jj, offset + filter_d) * kernel(ki, kj, filter, filter_d);
                 COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
+              } else {
+                COUNTERS_MAC_NOP(1);
               }
             }
           }

@@ -86,6 +86,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_pee
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
+        COUNTERS_MAC_NOP(in_D*(3*3-(i1-i0+1)*(j1-j0+1)));
         m_out(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
       };
 
@@ -150,6 +151,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_pee
           ComputationType<T>::quantize(x, shift);
           COUNTERS(x);
           SATURATE(x);
+          COUNTERS_MAC_NOP(in_D*(3*3-3*(ihalf_size+start_w+1)));
           m_out(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
         }
 
@@ -176,6 +178,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_pee
           ComputationType<T>::quantize(x, shift);
           COUNTERS(x);
           SATURATE(x);
+          COUNTERS_MAC_NOP(in_D*(3*3-3*(end_filter+ihalf_size+1)));
           m_out(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
         }
       }
@@ -207,6 +210,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_pee
           ComputationType<T>::quantize(x, shift);
           COUNTERS(x);
           SATURATE(x);
+          COUNTERS_MAC_NOP(in_D*(3*3-3*(ihalf_size+start_h+1)));
           m_out(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
         }
         im_i = ((in_H - ihalf_size - start_h) / s_h) * s_h + start_h;
@@ -232,6 +236,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_pee
           ComputationType<T>::quantize(x, shift);
           COUNTERS(x);
           SATURATE(x);
+          COUNTERS_MAC_NOP(in_D*(3*3-3*(end_filter+ihalf_size+1)));
           m_out(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
         }
       }

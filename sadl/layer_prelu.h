@@ -83,7 +83,9 @@ template<typename T> bool PReLU<T>::apply(std::vector<Tensor<T> *> &in)
             COUNTERS_MAC(z);
             SATURATE(z);
             m_out(n_nb, h_nb, w_nb, c_nb) = z;
-          }
+          } else {
+            COUNTERS_MAC_NOP(1);
+          } 
         }
       }
     }

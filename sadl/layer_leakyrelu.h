@@ -72,6 +72,8 @@ template<typename T> bool LeakyRelu<T>::apply(std::vector<Tensor<T> *> &in)
       COUNTERS_MAC(z);
       SATURATE(z); 
       x = z;
+    } else {
+      COUNTERS_MAC_NOP(1);
     }
   }
 

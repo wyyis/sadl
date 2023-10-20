@@ -86,6 +86,8 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_5x5_s(con
               {
                 x += (typename ComputationType<T>::type) A(im_nb, ii, jj, offset + filter_d) * kernel(ki, kj, filter, filter_d);
                 COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
+              } else {
+                COUNTERS_MAC_NOP(1);
               }
             }
           }
