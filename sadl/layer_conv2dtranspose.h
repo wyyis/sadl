@@ -453,7 +453,7 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_simd256(int nb_filters, const Ten
             // fixed
             for (int filter_d = 0; filter_d < in_D; filter_d += 16)
             {
-              const __m256i k0   = _mm256_loadu_si256((__m256i_u *) (kptr + filter_d));   // not always aligned
+              const __m256i k0   = _mm256_loadu_si256((__m256i *) (kptr + filter_d));   // not always aligned
               const __m256i v0   = _mm256_load_si256((__m256i *) (aptr + filter_d));
               const __m256i mad0 = _mm256_madd_epi16(k0, v0);   // res in si32
               s                  = _mm256_add_epi32(s, mad0);

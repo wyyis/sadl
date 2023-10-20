@@ -196,9 +196,9 @@ inline void bilinear_in_channels_simd256(const Tensor<int16_t> &data, const int3
     for (int im_c = 0; im_c < in_D; im_c += 8)
     {
       const __m256i d0 = _mm256_cvtepi16_epi32(_mm_loadu_si128((__m128i *) (dptr + im_c)));
-      const __m256i b0 = _mm256_loadu_si256((__m256i_u *) (bptr + im_c));
+      const __m256i b0 = _mm256_loadu_si256((__m256i *) (bptr + im_c));
       const __m256i s  = _mm256_add_epi32(_mm256_mullo_epi32(c0, d0), b0);   // res in int32
-      _mm256_storeu_si256((__m256i_u *) (bptr + im_c), s);
+      _mm256_storeu_si256((__m256i *) (bptr + im_c), s);
     }
   }
   for (int im_c = 0; im_c < in_D; im_c++)
