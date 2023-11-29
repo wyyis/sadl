@@ -708,7 +708,6 @@ template<typename T> void Model<T>::insertCopyLayers()
     }
     if (layer_with_current_as_mutable_input.size() > 1)
     {                                                           // need copy layer
-      assert(layer_with_current_as_mutable_input.size() < 3);   // for now. can be removed ?
       // for current layer L, insert copy layers C just after: x x x L C C xxxx
       std::vector<typename layers::Layer<T>::Id> id_copy_layers;
       for (int n = 0; n < (int) layer_with_current_as_mutable_input.size() - 1; ++n)
