@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2023, ITU/ISO/IEC
+ * Copyright (c) 2010-2024, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -126,6 +126,9 @@ protected:
 
   }
 
+  template<int in_D, int ihalf_size, int jhalf_size> void simd32_conv2d_ixj_s11_g1_d_core(const Tensor<T> &A, const Tensor<T> &kernel) {
+    simd16_conv2d_ixj_s11_g1_d_core<in_D,ihalf_size,jhalf_size>(A,kernel);
+  }
 #endif
   DUMP_MODEL_EXT;
 };
