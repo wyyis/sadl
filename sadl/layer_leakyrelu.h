@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2023, ITU/ISO/IEC
+ * Copyright (c) 2010-2024, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,64 +32,12 @@
  */
 #pragma once
 #include "layer.h"
+#include "layer_prelu.h"
 
 namespace sadl
 {
 namespace layers
 {
-template<typename T> class LeakyRelu : public Layer<T>
-{
-public:
-  using Layer<T>::Layer;
-  using Layer<T>::m_out;   // to avoid this->
-  using Layer<T>::m_initDone;
-
-  virtual bool apply(std::vector<Tensor<T> *> &in) override;
-  virtual bool init(const std::vector<Tensor<T> *> &in) override;
-  virtual bool mutateInput() const override { return true; }
-
-protected:
-  virtual bool loadInternal(std::istream &file, Version) override;
-};
-
-template<typename T> bool LeakyRelu<T>::apply(std::vector<Tensor<T> *> &in)
-{
-  assert(in.size() == 2);
-  assert(in[0]->dims() == m_out.dims());
-  const Tensor<T> &A = *in[1];
-  swap(*in[0], m_out);
-  // keep same qunatiz as input
-  const typename ComputationType<T>::type alpha = A[0];
-
-  const int alpha_q = A.quantizer;
-  for (auto &x: m_out)
-  {
-    if (x < 0)
-    {
-      typename ComputationType<T>::type z = x * alpha;
-      ComputationType<T>::quantize(z, alpha_q);
-      COUNTERS(z);
-      COUNTERS_MAC(z);
-      SATURATE(z); 
-      x = z;
-    } else {
-      COUNTERS_MAC_NOP(1);
-    }
-  }
-
-  return true;
-}
-
-template<typename T> bool LeakyRelu<T>::init(const std::vector<Tensor<T> *> &in)
-{
-  if (in.size() != 2)
-    return false;
-  m_out.resize(in[0]->dims());
-  m_initDone = true;
-  return true;
-}
-
-template<typename T> bool LeakyRelu<T>::loadInternal(std::istream &, Version) { return true; }
-
+template<typename T>  using LeakyRelu=PReLU<T>;
 }   // namespace layers
 }   // namespace sadl

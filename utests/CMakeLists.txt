@@ -12,7 +12,7 @@ add_executable(test   test.cpp ${HEADER_FILES})
 
 if( UNIX OR MINGW )
  set(CMAKE_CXX_FLAGS "-ffast-math -Wall -fstrict-aliasing") 
- set_target_properties(test  PROPERTIES COMPILE_FLAGS "-mavx2  -mavx512f -mavx512bw" )
+ set_target_properties(test  PROPERTIES COMPILE_FLAGS "-mavx2  -mavx512f -mavx512bw -mavx512dq" )
 endif()
 
 

@@ -35,8 +35,8 @@ add_executable(quantization_test quantization_test.cpp ${HEADER_FILES})
 if( UNIX OR MINGW )
  set(CMAKE_CXX_FLAGS "-ffast-math -Wall -fstrict-aliasing") 
  set_target_properties(sample_simd256  PROPERTIES COMPILE_FLAGS "-mavx2" )
- set_target_properties(sample_simd512  PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512bw" )
- set_target_properties(debug_model  PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512bw" ) # must build in SIMD mode to debug SIMD issue
+ set_target_properties(sample_simd512  PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512bw -mavx512dq" )
+ set_target_properties(debug_model  PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512bw -mavx512dq" ) # must build in SIMD mode to debug SIMD issue
 endif()
 
 
