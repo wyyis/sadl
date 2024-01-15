@@ -74,4 +74,4 @@ inputs_torch = [torch.from_numpy(input0)]
 inputs_torch[0].requires_grad = True
 output = model(inputs_torch)
 print("Output", output)
-torch.onnx.export(model, inputs_torch, "./pytorch.onnx")
+torch.onnx.export(model, inputs_torch, "./pytorch.onnx", opset_version=10)
