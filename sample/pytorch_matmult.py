@@ -30,5 +30,5 @@ output = model(inputs_torch)
 print("Output", output)
 print(model)
 torch.onnx.export(
-    model, inputs_torch, "./pytorch_matmult.onnx", verbose=True, opset_version=14
+    model, inputs_torch, "./pytorch_matmult.onnx", verbose=True, opset_version=10
 )
