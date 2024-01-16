@@ -315,7 +315,7 @@ template<typename T> template<int in_D, int ihalf_size, int jhalf_size> void Con
   int           start_h{ ihalf_size - top };
   int           start_w{ jhalf_size - left };
 #if DEBUG_SIMD && __AVX2__
-  std::cout << "\n[WARN] generic version conv (s=1, g=1, known kernel)" << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D << " outD=" << nb_filters
+  std::cout << "\n[WARN] generic version conv2d_ixj_s11_g1_d_core (s=1, g=1, known kernel)" << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D << " outD=" << nb_filters
             << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << "?? kMAC" << std::endl;
 #endif
@@ -476,6 +476,12 @@ template<> template<int in_D, int ihalf_size, int jhalf_size> void Conv2D<int16_
   int           in_W{ A.dims()[2] };
   int           start_h{ ihalf_size - top };
   int           start_w{ jhalf_size - left };
+#if DEBUG_SIMD && __AVX512BW__
+  if (in_D % 32 == 0 || in_D>=32)
+    std::cout << "\n[WARN] avx2 (instead of avx512) version simd16_conv2d_ixj_s11_g1_d_core (s=1, g=1, known kernel)" << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D << " outD=" << nb_filters
+              << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
+              << "?? kMAC" << std::endl;
+#endif
 
   assert(start_h + s_h - ihalf_size >= 0);
   assert(start_w + s_w - jhalf_size >= 0);
@@ -529,7 +535,7 @@ template<typename T> template<int in_D, int ihalf_size, int jhalf_size> void Con
   int           start_h{ ihalf_size - top };
   int           start_w{ jhalf_size - left };
 #if DEBUG_SIMD && __AVX2__
-  std::cout << "\n[WARN] partially generic version conv " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D
+  std::cout << "\n[WARN] partially generic version conv2d_ixj_s11_gD_d_core " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D
             << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << "?? kMAC" << std::endl;
 #endif
@@ -656,12 +662,16 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
       constexpr int kj = 0;
       switch (in_D)
       {
+      case 16:
+        CONV_MOD16<16, ki, kj>(A, kernel);
+        return;
+        break;
       case 32:
-        CONV_MOD16<32, ki, kj>(A, kernel);
+        CONV_MOD32<32, ki, kj>(A, kernel);
         return;
         break;
       case 64:
-        CONV_MOD16<64, ki, kj>(A, kernel);
+        CONV_MOD32<64, ki, kj>(A, kernel);
         return;
         break;
       default:   // do default

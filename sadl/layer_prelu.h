@@ -76,7 +76,7 @@ template<typename T> bool PReLU<T>::apply(std::vector<Tensor<T> *> &in)
     }
   }
 #endif
-#if __AVX512BW__   // on purpose to induce build error for missing options && __AVX512DQ__
+#if __AVX512BW__   && 0 // on purpose to induce build error for missing options && __AVX512DQ__
   if (std::is_same<T, int16_t>::value && in[0]->size() % 32 == 0)
   {
     if (in[1]->size() == 1)
@@ -101,6 +101,9 @@ template<typename T> bool PReLU<T>::apply(std::vector<Tensor<T> *> &in)
       return apply_simd256<true>(in);
     }
   }
+#endif
+
+#if __AVX2__ && 0
   if (std::is_same<T, int16_t>::value && in[0]->size() % 16 == 0)
   {
     if (in[1]->size() == 1)
