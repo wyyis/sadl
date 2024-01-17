@@ -72,7 +72,8 @@ struct OperationType
     ScatterND          = 22,
     GridSample         = 23,
     Resize             = 24,
-    OperationTypeCount = 25
+    Compare            = 25,
+    OperationTypeCount = 26
   };
 };
 

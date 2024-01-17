@@ -57,6 +57,7 @@
 #include "layer_scatternd.h"
 #include "layer_gridsample.h"
 #include "layer_resize.h"
+#include "layer_compare.h"
 
 namespace sadl
 {
@@ -96,6 +97,7 @@ inline std::string opName(const OperationType::Type op)
     DIRTYCASEPRINT(ScatterND);
     DIRTYCASEPRINT(GridSample);
     DIRTYCASEPRINT(Resize);
+    DIRTYCASEPRINT(Compare);
   default:
     oss << "??";
     break;
