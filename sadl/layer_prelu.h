@@ -76,7 +76,7 @@ template<typename T> bool PReLU<T>::apply(std::vector<Tensor<T> *> &in)
     }
   }
 #endif
-#if __AVX512BW__   && 0 // do not put  && __AVX512DQ__ on purpose to induce build error for missing options
+#if __AVX512BW__
   if (std::is_same<T, int16_t>::value && in[0]->size() % 32 == 0)
   {
     if (in[1]->size() == 1)
@@ -286,7 +286,6 @@ template<typename T> template<bool multialpha> bool PReLU<T>::apply_simd256(std:
 #endif
 
 #if __AVX512F__
-
 template<> template<bool multialpha> inline bool PReLU<float>::apply_simd512(std::vector<Tensor<float> *> &in)   // simd512 float
 {
   Tensor<float> &A = *in[1];
@@ -314,7 +313,7 @@ template<> template<bool multialpha> inline bool PReLU<float>::apply_simd512(std
 
 #endif
 
-#if __AVX512BW__  && 0
+#if __AVX512BW__  
 template<> template<bool multialpha> inline bool PReLU<int16_t>::apply_simd512(std::vector<Tensor<int16_t> *> &in)   // simd512 int16 quantize
 {
   Tensor<int16_t> &A = *in[1];
@@ -327,8 +326,8 @@ template<> template<bool multialpha> inline bool PReLU<int16_t>::apply_simd512(s
   const auto                            max       = _mm512_set1_epi32(32767);
   const auto                            min       = _mm512_set1_epi32(-32768);
   const auto                            zeros     = _mm512_setzero_si512();
-  const auto                            shuffle =
-    _mm512_set_epi16(62, 60, 58, 56, 54, 52, 50, 48, 46, 44, 42, 40, 38, 36, 34, 32, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0);
+  static constexpr int16_t data[]={0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62};
+  const auto shuffle=  _mm512_loadu_si512((void *)data);
 
   const int N = m_out.size();
 
