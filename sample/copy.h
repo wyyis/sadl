@@ -94,6 +94,9 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
     dynamic_cast<sadl::layers::Resize<T> &>(layerQ).m_mode            = dynamic_cast<const sadl::layers::Resize<float> &>(layer).m_mode;
     dynamic_cast<sadl::layers::Resize<T> &>(layerQ).m_nearest_mode    = dynamic_cast<const sadl::layers::Resize<float> &>(layer).m_nearest_mode;
     break;
+  case sadl::layers::OperationType::Compare:
+    dynamic_cast<sadl::layers::Compare<T> &>(layerQ).m_mode            = dynamic_cast<const sadl::layers::Compare<float> &>(layer).m_mode;
+    break;
     // no default to get warning
   }
 
