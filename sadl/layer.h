@@ -73,7 +73,8 @@ struct OperationType
     GridSample         = 23,
     Resize             = 24,
     Compare            = 25,
-    OperationTypeCount = 26
+    Where              = 26,
+    OperationTypeCount = 27
   };
 };
 

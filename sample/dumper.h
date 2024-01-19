@@ -135,6 +135,11 @@ template<typename T> bool sadl::layers::Compare<T>::dump(std::ostream &file)
   return true;
 }
 
+template<typename T> bool sadl::layers::Where<T>::dump(std::ostream &file)
+{
+  return true;
+}
+
 template<typename T> bool sadl::layers::Layer<T>::dump(std::ostream &file)
 {
   // std::cout<<"todo? "<<opName(op_)<<std::endl;
