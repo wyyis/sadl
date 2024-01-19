@@ -58,6 +58,7 @@
 #include "layer_gridsample.h"
 #include "layer_resize.h"
 #include "layer_compare.h"
+#include "layer_where.h"
 
 namespace sadl
 {

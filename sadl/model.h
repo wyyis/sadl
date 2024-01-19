@@ -182,6 +182,9 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
   case layers::OperationType::Compare:
     return std::unique_ptr<layers::Layer<T>>(new layers::Compare<T>{ id, op });
     break;
+  case layers::OperationType::Where:
+    return std::unique_ptr<layers::Layer<T>>(new layers::Where<T>{ id, op });
+    break;
   case layers::OperationType::OperationTypeCount:
     break;   // no default on purpose
   }
@@ -445,7 +448,7 @@ template<typename T> bool Model<T>::init(std::vector<Tensor<T>> &in)
       op_type[inputs_cnt]                 = L.layer->op();
 
       // always put data layers first when const layers
-      if (inputs_cnt > 0 && op_type[inputs_cnt - 1] == layers::OperationType::Const && op_type[inputs_cnt] != layers::OperationType::Const)
+      if ((inputs_cnt > 0 && op_type[inputs_cnt - 1] == layers::OperationType::Const && op_type[inputs_cnt] != layers::OperationType::Const) && m_data[layer_cnt].layer->op() != layers::OperationType::Where)
       {
         std::cerr << "[ERROR] data layers should be first" << std::endl;
         return false;

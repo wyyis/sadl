@@ -97,6 +97,8 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
   case sadl::layers::OperationType::Compare:
     dynamic_cast<sadl::layers::Compare<T> &>(layerQ).m_mode            = dynamic_cast<const sadl::layers::Compare<float> &>(layer).m_mode;
     break;
+  case sadl::layers::OperationType::Where:
+    break;
     // no default to get warning
   }
 
