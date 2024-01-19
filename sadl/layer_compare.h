@@ -51,7 +51,6 @@ public:
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
-  virtual bool mutateInput() const override { return true; }
 
 protected:
   virtual bool loadInternal(std::istream &file, Version) override;
