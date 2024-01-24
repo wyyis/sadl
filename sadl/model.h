@@ -179,6 +179,12 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
   case layers::OperationType::Resize:
     return std::unique_ptr<layers::Layer<T>>(new layers::Resize<T>{ id, op });
     break;
+  case layers::OperationType::Compare:
+    return std::unique_ptr<layers::Layer<T>>(new layers::Compare<T>{ id, op });
+    break;
+  case layers::OperationType::Where:
+    return std::unique_ptr<layers::Layer<T>>(new layers::Where<T>{ id, op });
+    break;
   case layers::OperationType::OperationTypeCount:
     break;   // no default on purpose
   }
@@ -442,7 +448,7 @@ template<typename T> bool Model<T>::init(std::vector<Tensor<T>> &in)
       op_type[inputs_cnt]                 = L.layer->op();
 
       // always put data layers first when const layers
-      if (inputs_cnt > 0 && op_type[inputs_cnt - 1] == layers::OperationType::Const && op_type[inputs_cnt] != layers::OperationType::Const)
+      if ((inputs_cnt > 0 && op_type[inputs_cnt - 1] == layers::OperationType::Const && op_type[inputs_cnt] != layers::OperationType::Const) && m_data[layer_cnt].layer->op() != layers::OperationType::Where)
       {
         std::cerr << "[ERROR] data layers should be first" << std::endl;
         return false;
@@ -708,7 +714,6 @@ template<typename T> void Model<T>::insertCopyLayers()
     }
     if (layer_with_current_as_mutable_input.size() > 1)
     {                                                           // need copy layer
-      assert(layer_with_current_as_mutable_input.size() < 3);   // for now. can be removed ?
       // for current layer L, insert copy layers C just after: x x x L C C xxxx
       std::vector<typename layers::Layer<T>::Id> id_copy_layers;
       for (int n = 0; n < (int) layer_with_current_as_mutable_input.size() - 1; ++n)

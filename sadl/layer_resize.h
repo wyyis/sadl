@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2023, ITU/ISO/IEC
+ * Copyright (c) 2010-2024, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -135,10 +135,10 @@ template<typename T> bool Resize<T>::init(const std::vector<Tensor<T> *> &in)
   float scale_N = 0, scale_C = 0, scale_H = 0, scale_W = 0;
   if (m_input_label == 1)   // inputs are X and sizes
   {
-    scale_N = in[1]->data()[0] / N;
-    scale_C = in[1]->data()[1] / C;
-    scale_H = in[1]->data()[2] / H_in;
-    scale_W = in[1]->data()[3] / W_in;
+    scale_N = in[1]->data()[0] / (float)N;
+    scale_C = in[1]->data()[1] / (float)C;
+    scale_H = in[1]->data()[2] / (float)H_in;
+    scale_W = in[1]->data()[3] / (float)W_in;
   }
   else if (m_input_label == 2)   // inputs are X and scales
   {
@@ -153,17 +153,17 @@ template<typename T> bool Resize<T>::init(const std::vector<Tensor<T> *> &in)
     return false;
   }
   scale_factors.resize(in[1]->dims());
-  scale_factors[0] = scale_N;
-  scale_factors[1] = scale_H;
-  scale_factors[2] = scale_W;
-  scale_factors[3] = scale_C;
+  scale_factors[0] = static_cast<T2>(scale_N);
+  scale_factors[1] = static_cast<T2>(scale_H);
+  scale_factors[2] = static_cast<T2>(scale_W);
+  scale_factors[3] = static_cast<T2>(scale_C);
   // resize m_out
   Dimensions dim;
   dim.resize(4);
-  dim[0] = N * scale_N;
-  dim[1] = H_in * scale_H;
-  dim[2] = W_in * scale_W;
-  dim[3] = C * scale_C;
+  dim[0] = (int)(N * scale_N);
+  dim[1] = (int)(H_in * scale_H);
+  dim[2] = (int)(W_in * scale_W);
+  dim[3] = (int)(C * scale_C);
   m_out.resize(dim);
   m_initDone = true;
   return true;
@@ -261,8 +261,8 @@ template<> inline void Resize<float>::calc_positions(int y, int x, int H, int W,
 
   if (m_coordinate_transformation_mode == resize_coordinate_transformation_mode_half_pixel)
   {
-    x_ori = (x + 0.5) / scale_factors[2] - 0.5;
-    y_ori = (y + 0.5) / scale_factors[1] - 0.5;
+    x_ori = (x + 0.5f) / scale_factors[2] - 0.5f;
+    y_ori = (y + 0.5f) / scale_factors[1] - 0.5f;
   }
   else if (m_coordinate_transformation_mode == resize_coordinate_transformation_mode_asymmetric)
   {
@@ -273,8 +273,8 @@ template<> inline void Resize<float>::calc_positions(int y, int x, int H, int W,
   y_ori_int = std::floor(y_ori);
 
   // acquire the positions of adjacent pixels, prioritizing the left and top pixels
-  x_ori_left   = (x_ori == x_ori_int) ? x_ori_int - 1 : x_ori_int;
-  y_ori_top    = (y_ori == y_ori_int) ? y_ori_int - 1 : y_ori_int;
+  x_ori_left   = (int)((x_ori == x_ori_int) ? x_ori_int - 1 : x_ori_int);
+  y_ori_top    = (int)((y_ori == y_ori_int) ? y_ori_int - 1 : y_ori_int);
   x_ori_right  = x_ori_left + 1;
   y_ori_bottom = y_ori_top + 1;
   x_ori_left   = std::max(0, x_ori_left);

@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2023, ITU/ISO/IEC
+ * Copyright (c) 2010-2024, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -214,12 +214,12 @@ template<> inline void GridSample<float>::gs_denormalize(float &x, int length)
 {
   if (m_mode == gridsample_mode_nearest)
   {
-    x = (x + 1) * (length - 1) / 2.0;
+    x = (x + 1) * (length - 1) / 2.0f;
     x = round(x);
   }
   else if (m_mode == gridsample_mode_bilinear)
   {
-    x = (x + 1) * (length - 1) / 2.0;
+    x = (x + 1) * (length - 1) / 2.0f;
   }
 }
 
@@ -244,8 +244,8 @@ template<> inline void GridSample<float>::get_bilinear_coeffs(float y, float x, 
   float &coeff11 = coeffs[0], &coeff12 = coeffs[1], &coeff21 = coeffs[2], &coeff22 = coeffs[3];
   int   &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
 
-  x_ori_left   = floor(x);
-  y_ori_top    = floor(y);
+  x_ori_left   = (int)floor(x);
+  y_ori_top    = (int)floor(y);
   x_ori_right  = x_ori_left + 1;
   y_ori_bottom = y_ori_top + 1;
   float dy2    = y_ori_bottom - y;

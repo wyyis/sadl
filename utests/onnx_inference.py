@@ -66,6 +66,8 @@ if args.output is not None:
                 f.write("{} ".format(i))
             f.write("\n")
             for x in np.nditer(o):
+                if np.issubdtype(x.dtype, np.bool_):
+                    x = x.astype(float)
                 f.write("{} ".format(x))
             f.write("\n")
         print("[INFO] results file in {}".format(args.output))

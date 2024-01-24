@@ -125,6 +125,8 @@ class OPTYPE(IntEnum):
     ScatterND = (22,)
     GridSample = (23,)
     Resize = (24,)
+    Compare = (25,)
+    Where = (26,)
 
     # "BatchMatMulV2" did not exist in Tensorflow 1.9. It exists in
     # Tensorflow 1.15.
@@ -1109,6 +1111,93 @@ def parse_graph_node(
         myGraph[node.output[0]]["additional"]["mode"] = mode
         myGraph[node.output[0]]["additional"]["nearest_mode"] = nearest_mode
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
+    
+    elif node.op_type == "Less":
+        additional = {}
+        additional["data"] = node
+        if is_constant(node.input[1], model_onnx.graph.initializer):
+            n2 = getNodesWithOutput(node.input[1], model_onnx)      #constant
+            additional["dims"], additional["raw_data"], additional[
+                "dtype"
+            ] = extract_additional_data(
+                node.input[1],
+                False, 
+                model_onnx.graph,
+                verbose,
+            )
+            myGraph[node.input[1]] = {}
+            myGraph[node.input[1]]["op_type"] = OPTYPE.Const
+            myGraph[node.input[1]]["inputs"] = []
+            myGraph[node.input[1]]["additional"] = additional
+            map_onnx_to_myGraph[node.input[1]] = node.input[1]
+        
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.Compare
+        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [map_onnx_to_myGraph[node.input[1]]]
+        myGraph[node.output[0]]["additional"] = {}
+        myGraph[node.output[0]]["additional"]["data"] = node
+        myGraph[node.output[0]]["additional"]["mode"] = 0
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+
+    elif node.op_type == "Greater":
+        additional = {}
+        additional["data"] = node
+        if is_constant(node.input[1], model_onnx.graph.initializer):
+            n2 = getNodesWithOutput(node.input[1], model_onnx)      #constant
+            additional["dims"], additional["raw_data"], additional[
+                "dtype"
+            ] = extract_additional_data(
+                node.input[1],
+                False, 
+                model_onnx.graph,
+                verbose,
+            )
+            myGraph[node.input[1]] = {}
+            myGraph[node.input[1]]["op_type"] = OPTYPE.Const
+            myGraph[node.input[1]]["inputs"] = []
+            myGraph[node.input[1]]["additional"] = additional
+            map_onnx_to_myGraph[node.input[1]] = node.input[1]
+        
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.Compare
+        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [map_onnx_to_myGraph[node.input[1]]]
+        myGraph[node.output[0]]["additional"] = {}
+        myGraph[node.output[0]]["additional"]["data"] = node
+        myGraph[node.output[0]]["additional"]["mode"] = 1
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+        
+    elif node.op_type == "Where":
+        if is_constant(node.input[1], model_onnx.graph.initializer):
+            additional = {}
+            additional["data"] = node
+            n2 = getNodesWithOutput(node.input[1], model_onnx)
+            additional["dims"], additional["raw_data"], additional[
+                "dtype"
+            ] = extract_additional_data(node.input[1], False, model_onnx.graph, verbose)
+            myGraph[node.input[1]] = {}
+            myGraph[node.input[1]]["op_type"] = OPTYPE.Const
+            myGraph[node.input[1]]["inputs"] = []
+            myGraph[node.input[1]]["additional"] = additional
+            map_onnx_to_myGraph[node.input[1]] = node.input[1]
+        if is_constant(node.input[2], model_onnx.graph.initializer):
+            additional = {}
+            additional["data"] = node
+            n2 = getNodesWithOutput(node.input[2], model_onnx)
+            additional["dims"], additional["raw_data"], additional[
+                "dtype"
+            ] = extract_additional_data(node.input[2], False, model_onnx.graph, verbose)
+            myGraph[node.input[2]] = {}
+            myGraph[node.input[2]]["op_type"] = OPTYPE.Const
+            myGraph[node.input[2]]["inputs"] = []
+            myGraph[node.input[2]]["additional"] = additional
+            map_onnx_to_myGraph[node.input[2]] = node.input[2]
+        
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.Where
+        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [map_onnx_to_myGraph[node.input[1]]]+[map_onnx_to_myGraph[node.input[2]]]
+        myGraph[node.output[0]]["additional"] = {}
+        myGraph[node.output[0]]["additional"]["data"] = node
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
     else:
         raise Exception("[ERROR] node not supported:\n{})".format(node))
@@ -1411,6 +1500,12 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
                 if verbose:
                     print("#\t nearest_mode", node["additional"]["nearest_mode"])
                 f.write(struct.pack("i", int(node["additional"]["nearest_mode"])))
+
+            elif node["op_type"] == OPTYPE.Compare:
+                if verbose:
+                    print("#\t mode", node["additional"]["mode"])
+                f.write(struct.pack("i", int(node["additional"]["mode"])))
+
 
             if (
                 node["op_type"] == OPTYPE.Conv2D

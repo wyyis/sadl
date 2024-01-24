@@ -48,7 +48,7 @@ static constexpr float kSparsifySizeThreshold = 1000.0f;
 // nothing/-msse42: no simd
 // -mavx2:  avx2
 // -mavx2 -mfma: avx2 + fuse multiply/add
-// -mavx512bw -mavx512f: avx512
+// -mavx512bw -mavx512f: avx512 -mavx512dq
 // #define NDEBUG        1 // remove sanity tests
 
 // debug

@@ -25,4 +25,4 @@ output = model(input)
 # Output onnx model path
 onnx_model_path = os.path.join(os.path.dirname(sys.argv[0]), "slice_chw_pytorch.onnx")
 # Convert to onnx
-torch.onnx.export(model, input, onnx_model_path)
+torch.onnx.export(model, input, onnx_model_path, opset_version=10)
