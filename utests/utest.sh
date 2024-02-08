@@ -33,12 +33,30 @@ if [ ! -f ${BNAME}.sadl ]; then
  exit -1;
 fi
 
-${BDIR}/build/test ${BNAME}.sadl ${BNAME}.results 0.001 > /dev/null
+${BDIR}/build/test_scalar ${BNAME}.sadl ${BNAME}.results 0.001 > /dev/null
 E=$?;
 if (( E == 0 )); then
-  echo -e "   \e[32m[PASS]\e[0m $BNAME " 
+  echo -e "   \e[32m[PASS]\e[0m $BNAME scalar" 
 else
-  echo -e "   \e[31m[FAIL]\e[0m $BNAME"
+  echo -e "   \e[31m[FAIL]\e[0m $BNAME scalar"
+  exit -1;  
+fi;
+
+${BDIR}/build/test_avx2 ${BNAME}.sadl ${BNAME}.results 0.001 > /dev/null
+E=$?;
+if (( E == 0 )); then
+  echo -e "   \e[32m[PASS]\e[0m $BNAME avx2" 
+else
+  echo -e "   \e[31m[FAIL]\e[0m $BNAME avx2"
+  exit -1;  
+fi;
+
+${BDIR}/build/test_avx512 ${BNAME}.sadl ${BNAME}.results 0.001 > /dev/null
+E=$?;
+if (( E == 0 )); then
+  echo -e "   \e[32m[PASS]\e[0m $BNAME avx512" 
+else
+  echo -e "   \e[31m[FAIL]\e[0m $BNAME avx512"
   exit -1;  
 fi;
 
