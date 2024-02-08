@@ -59,6 +59,7 @@
 #include "layer_resize.h"
 #include "layer_compare.h"
 #include "layer_where.h"
+#include "layer_sigmoid.h"
 
 namespace sadl
 {
@@ -99,6 +100,7 @@ inline std::string opName(const OperationType::Type op)
     DIRTYCASEPRINT(GridSample);
     DIRTYCASEPRINT(Resize);
     DIRTYCASEPRINT(Compare);
+    DIRTYCASEPRINT(Sigmoid);
   default:
     oss << "??";
     break;

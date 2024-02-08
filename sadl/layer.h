@@ -74,7 +74,8 @@ struct OperationType
     Resize             = 24,
     Compare            = 25,
     Where              = 26,
-    OperationTypeCount = 27
+    Sigmoid            = 27,
+    OperationTypeCount = 28
   };
 };
 
