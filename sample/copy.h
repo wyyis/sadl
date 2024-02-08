@@ -99,6 +99,8 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
     break;
   case sadl::layers::OperationType::Where:
     break;
+  case sadl::layers::OperationType::Sigmoid:
+    break;
     // no default to get warning
   }
 
