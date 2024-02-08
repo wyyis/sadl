@@ -193,7 +193,6 @@ template<typename T> template<bool multialpha> bool PReLU<T>::apply_scalar(std::
 #if __AVX2__
 template<> template<bool multialpha> inline bool PReLU<float>::apply_simd256(std::vector<Tensor<float> *> &in)   // simd256 float
 {
-  exit(-1);   // to correct
   Tensor<float> &A = *in[1];
   swap(*in[0], m_out);
   float *const       data_ptr  = m_out.data();
