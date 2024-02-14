@@ -57,7 +57,7 @@ private:
   std::vector<LayerData>                     m_data;
   int32_t                                    m_nb_inputs       = 0;
   static constexpr int                       kMaxInputByLayer = 2;
-  static constexpr int                       kMaxLayers       = 2048;
+  static constexpr int                       kMaxLayers       = 8192;
   std::vector<typename layers::Layer<T>::Id> getLayerIdsWithInput(typename layers::Layer<T>::Id id) const;
   void                                       insertCopyLayers();
   void                                       reshapeConv2DFilters();
