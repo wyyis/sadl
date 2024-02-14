@@ -85,6 +85,18 @@ template<typename T> void infer(const string &filename)
   cout << "[INFO] " << stat.mac << " MACs" << endl;
   cout << "[INFO] " << stat.overflow << " overflow" << endl;
   cout << "[INFO] " << stat.mac_nz << " MACs non 0" << endl;
+
+  // nb prms in const layers
+  auto v=model.getLayersId();
+  int64_t nb_prms=0;
+  for(const auto id: v) {
+      auto &L=model.getLayer(id);
+      if (L.layer->op()==sadl::layers::OperationType::Const) {
+          sadl::layers::Const<T> *lconst=dynamic_cast<sadl::layers::Const<T> *>(L.layer.get());
+          nb_prms+=lconst->output().size();
+      }
+  }
+  cout << "[INFO] " << nb_prms<<" parameters"<<endl;
   cout << "[INFO] ---------------------------------" << endl;
 }
 
