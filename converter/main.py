@@ -128,6 +128,7 @@ class OPTYPE(IntEnum):
     Compare = (25,)
     Where = (26,)
     Sigmoid = (27,)
+    Softmax = (28,)
 
     # "BatchMatMulV2" did not exist in Tensorflow 1.9. It exists in
     # Tensorflow 1.15.
@@ -1208,6 +1209,22 @@ def parse_graph_node(
         myGraph[node.output[0]]["additional"]["data"] = node
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
+    elif node.op_type == 'Softmax':
+        inputs, additional = [], {}
+        inputs = [map_onnx_to_myGraph[n0name]]
+        a = getAttribute(node, "axis")
+        if a is None:  # for Tensorflow axis==3
+            a_i = 3
+        else:
+            a_i = a.i
+        additional["data"] = node
+        additional["axis"] = a_i
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["inputs"] = inputs
+        myGraph[node.output[0]]["additional"] = additional
+        myGraph[node.output[0]]["op_type"] = OPTYPE.Softmax
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+
     else:
         raise Exception("[ERROR] node not supported:\n{})".format(node))
 
@@ -1515,6 +1532,10 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
                     print("#\t mode", node["additional"]["mode"])
                 f.write(struct.pack("i", int(node["additional"]["mode"])))
 
+            elif node["op_type"] == OPTYPE.Softmax:
+                if verbose:
+                    print("#\t axis", node["additional"]["axis"])
+                f.write(struct.pack("i", int(node["additional"]["axis"])))
 
             if (
                 node["op_type"] == OPTYPE.Conv2D
@@ -1696,6 +1717,28 @@ def annotate_node(
         n2 = getInitializer(node.input[1], model_onnx)
         if global_data_layout == "nchw":
             node_annotation[n2.name].to_transpose = True
+    
+    elif node.op_type == "Softmax":
+        a = getAttribute(node, "axis")
+        if data_layout == "nchw":
+            dims_t = [3, 1, 1, 2]
+            nexts = getNodesWithInput(node.output[0], model_onnx)
+            previous = getNodesWithOutput(node.input[0], model_onnx)
+            if hasattr(previous, "op_type"):  # for pytorch axis==3
+                d_n = []
+                d_p = []
+                if previous.op_type == "Transpose":
+                    d_p = toList(getAttribute(previous, "perm").ints)
+                for n in nexts:
+                    if n.op_type == "Transpose":
+                        d_n = toList(getAttribute(n, "perm").ints)
+                if d_n == d_p and len(d_p) != 0:
+                    a_i = dims_t[d_p[-1]]
+                    a.i = a_i
+                elif a.i == 3:
+                    a.i = dims_t[3]
+            elif a.i == 3:
+                a.i = dims_t[3]
 
     nexts = getNodesWithInput(node.output[0], model_onnx)
     for n in nexts:

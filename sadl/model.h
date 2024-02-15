@@ -188,6 +188,9 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
   case layers::OperationType::Sigmoid:
     return std::unique_ptr<layers::Layer<T>>(new layers::Sigmoid<T>{ id, op });
     break;
+  case layers::OperationType::Softmax:
+    return std::unique_ptr<layers::Layer<T>>(new layers::Softmax<T>{ id, op });
+    break;
   case layers::OperationType::OperationTypeCount:
     break;   // no default on purpose
   }
