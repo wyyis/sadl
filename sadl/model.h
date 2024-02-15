@@ -246,7 +246,7 @@ template<typename T> bool Model<T>::load(std::istream &file)
     if ((std::is_same<T, float>::value && x != layers::TensorInternalType::Float) || (std::is_same<T, int32_t>::value && x != layers::TensorInternalType::Int32)
         || (std::is_same<T, int16_t>::value && x != layers::TensorInternalType::Int16))
     {
-      std::cerr << "[ERROR] wrong model type and Model<T>" << std::endl;
+      std::cerr << "[ERROR] wrong model type and Model<T> " << std::endl;
       return false;
     }
     SADL_DBG(std::cout << "[INFO] Model type: " << (int) x << std::endl);
