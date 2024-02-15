@@ -60,6 +60,7 @@
 #include "layer_compare.h"
 #include "layer_where.h"
 #include "layer_sigmoid.h"
+#include "layer_softmax.h"
 
 namespace sadl
 {
@@ -101,6 +102,7 @@ inline std::string opName(const OperationType::Type op)
     DIRTYCASEPRINT(Resize);
     DIRTYCASEPRINT(Compare);
     DIRTYCASEPRINT(Sigmoid);
+    DIRTYCASEPRINT(Softmax);
   default:
     oss << "??";
     break;

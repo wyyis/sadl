@@ -145,6 +145,13 @@ template<typename T> bool sadl::layers::Sigmoid<T>::dump(std::ostream &file)
   return true;
 }
 
+template<typename T> bool sadl::layers::Softmax<T>::dump(std::ostream &file)
+{
+  int32_t x = m_axis;
+  file.write((const char *) &x, sizeof(int32_t));
+  return true;
+}
+
 template<typename T> bool sadl::layers::Layer<T>::dump(std::ostream &file)
 {
   // std::cout<<"todo? "<<opName(op_)<<std::endl;

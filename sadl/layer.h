@@ -75,7 +75,8 @@ struct OperationType
     Compare            = 25,
     Where              = 26,
     Sigmoid            = 27,
-    OperationTypeCount = 28
+    Softmax            = 28,
+    OperationTypeCount = 29
   };
 };
 
