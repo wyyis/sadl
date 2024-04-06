@@ -107,7 +107,7 @@ void bilinear_in_channels_wo_simd(const Tensor<T> &data, const T2 coeffs[], cons
   constexpr int im_nb      = 0;
   int           in_D       = data.dims()[3];
   const int    &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
-  const int     pos_table[4][2] = { y_ori_top, x_ori_left, y_ori_top, x_ori_right, y_ori_bottom, x_ori_left, y_ori_bottom, x_ori_right };
+  const int     pos_table[4][2] = { {y_ori_top, x_ori_left}, {y_ori_top, x_ori_right}, {y_ori_bottom, x_ori_left}, {y_ori_bottom, x_ori_right} };
 
   static std::vector<T2> temp_buffer;
   temp_buffer.resize(in_D);

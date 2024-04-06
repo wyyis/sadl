@@ -35,7 +35,11 @@
 #include <array>
 #include <cstdint>
 #include <iostream>
+#if defined (__ARM_NEON__) || defined(__ARM_NEON)
+#include <stdlib.h>
+#else
 #include <malloc.h>
+#endif
 #include <memory>
 #include <numeric>
 #include <sstream>

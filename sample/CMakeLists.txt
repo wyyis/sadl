@@ -16,10 +16,12 @@ include_directories(..)
 file(GLOB HEADER_FILES helper.h ../sadl/*.h )
 
 add_executable(sample_generic   sample.cpp ${HEADER_FILES})
-add_executable(sample_simd256   sample.cpp ${HEADER_FILES})
-add_executable(sample_simd512   sample.cpp ${HEADER_FILES})
-set_target_properties(sample_simd256  PROPERTIES COMPILE_FLAGS "-DNDEBUG=1 " )
-set_target_properties(sample_simd512  PROPERTIES COMPILE_FLAGS "-DNDEBUG=1" )
+if( NOT (CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64") )
+  add_executable(sample_simd256   sample.cpp ${HEADER_FILES})
+  add_executable(sample_simd512   sample.cpp ${HEADER_FILES})
+  set_target_properties(sample_simd256  PROPERTIES COMPILE_FLAGS "-DNDEBUG=1 " )
+  set_target_properties(sample_simd512  PROPERTIES COMPILE_FLAGS "-DNDEBUG=1" )
+endif()
 
 add_executable(count_mac   count_mac.cpp ${HEADER_FILES})
 set_target_properties(count_mac  PROPERTIES COMPILE_FLAGS "-DNDEBUG=1 " )  # must build in scalar mode to count MAC
@@ -33,10 +35,12 @@ add_executable(update_model_version update_model_version.cpp ${HEADER_FILES} dum
 add_executable(quantization_test quantization_test.cpp ${HEADER_FILES})
 
 if( UNIX OR MINGW )
- set(CMAKE_CXX_FLAGS "-ffast-math -Wall -fstrict-aliasing") 
- set_target_properties(sample_simd256  PROPERTIES COMPILE_FLAGS "-mavx2" )
- set_target_properties(sample_simd512  PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512bw -mavx512dq" )
- set_target_properties(debug_model  PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512bw -mavx512dq" ) # must build in SIMD mode to debug SIMD issue
+ set(CMAKE_CXX_FLAGS "-ffast-math -Wall -fstrict-aliasing")
+ if( NOT (CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64") )
+   set_target_properties(sample_simd256  PROPERTIES COMPILE_FLAGS "-mavx2" )
+   set_target_properties(sample_simd512  PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512bw -mavx512dq" )
+   set_target_properties(debug_model  PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512bw -mavx512dq" ) # must build in SIMD mode to debug SIMD issue
+ endif()
 endif()
 
 
