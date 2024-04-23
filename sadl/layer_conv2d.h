@@ -158,11 +158,11 @@ template<typename T> bool Conv2D<T>::apply(std::vector<Tensor<T> *> &in)
   {
     return apply_s<1, 1>(A, kernel);
   }
-  else if (m_strides[1] == 1 && m_strides[2] == 2 && m_groups == 1)
+  else if (m_strides[1] == 1 && m_strides[2] == 2)
   {
     return apply_s<1, 2>(A, kernel);
   }
-  else if ((m_strides[1] == 2 && m_strides[2] == 1) && m_groups == 1)
+  else if (m_strides[1] == 2 && m_strides[2] == 1)
   {
     return apply_s<2, 1>(A, kernel);
   }
