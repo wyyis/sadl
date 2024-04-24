@@ -23,6 +23,28 @@ for F in $L; do
   ../utest.sh ../models/${F}.onnx;
 done
 
+# test border peeling
+function test_border() {
+  rm -f $1.sadl;
+  python3 ../../converter/main.py --input_onnx ../models/$1.onnx  --output $1.sadl > /dev/null
+  if [ ! -f ${1}.sadl ]; then
+   echo " [ERROR] $1 onnx to SADL conversion failed";
+   exit -1;
+  fi
+  
+  ../build/test_border_avx2 $1.sadl $2 $3 
+  E=$?;
+  if (( E == 0 )); then
+   echo -e "   \e[32m[PASS]\e[0m $1 border"
+  else
+   echo -e "   \e[31m[FAIL]\e[0m $1 border"
+   exit -1;
+  fi;
+}
 
+test_border conv2d_8x8x1_g1_3s1x3s1x4 1 1
+test_border conv2d_7x8x1_g1_3s1x3s1x4 1 1
+test_border conv2d_8x7x1_g1_3s1x3s1x4 1 1
+ 
 
 
