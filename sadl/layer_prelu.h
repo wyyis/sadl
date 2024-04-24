@@ -229,8 +229,8 @@ template<> template<bool multialpha> inline bool PReLU<int16_t>::apply_simd256(s
   const __m256i max   = _mm256_set1_epi32(32767);
   const __m256i min   = _mm256_set1_epi32(-32768);
   const __m256i zeros = _mm256_setzero_si256();
-  const int     N     = m_out.size();
-  for (int iter = 0; iter < N; iter += 16)
+  const auto     N     = m_out.size();
+  for (int64_t iter = 0; iter < N; iter += 16)
   {
     int16_t *aptr = data_ptr + iter;
     auto     a    = _mm256_load_si256((__m256i *) aptr);   // load
@@ -293,7 +293,7 @@ template<> template<bool multialpha> inline bool PReLU<float>::apply_simd512(std
   const float *const alpha_ptr = A.data();
   const __m512       m_zeros   = _mm512_setzero_ps();
   __m512             alpha     = _mm512_set1_ps(*A.data());
-  for (int iter = 0; iter < m_out.size(); iter += 16)
+  for (int64_t iter = 0; iter < m_out.size(); iter += 16)
   {
     if (multialpha)
       alpha = _mm512_load_ps(alpha_ptr + iter % A.size());
@@ -328,9 +328,9 @@ template<> template<bool multialpha> inline bool PReLU<int16_t>::apply_simd512(s
   static constexpr int16_t data[]={0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62};
   const auto shuffle=  _mm512_loadu_si512((void *)data);
 
-  const int N = m_out.size();
+  const auto N = m_out.size();
 
-  for (int iter = 0; iter < N; iter += 32)
+  for (int64_t iter = 0; iter < N; iter += 32)
   {
     int16_t *aptr = data_ptr + iter;
     auto     a    = _mm512_loadu_si512((__m512i *) aptr);   // load
