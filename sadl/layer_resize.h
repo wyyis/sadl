@@ -85,7 +85,7 @@ template<typename T> bool Resize<T>::loadInternal(std::istream &file, Version v)
   int32_t x = 0;
   file.read((char *) &x, sizeof(x));
   m_input_label = x;
-  SADL_DBG(std::cout << "  - input_lable: " << m_input_label << std::endl);
+  SADL_DBG(std::cout << "  - input_label: " << m_input_label << std::endl);
   file.read((char *) &x, sizeof(x));
   m_coordinate_transformation_mode = x;
   SADL_DBG(std::cout << "  - coordinate_transformation_mode: " << m_coordinate_transformation_mode << std::endl);
@@ -155,7 +155,6 @@ template<typename T> bool Resize<T>::init(const std::vector<Tensor<T> *> &in)
   scale_W=(int)round(scale_W);
   scale_C=(int)round(scale_C);
 
-  std::cout<<scale_N <<' ' << scale_H  <<' ' <<scale_W <<' '<< scale_C  <<std::endl;
   if ((int)scale_N != 1 || (int)scale_H != 2 || (int)scale_W != 2 || (int)scale_C != 1)
   {
     std::cerr << "[ERROR] invalid scale factor: input: "<<in[0]->dims()<<" scales: "<<*in[1]<<" result=(" << scale_N << ", " << scale_H << ", " << scale_W << ", " << scale_C << ")" << std::endl;
