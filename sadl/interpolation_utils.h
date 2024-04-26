@@ -182,7 +182,7 @@ inline void bilinear_in_channels_simd256(const Tensor<int16_t> &data, const int3
   using T = int16_t;
 #endif
   const int &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
-  const int  pos_table[4][2] = { y_ori_top, x_ori_left, y_ori_top, x_ori_right, y_ori_bottom, x_ori_left, y_ori_bottom, x_ori_right };
+  const int  pos_table[4][2] = { {y_ori_top, x_ori_left}, {y_ori_top, x_ori_right}, {y_ori_bottom, x_ori_left}, {y_ori_bottom, x_ori_right} };
 
   static std::vector<int32_t> temp_buffer;
   temp_buffer.resize(in_D);

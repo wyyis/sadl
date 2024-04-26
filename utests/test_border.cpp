@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2023, ITU/ISO/IEC
+ * Copyright (c) 2010-2024, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -69,6 +69,13 @@ template<typename T> bool checkResults(const sadl::Tensor<T> &gt, const sadl::Te
       for(int j=0;j<border_sizex;++j) {
        if (test(0,i,j,c)!=canary||test(0,i,W-1-j,c)!=canary) {
           if (verbose) cerr<<"[ERROR] border v changed"<<endl;
+          if (verbose>1) {
+             std::cout<<"GT\n";
+             print(gt,c);
+             std::cout<<"\nTEST\n";
+             print(test,c);
+             std::cout<<std::endl;
+          }
           return false;
        }
       }
@@ -77,6 +84,13 @@ template<typename T> bool checkResults(const sadl::Tensor<T> &gt, const sadl::Te
      for(int i=0;i<border_sizey;++i) {
       if (test(0,i,j,c)!=canary||test(0,H-1-i,j,c)!=canary) {
        if (verbose) cerr<<"[ERROR] border h changed"<<endl;
+       if (verbose>1) {
+             std::cout<<"GT\n";
+             print(gt,c);
+             std::cout<<"\nTEST\n";
+             print(test,c);
+             std::cout<<std::endl;
+        }
        return false;
       }
      }
@@ -139,7 +153,7 @@ template<typename T> sadl::Tensor<T> infer(const std::string &filename, bool no_
     exit(-1);
   }
   if (model.nbOutputs()>1) {
-    cerr << "[ERROR] nb outputs" << endl;
+    cerr << "[ERROR] nb outputs " << model.nbOutputs()<<endl;
     exit(-1);
   }
   return model.result();
