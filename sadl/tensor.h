@@ -41,6 +41,7 @@
 #include <numeric>
 #include <vector>
 #include <limits>
+#include <utility>
 #include "options.h"
 
 #include "dimensions.h"
@@ -198,7 +199,7 @@ public:
   const_iterator end() const { return m_data.end(); }
 
   int                      quantizer   = 0;   // for int
-  int                      border_skip = 0;
+  std::pair<int,int>       border_skip = {0,0};
   static constexpr int64_t kMaxSize    = 32LL * 1024 * 1024 * 1024;
 
   Data &getData() { return m_data; }
