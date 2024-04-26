@@ -39,7 +39,7 @@ if( UNIX OR MINGW )
  if( NOT (CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64") )
    set_target_properties(sample_simd256  PROPERTIES COMPILE_FLAGS "-mavx2" )
    set_target_properties(sample_simd512  PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512bw -mavx512dq" )
-   set_target_properties(debug_model  PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512bw -mavx512dq" ) # must build in SIMD mode to debug SIMD issue
+   set_target_properties(debug_model  PROPERTIES COMPILE_FLAGS "-mavx2" ) # must build in SIMD mode to debug SIMD issue
  endif()
 endif()
 
