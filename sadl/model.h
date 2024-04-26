@@ -622,10 +622,13 @@ template<typename T> typename Model<T>::Stat Model<T>::printOverflow(bool printi
                 << "]: overflow: " << m_data[layer_cnt].layer->cpt_overflow << '/' << m_data[layer_cnt].layer->cpt_op << " ("
                 << m_data[layer_cnt].layer->cpt_overflow * 100. / m_data[layer_cnt].layer->cpt_op << "%)" << std::endl;
     }
-    else if (printinfo && m_data[layer_cnt].layer->cpt_op > 0)
-    {
-      std::cout << "[INFO] layer " << m_data[layer_cnt].layer->id() << ' ' << m_data[layer_cnt].layer->name() << " [" << opName(m_data[layer_cnt].layer->op())
-                << "]: " << m_data[layer_cnt].layer->cpt_op << " op" << std::endl;
+    else {
+      if (printinfo && (m_data[layer_cnt].layer->cpt_op > 0 || m_data[layer_cnt].layer->cpt_mac > 0 ) )
+      {
+        std::cout << "[INFO] layer " << m_data[layer_cnt].layer->id() << ' ' << m_data[layer_cnt].layer->name() << " [" << opName(m_data[layer_cnt].layer->op()) << "]: "
+                  << m_data[layer_cnt].layer->cpt_mac << " mac, "
+                  << m_data[layer_cnt].layer->cpt_op << " op" << std::endl;
+      }
     }
   }
 #if DEBUG_COUNTERS && __AVX2__
