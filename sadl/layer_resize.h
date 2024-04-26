@@ -146,10 +146,19 @@ template<typename T> bool Resize<T>::init(const std::vector<Tensor<T> *> &in)
     scale_C = in[1]->data()[1];
     scale_H = in[1]->data()[2];
     scale_W = in[1]->data()[3];
+  } else {
+    std::cerr << "[ERROR] invalid type " << m_input_label<< std::endl;
+    return false;
   }
-  if (scale_N != 1 || scale_H != 2 || scale_W != 2 || scale_C != 1)
+  scale_N=(int)round(scale_N);
+  scale_H=(int)round(scale_H);
+  scale_W=(int)round(scale_W);
+  scale_C=(int)round(scale_C);
+
+  std::cout<<scale_N <<' ' << scale_H  <<' ' <<scale_W <<' '<< scale_C  <<std::endl;
+  if ((int)scale_N != 1 || (int)scale_H != 2 || (int)scale_W != 2 || (int)scale_C != 1)
   {
-    std::cerr << "[ERROR] invalid scale factor: (" << scale_N << ", " << scale_H << ", " << scale_W << ", " << scale_C << ")" << std::endl;
+    std::cerr << "[ERROR] invalid scale factor: input: "<<in[0]->dims()<<" scales: "<<*in[1]<<" result=(" << scale_N << ", " << scale_H << ", " << scale_W << ", " << scale_C << ")" << std::endl;
     return false;
   }
   scale_factors.resize(in[1]->dims());

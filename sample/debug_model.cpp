@@ -80,7 +80,7 @@ template<typename T> void infer(const string &filename)
   }
 
   if (sadl::Tensor<T>::skip_border)
-    cout << "[INFO] discard border size=" << model.result().border_skip << endl;
+    cout << "[INFO] discard border size=" << model.result().border_skip.first << ' ' << model.result().border_skip.second << endl;
 
   const int N = model.getIdsOutput().size();
   for (int i = 0; i < N; ++i)

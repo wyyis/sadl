@@ -209,11 +209,12 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
       {   // skip border
         if (s_h == 1 && s_w == 1)
         {
-          start_h += m_out.border_skip;
-          start_w += m_out.border_skip;
-          in_H -= m_out.border_skip;
-          in_W -= m_out.border_skip;
-          m_out.border_skip++;
+          start_h += m_out.border_skip.first;
+          start_w += m_out.border_skip.second;
+          in_H -= m_out.border_skip.first;
+          in_W -= m_out.border_skip.second;
+          m_out.border_skip.first++;
+          m_out.border_skip.second++;
         }
       }
       conv2d_3x3_s_core_dispatch<s_h, s_w>(A, kernel);
