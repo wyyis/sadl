@@ -127,6 +127,7 @@ class OPTYPE(IntEnum):
     Resize = (24,)
     Compare = (25,)
     Where = (26,)
+    Minimum = (27,)
 
     # "BatchMatMulV2" did not exist in Tensorflow 1.9. It exists in
     # Tensorflow 1.15.
@@ -681,8 +682,8 @@ def parse_graph_node(
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
-
-    elif node.op_type == "Identity":
+    
+    elif node.op_type == "Identity" or node.op_type == "Cast":
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Identity
         myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]]
@@ -823,6 +824,17 @@ def parse_graph_node(
     elif node.op_type == "Max":
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Maximum
+        myGraph[node.output[0]]["inputs"] = [
+            map_onnx_to_myGraph[n0name],
+            map_onnx_to_myGraph[node.input[1]],
+        ]
+        myGraph[node.output[0]]["additional"] = {}
+        myGraph[node.output[0]]["additional"]["data"] = node
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+
+    elif node.op_type == "Min":
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.Minimum
         myGraph[node.output[0]]["inputs"] = [
             map_onnx_to_myGraph[n0name],
             map_onnx_to_myGraph[node.input[1]],

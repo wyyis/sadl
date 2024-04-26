@@ -74,7 +74,8 @@ struct OperationType
     Resize             = 24,
     Compare            = 25,
     Where              = 26,
-    OperationTypeCount = 27
+    Minimum            = 27,
+    OperationTypeCount = 28
   };
 };
 

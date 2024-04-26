@@ -185,6 +185,9 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
   case layers::OperationType::Where:
     return std::unique_ptr<layers::Layer<T>>(new layers::Where<T>{ id, op });
     break;
+  case layers::OperationType::Minimum:
+    return std::unique_ptr<layers::Layer<T>>(new layers::Minimum<T>{ id, op });
+    break;
   case layers::OperationType::OperationTypeCount:
     break;   // no default on purpose
   }
