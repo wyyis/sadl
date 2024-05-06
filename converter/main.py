@@ -768,7 +768,7 @@ def parse_graph_node(
         myGraph[node.output[0]]["op_type"] = OPTYPE.Expand
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
-    elif node.op_type == "Reshape" or node.op_type == "MatMul":
+    elif node.op_type == "Reshape":
         # Const
         myGraph[node.input[1]] = {}
         myGraph[node.input[1]]["op_type"] = OPTYPE.Const
@@ -791,10 +791,64 @@ def parse_graph_node(
 
         if node.op_type == "Reshape":
             myGraph[node.output[0]]["op_type"] = OPTYPE.Reshape
-        elif node.op_type == "MatMul":
-            myGraph[node.output[0]]["op_type"] = OPTYPE.MatMul
 
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
+
+    elif node.op_type == "MatMul":
+        # check the inputs
+        if is_constant(n0name, model_onnx.graph.initializer) and is_constant(
+            node.input[1], model_onnx.graph.initializer
+        ):
+            quit("[ERROR] unsupported double constants MatMul", node)
+        swap_inputs = False
+        if is_constant(n0name, model_onnx.graph.initializer):
+            additional = {}
+            additional["data"] = node
+            n2 = getNodesWithOutput(n0name, model_onnx)
+            additional["dims"], additional["raw_data"], additional[
+                "dtype"
+            ] = extract_additional_data(
+                n0name, node_annotation[n2.name].to_transpose, model_onnx.graph, verbose
+            )
+            map_onnx_to_myGraph[n0name] = n0name
+            myGraph[n0name] = {}
+            myGraph[n0name]["inputs"] = []
+            myGraph[n0name]["additional"] = additional
+            myGraph[n0name]["op_type"] = OPTYPE.Const
+            swap_inputs = True
+        if is_constant(node.input[1], model_onnx.graph.initializer):
+            additional = {}
+            additional["data"] = node
+            n2 = getNodesWithOutput(node.input[1], model_onnx)
+            additional["dims"], additional["raw_data"], additional[
+                "dtype"
+            ] = extract_additional_data(
+                node.input[1],
+                node_annotation[n2.name].to_transpose,
+                model_onnx.graph,
+                verbose,
+            )
+            map_onnx_to_myGraph[node.input[1]] = node.input[1]
+            myGraph[node.input[1]] = {}
+            myGraph[node.input[1]]["inputs"] = []
+            myGraph[node.input[1]]["additional"] = additional
+            myGraph[node.input[1]]["op_type"] = OPTYPE.Const
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.MatMul
+        if swap_inputs:
+            myGraph[node.output[0]]["inputs"] = [
+                map_onnx_to_myGraph[node.input[1]],
+                map_onnx_to_myGraph[n0name],
+            ]
+        else:
+            myGraph[node.output[0]]["inputs"] = [
+                map_onnx_to_myGraph[n0name],
+                map_onnx_to_myGraph[node.input[1]],
+            ]
+        myGraph[node.output[0]]["additional"] = {}
+        myGraph[node.output[0]]["additional"]["data"] = node
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+
 
     elif node.op_type == "Concat":
         # Const
@@ -1689,6 +1743,13 @@ def annotate_node(
         node_annotation[n2.name].to_transpose = True
         node_annotation[n2.name].layout_onnx = "nhwc"
 
+    elif node.op_type == "MatMul":
+        if global_data_layout == "nchw":
+            n2 = getNodesWithOutput(node.input[1], model_onnx)
+            node_annotation[n2.name].add_transpose_after = True
+            node_annotation[node.name].add_transpose_before = True
+            node_annotation[node.name].add_transpose_after = True
+
     elif node.op_type == "Gemm":
         n2 = getInitializer(node.input[1], model_onnx)
         if global_data_layout == "nchw":
@@ -1701,6 +1762,7 @@ def annotate_node(
             node_annotation[n2.name].to_transpose = True
 
     nexts = getNodesWithInput(node.output[0], model_onnx)
+
     for n in nexts:
         annotate_node(
             n, model_onnx, node_annotation, global_data_layout, verbose
