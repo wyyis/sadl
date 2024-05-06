@@ -318,6 +318,7 @@ template<> struct ComputationType<int32_t>
   static void           shift_left(int32_t &z, int q) { z <<= q; }
 };
 
+
 template<> struct ComputationType<int16_t>
 {
 #if DEBUG_OVERFLOW

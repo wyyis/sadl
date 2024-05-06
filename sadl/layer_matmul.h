@@ -55,6 +55,8 @@ protected:
   virtual bool          loadInternal(std::istream &file, Version v) override;
   template<int NN> bool apply_dim2(std::vector<Tensor<T> *> &in);
   template<int NN> bool apply_dim3(std::vector<Tensor<T> *> &in);
+  template<int NN> bool apply_dim4(std::vector<Tensor<T> *> &in);
+
 #if __AVX2__
   bool apply_dim2_simd8(std::vector<Tensor<T> *> &in) { return apply_dim2<8>(in); }
   bool apply_dim2_simd16(std::vector<Tensor<T> *> &in) { return apply_dim2_simd8(in); }
@@ -126,6 +128,9 @@ template<typename T> bool MatMul<T>::apply(std::vector<Tensor<T> *> &in)
     break;
   case 3:
     return apply_dim3<1>(in);
+    break;
+  case 4:
+    return apply_dim4<1>(in);
     break;
   default:
     std::cerr << "Logical error MatMul::apply(std::vector<Tensor<T> *> &in)" << A.dims() << ' ' << B.dims() << std::endl;
@@ -348,6 +353,48 @@ template<typename T> template<int NN> bool MatMul<T>::apply_dim3(std::vector<Ten
   }
   return true;
 }
+template<typename T> template<int NN> bool MatMul<T>::apply_dim4(std::vector<Tensor<T> *> &in)
+{
+  const Tensor<T> &A{ *in[0] };
+  const Tensor<T> &B{ *in[1] };
+  int        shift{ in[1]->quantizer + m_q };
+  const int        last = A.dims().size() - 1;
+  const int        N{ A.dims()[last - 2] };
+  const int        H{ A.dims()[last - 1] };
+  const int        R{ B.dims().back() };
+  const int        W{ (A.dims()[last] / NN) * NN };
+  (void) W;
+#if __AVX2__ && DEBUG_SIMD
+  std::cout << "\n[WARN] generic version matmul dim4 " << A.dims() << ' ' << B.dims() << "(H=" << H << ") " << (N * R * H * W) / 1000 << " kMAC" << std::endl;
+#endif   // SIMD
+  constexpr int idx_start{ 0 };
+  const int     idx_end{ W };
+
+  for (int b = 0; b < N; ++b)
+  {
+    for (int i = 0; i < H; ++i)
+    {
+      for (int t = 0; t < R; ++t)
+      {
+        typename ComputationType<T>::type x = 0;
+        {
+          for (int j = idx_start; j < idx_end; ++j)
+          {
+            x += (typename ComputationType<T>::type) A(0, b, i, j) * B(0, b, j, t);
+            COUNTERS_MAC(B(0, b, j, t));
+          }
+        }
+        ComputationType<T>::quantize(x, shift);
+        COUNTERS(x);
+        SATURATE(x);
+        m_out(0, b, i, t) = (T) x;
+      }
+    }
+  }
+  
+  return true;
+}
+
 
 #if SPARSE_SUPPORT
 template<typename T> bool MatMul<T>::apply_sparse_matmul(std::vector<Tensor<T> *> &in)
@@ -558,7 +605,7 @@ template<typename T> bool MatMul<T>::init(const std::vector<Tensor<T> *> &in)
   // B: const (because assumed transposed)
   // 1- A [x,y] B[y,z] || A [x,y,z] B[x,z,t] || A [1,x,y,z] B[1,x,z,t]
   // 2- A [1,x,y] B[y,z] || A [1,x,y,z] B[x,z,t]
-  if (in[1]->dims().size() < 2 || in[1]->dims().size() > 3)
+  if (in[1]->dims().size() < 2 || in[1]->dims().size() > 4)
   {
     return false;
   }
