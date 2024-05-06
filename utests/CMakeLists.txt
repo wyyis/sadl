@@ -25,6 +25,6 @@ endif()
 
 
 if( MSVC )
-  set_property(test_avx2 PROPERTIES COMPILE_FLAGS "/arch:AVX2")
-  set_property(test_border_avx2 PROPERTIES COMPILE_FLAGS "/arch:AVX2")
+  set_target_properties(test_avx2 PROPERTIES COMPILE_FLAGS "/arch:AVX2")
+  set_target_properties(test_border_avx2 PROPERTIES COMPILE_FLAGS "/arch:AVX2")
 endif()
