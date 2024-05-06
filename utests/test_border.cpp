@@ -145,7 +145,7 @@ template<typename T> sadl::Tensor<T> infer(const std::string &filename, bool no_
   srand(42);
   for(auto &v: inputs)
    for(auto &x: v)
-    x=(rand()%1024);
+      x = (float)(rand() % 1024);
 
   if (!model.apply(inputs))
   {

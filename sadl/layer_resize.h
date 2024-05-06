@@ -132,30 +132,26 @@ template<typename T> bool Resize<T>::init(const std::vector<Tensor<T> *> &in)
   int W_in = in[0]->dims()[2];
   int C    = in[0]->dims()[3];
   // scale factor
-  float scale_N = 0, scale_C = 0, scale_H = 0, scale_W = 0;
+  int scale_N = 0, scale_C = 0, scale_H = 0, scale_W = 0;
   if (m_input_label == 1)   // inputs are X and sizes
   {
-    scale_N = in[1]->data()[0] / (float)N;
-    scale_C = in[1]->data()[1] / (float)C;
-    scale_H = in[1]->data()[2] / (float)H_in;
-    scale_W = in[1]->data()[3] / (float)W_in;
+    scale_N = (int)round(in[1]->data()[0] / (float)N);
+    scale_C = (int)round(in[1]->data()[1] / (float)C);
+    scale_H = (int)round(in[1]->data()[2] / (float)H_in);
+    scale_W = (int)round(in[1]->data()[3] / (float)W_in);
   }
   else if (m_input_label == 2)   // inputs are X and scales
   {
-    scale_N = in[1]->data()[0];
-    scale_C = in[1]->data()[1];
-    scale_H = in[1]->data()[2];
-    scale_W = in[1]->data()[3];
+    scale_N = (int)round(in[1]->data()[0]);
+    scale_C = (int)round(in[1]->data()[1]);
+    scale_H = (int)round(in[1]->data()[2]);
+    scale_W = (int)round(in[1]->data()[3]);
   } else {
     std::cerr << "[ERROR] invalid type " << m_input_label<< std::endl;
     return false;
   }
-  scale_N=(int)round(scale_N);
-  scale_H=(int)round(scale_H);
-  scale_W=(int)round(scale_W);
-  scale_C=(int)round(scale_C);
 
-  if ((int)scale_N != 1 || (int)scale_H != 2 || (int)scale_W != 2 || (int)scale_C != 1)
+  if (scale_N != 1 || scale_H != 2 || scale_W != 2 || scale_C != 1)
   {
     std::cerr << "[ERROR] invalid scale factor: input: "<<in[0]->dims()<<" scales: "<<*in[1]<<" result=(" << scale_N << ", " << scale_H << ", " << scale_W << ", " << scale_C << ")" << std::endl;
     return false;

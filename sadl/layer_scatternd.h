@@ -72,9 +72,9 @@ template<typename T> bool ScatterND<T>::apply(std::vector<Tensor<T> *> &in)
     {
       for (int c = 0; c < dim_C; c++)
       {
-        index_H                             = indices(h, w, c, 1);
-        index_W                             = indices(h, w, c, 2);
-        index_C                             = indices(h, w, c, 3);
+        index_H                             = (int)indices(h, w, c, 1);
+        index_W                             = (int)indices(h, w, c, 2);
+        index_C                             = (int)indices(h, w, c, 3);
         m_out(0, index_H, index_W, index_C) = updates(0, h, w, c);   // n==1
       }
     }

@@ -75,7 +75,7 @@ public:
   // aditionnal info
   std::vector<Tensor<T>>                            getInputsTemplate() const;
   const std::vector<typename layers::Layer<T>::Id> &getIdsOutput() const { return m_ids_output; }
-  int                                               nbOutputs() const { return m_ids_output.size(); }
+  size_t                                            nbOutputs() const { return m_ids_output.size(); }
   std::vector<typename layers::Layer<T>::Id>        getLayersId() const;
   const LayerData &                                 getLayer(const typename layers::Layer<T>::Id &id) const;
   LayerData &                                getLayer(const typename layers::Layer<T>::Id &id);
