@@ -46,6 +46,7 @@ public:
 
   virtual bool apply(std::vector<Tensor<T> *> &in) override;
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
+  virtual bool mutateInput() const override { return true; }
 
 protected:
   virtual bool loadInternal(std::istream &file, Version) override;
@@ -55,22 +56,44 @@ protected:
 template<typename T> bool Where<T>::apply(std::vector<Tensor<T> *> &in)
 {
   assert(in.size() == 3);
-  assert(in[0]->dims() == m_out.dims());
-  assert(in[0]->dims() == in[1]->dims() || (in[1]->dims().size() == 1 && in[1]->dims()[0] == 1));
-  assert(in[0]->dims() == in[2]->dims() || (in[2]->dims().size() == 1 && in[2]->dims()[0] == 1));
-  const Tensor<T> &condition = *in[0];
-  const Tensor<T> &A = *in[1];
-  const Tensor<T> &B = *in[2];
-  m_out.quantizer = A.quantizer > B.quantizer ? A.quantizer : B.quantizer;
-  for (int i = 0; i < m_out.size(); i++)
+  if (in[0]->size() != 1)
   {
-    const T A_i = (A.dims().size() == 1) ? A[0] : A[i];
-    const T B_i = (B.dims().size() == 1) ? B[0] : B[i];
-    typename ComputationType<T>::type z = condition[i] ? A_i : B_i;
-    const int z_q = condition[i] ? A.quantizer : B.quantizer ;
-    ComputationType<T>::shift_left(z, m_out.quantizer - z_q);
-    COUNTERS(z);
-    m_out[i] = z;
+    assert(in[0]->dims() == m_out.dims());
+    assert(in[0]->dims() == in[1]->dims() || (in[1]->dims().size() == 1 && in[1]->dims()[0] == 1));
+    assert(in[0]->dims() == in[2]->dims() || (in[2]->dims().size() == 1 && in[2]->dims()[0] == 1));
+  }
+  else
+  {
+    assert(in[1]->dims() == m_out.dims());
+    assert(in[1]->dims() == in[2]->dims());
+  }
+  const Tensor<T> &condition = *in[0];
+  if (condition.size() == 1)
+  {
+    if (condition[0])
+    {
+      swap(*in[1], m_out);
+    }
+    else
+    {
+      swap(*in[2], m_out);
+    }
+  }
+  else
+  {
+    const Tensor<T> &A = *in[1];
+    const Tensor<T> &B = *in[2];
+    m_out.quantizer = A.quantizer > B.quantizer ? A.quantizer : B.quantizer;
+    for (int i = 0; i < m_out.size(); i++)
+    {
+      const T A_i = (A.dims().size() == 1) ? A[0] : A[i];
+      const T B_i = (B.dims().size() == 1) ? B[0] : B[i];
+      typename ComputationType<T>::type z = condition[i] ? A_i : B_i;
+      const int z_q = condition[i] ? A.quantizer : B.quantizer ;
+      ComputationType<T>::shift_left(z, m_out.quantizer - z_q);
+      COUNTERS(z);
+      m_out[i] = z;
+    }
   }
   return true;
 }
@@ -80,7 +103,10 @@ template<typename T> bool Where<T>::init(const std::vector<Tensor<T> *> &in)
 {
   if (in.size() != 3)
     return false;
-  m_out.resize(in[0]->dims());//condition dims
+  if (in[0]->size() == 1)//condition dims
+    m_out.resize(in[1]->dims());
+  else
+    m_out.resize(in[0]->dims());
   m_initDone = true;
   return true;
 }

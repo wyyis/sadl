@@ -1265,6 +1265,37 @@ def parse_graph_node(
         myGraph[node.output[0]]["additional"]["data"] = node
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
+    elif node.op_type == "Equal":
+        additional = {}
+        additional["data"] = node
+        if is_constant(node.input[1], model_onnx.graph.initializer):
+            n2 = getNodesWithOutput(node.input[1], model_onnx)  # constant
+            (
+                additional["dims"],
+                additional["raw_data"],
+                additional["dtype"],
+            ) = extract_additional_data(
+                node.input[1],
+                False,
+                model_onnx.graph,
+                verbose,
+            )
+            myGraph[node.input[1]] = {}
+            myGraph[node.input[1]]["op_type"] = OPTYPE.Const
+            myGraph[node.input[1]]["inputs"] = []
+            myGraph[node.input[1]]["additional"] = additional
+            map_onnx_to_myGraph[node.input[1]] = node.input[1]
+
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.Compare
+        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [
+            map_onnx_to_myGraph[node.input[1]]
+        ]
+        myGraph[node.output[0]]["additional"] = {}
+        myGraph[node.output[0]]["additional"]["data"] = node
+        myGraph[node.output[0]]["additional"]["mode"] = 2
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+
     else:
         raise Exception("[ERROR] node not supported:\n{})".format(node))
 
