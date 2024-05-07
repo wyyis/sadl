@@ -45,7 +45,7 @@ endif()
 
 
 if( MSVC )
-  set_property(sample_simd256 PROPERTIES COMPILE_FLAGS "/arch:AVX2")
-  set_property(sample_simd512 PROPERTIES COMPILE_FLAGS "/arch:AVX512")
-  set_property(debug_model PROPERTIES COMPILE_FLAGS "/arch:AVX2")
+  set_target_properties(sample_simd256 PROPERTIES COMPILE_FLAGS "/arch:AVX2")
+  set_target_properties(sample_simd512 PROPERTIES COMPILE_FLAGS "/arch:AVX512")
+  set_target_properties(debug_model PROPERTIES COMPILE_FLAGS "/arch:AVX2")
 endif()
