@@ -101,6 +101,7 @@ inline std::string opName(const OperationType::Type op)
     DIRTYCASEPRINT(Resize);
     DIRTYCASEPRINT(Compare);
     DIRTYCASEPRINT(Minimum);
+    DIRTYCASEPRINT(Where);
   default:
     oss << "??";
     break;
