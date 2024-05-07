@@ -113,7 +113,7 @@ template<typename T> bool Expand<T>::init(const std::vector<Tensor<T> *> &in)
     std::cerr << "[ERROR] quantizer on reshape dimensions data layer" << std::endl;
     return false;
   }
-  copy(in[1]->begin(), in[1]->end(), dim.begin());
+  for(int64_t i=0;i<in[1]->size();i++) dim[i]=(int)((*in[1])[i]); 
   // current restriction: broadcast only scalar to shape or expand last channel =1 of a tensor of dim 4
   bool ok = false;
   if (in[0]->size() == 1)
