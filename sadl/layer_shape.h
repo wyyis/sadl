@@ -67,7 +67,7 @@ template<typename T> bool Shape<T>::init(const std::vector<Tensor<T> *> &in)
   d.resize(1);
   d[0] = in[0]->dims().size();
   m_out.resize(d);
-  copy(in[0]->dims().begin(), in[0]->dims().end(), m_out.begin());
+  for(int i=0;i<in[0]->dims().size();i++) m_out[i]=(T)(in[0]->dims()[i]);
   m_initDone = true;
   return true;
 }
