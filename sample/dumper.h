@@ -170,12 +170,12 @@ template<typename T> bool sadl::Model<T>::dump(std::ostream &file)
   }
   file.write((const char *) &x, sizeof(int32_t));
 
-  int32_t nb_layers = m_data.size();
+  int32_t nb_layers = (int) m_data.size();
   file.write((const char *) &nb_layers, sizeof(int32_t));
-  int32_t nb = m_ids_input.size();
+  int32_t nb = (int) m_ids_input.size();
   file.write((const char *) &nb, sizeof(int32_t));
   file.write((const char *) m_ids_input.data(), sizeof(int32_t) * nb);
-  nb = m_ids_output.size();
+  nb = (int) m_ids_output.size();
   file.write((const char *) &nb, sizeof(int32_t));
   file.write((const char *) m_ids_output.data(), sizeof(int32_t) * nb);
 
@@ -187,10 +187,10 @@ template<typename T> bool sadl::Model<T>::dump(std::ostream &file)
     x = m_data[k].layer->op();
     file.write((const char *) &x, sizeof(int32_t));
     // savePrefix
-    int32_t L = m_data[k].layer->m_name.size();
+    int32_t L = (int) m_data[k].layer->m_name.size();
     file.write((const char *) &L, sizeof(int32_t));
     file.write((const char *) m_data[k].layer->m_name.c_str(), m_data[k].layer->m_name.size());
-    L = m_data[k].layer->m_inputs_id.size();
+    L = (int) m_data[k].layer->m_inputs_id.size();
     file.write((const char *) &L, sizeof(int32_t));
     file.write((const char *) m_data[k].layer->m_inputs_id.data(), m_data[k].layer->m_inputs_id.size() * sizeof(int32_t));
     m_data[k].layer->dump(file);

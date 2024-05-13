@@ -92,7 +92,7 @@ template<typename T> bool Where<T>::apply(std::vector<Tensor<T> *> &in)
       const int z_q = condition[i] ? A.quantizer : B.quantizer ;
       ComputationType<T>::shift_left(z, m_out.quantizer - z_q);
       COUNTERS(z);
-      m_out[i] = z;
+      m_out[i] = static_cast<T>(z);
     }
   }
   return true;

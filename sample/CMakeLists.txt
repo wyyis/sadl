@@ -5,7 +5,6 @@ project(sample LANGUAGES CXX)
 set(SPARSE_MATMULT_SUPPORT OFF CACHE BOOL "add support for sparse matrix multiplication" )
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 if (SPARSE_MATMULT_SUPPORT)
  add_definitions(-DSPARSE_SUPPORT=1) 
@@ -35,6 +34,7 @@ add_executable(update_model_version update_model_version.cpp ${HEADER_FILES} dum
 add_executable(quantization_test quantization_test.cpp ${HEADER_FILES})
 
 if( UNIX OR MINGW )
+ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
  set(CMAKE_CXX_FLAGS "-ffast-math -Wall -fstrict-aliasing")
  if( NOT (CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64") )
    set_target_properties(sample_simd256  PROPERTIES COMPILE_FLAGS "-mavx2" )
@@ -45,7 +45,9 @@ endif()
 
 
 if( MSVC )
+  set(CMAKE_CXX_FLAGS_RELEASE "/O2")
   set_target_properties(sample_simd256 PROPERTIES COMPILE_FLAGS "/arch:AVX2")
   set_target_properties(sample_simd512 PROPERTIES COMPILE_FLAGS "/arch:AVX512")
   set_target_properties(debug_model PROPERTIES COMPILE_FLAGS "/arch:AVX2")
+  string( APPEND CMAKE_CXX_FLAGS " /WX" ) #treat warnings as errors
 endif()

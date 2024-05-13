@@ -156,7 +156,7 @@ template<typename T> template<bool multialpha> bool PReLU<T>::apply_scalar(std::
               COUNTERS(z);
               COUNTERS_MAC(z);
               SATURATE(z);
-              m_out(n_nb, h_nb, w_nb, c_nb) = z;
+              m_out(n_nb, h_nb, w_nb, c_nb) = static_cast<T>(z);
             }
             else
             {
@@ -179,7 +179,7 @@ template<typename T> template<bool multialpha> bool PReLU<T>::apply_scalar(std::
         COUNTERS(z);
         COUNTERS_MAC(z);
         SATURATE(z);
-        x = z;
+        x = static_cast<T>(z);
       }
       else
       {

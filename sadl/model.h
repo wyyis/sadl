@@ -510,7 +510,7 @@ template<typename T> bool Model<T>::apply(std::vector<Tensor<T>> &in)
       }
       else
       {
-        float Q = (1 << m_data[layer_cnt].layer->m_out.quantizer);
+        float Q = (float) (1 << m_data[layer_cnt].layer->m_out.quantizer);
         for (int k = 0; k < 8 && k < (int) m_data[layer_cnt].layer->m_out.size(); ++k)
           std::cout << m_data[layer_cnt].layer->m_out[k] / Q << ' ';
         std::cout << "]\t";
@@ -581,7 +581,7 @@ template<typename T> bool Model<T>::apply(std::vector<Tensor<T>> &in)
       }
       else
       {
-        float Q = (1 << m_data[layer_cnt].layer->m_out.quantizer);
+        float Q = (float)(1 << m_data[layer_cnt].layer->m_out.quantizer);
         for (int k = 0; k < 8 && k < (int) m_data[layer_cnt].layer->m_out.size(); ++k)
           std::cout << m_data[layer_cnt].layer->m_out[k] / Q << ' ';
         if (m_data[layer_cnt].layer->m_out.size() > 8)
