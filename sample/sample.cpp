@@ -68,7 +68,7 @@ template<typename T> void infer(const string &filename)
   for (auto &t: inputs)
     for (auto &x: t)
     {
-      x = x0;
+      x = static_cast<T>(x0);
       x0 += step;
     }
   chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
@@ -81,7 +81,7 @@ template<typename T> void infer(const string &filename)
   chrono::duration<double>         dt = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
   cout << "[INFO] " << dt.count() * 1000. << " ms" << endl;
 
-  const int N = model.getIdsOutput().size();
+  const int N = (int) model.getIdsOutput().size();
   for (int i = 0; i < N; ++i)
     cout << "[INFO] output " << i << '\n' << model.result(i) << endl;
 }

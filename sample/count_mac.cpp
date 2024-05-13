@@ -58,7 +58,7 @@ template<typename T> void infer(const string &filename)
   // fill with 1
   for (auto &t: inputs)
   {
-    T v = 1 << (t.quantizer);
+    T v = static_cast<T>(1 << (t.quantizer));
     for (auto &x: t)
       x = v;
   }

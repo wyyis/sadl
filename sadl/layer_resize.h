@@ -296,7 +296,7 @@ template<typename T> void Resize<T>::calc_positions(int y, int x, int H, int W, 
   
   if (m_coordinate_transformation_mode == resize_coordinate_transformation_mode_half_pixel)
   {
-    T2 normalize_bias = 1 << (shift - 2);
+    T2 normalize_bias = (T)(1 << (shift - 2));
     x                 = x << shift;
     y                 = y << shift;
     x_ori             = ((x + 1) >> 1) - normalize_bias;
@@ -313,8 +313,8 @@ template<typename T> void Resize<T>::calc_positions(int y, int x, int H, int W, 
   y_ori_int = y_ori >> shift;
 
   // acquire the positions of adjacent pixels, prioritizing the left and top pixels
-  x_ori_left   = (x_ori == x_ori_int << shift) ? x_ori_int - 1 : x_ori_int;
-  y_ori_top    = (y_ori == y_ori_int << shift) ? y_ori_int - 1 : y_ori_int;
+  x_ori_left   = (int)((x_ori == x_ori_int << shift) ? x_ori_int - 1 : x_ori_int);
+  y_ori_top    = (int)((y_ori == y_ori_int << shift) ? y_ori_int - 1 : y_ori_int);
   x_ori_right  = x_ori_left + 1;
   y_ori_bottom = y_ori_top + 1;
   x_ori_left   = std::max(0, x_ori_left);   // boundary clamp
@@ -350,12 +350,12 @@ template<typename T> void Resize<T>::get_bilinear_coeffs(T2 y_ori, T2 x_ori, T2 
 
   T2 x_ori_int = x_ori >> shift;
   T2 y_ori_int = y_ori >> shift;
-  T2 x_ratio   = (x_ori == (x_ori_int << shift)) ? (1 << shift) : x_ori - (x_ori_int << shift);
-  T2 y_ratio   = (y_ori == (y_ori_int << shift)) ? (1 << shift) : y_ori - (y_ori_int << shift);
+  T2 x_ratio   = (x_ori == (x_ori_int << shift)) ? (T)(1 << shift) : x_ori - (x_ori_int << shift);
+  T2 y_ratio   = (y_ori == (y_ori_int << shift)) ? (T)(1 << shift) : y_ori - (y_ori_int << shift);
 
-  T2 x_coeff1 = (1 << shift) - x_ratio;
+  T2 x_coeff1 = (T)(1 << shift) - x_ratio;
   T2 x_coeff2 = x_ratio;
-  T2 y_coeff1 = (1 << shift) - y_ratio;
+  T2 y_coeff1 = (T)(1 << shift) - y_ratio;
   T2 y_coeff2 = y_ratio;
 
   coeff11 = (y_coeff1 * x_coeff1) >> shift;
@@ -397,9 +397,9 @@ template<typename T> void Resize<T>::get_nearest_coeffs(T2 ori, T2 &coeff_1, T2 
 {
   int shift   = m_quantizer;
   T2  ori_int = ori >> shift;   // floor
-  T2  ratio   = (ori == (ori_int << shift)) ? (1 << shift) : (ori - (ori_int << shift));
+  T2  ratio   = (ori == (ori_int << shift)) ? (T)(1 << shift) : (ori - (ori_int << shift));
 
-  if (ratio == (1 << shift))
+  if (ratio == (T)(1 << shift))
   {
     coeff_1 = 0;
     coeff_2 = 1;
@@ -413,7 +413,7 @@ template<typename T> void Resize<T>::get_nearest_coeffs(T2 ori, T2 &coeff_1, T2 
   }
   if (m_nearest_mode == resize_nearest_mode_round_prefer_ceil)
   {
-    if (ratio < (1 << (shift - 1)))
+    if (ratio < (T)(1 << (shift - 1)))
       coeff_1 = 1;
     else
       coeff_1 = 0;

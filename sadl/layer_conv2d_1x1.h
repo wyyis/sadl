@@ -426,7 +426,7 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd32_con
         typename ComputationType<int32_t>::type z = (_mm512_reduce_add_epi32(s) >> shift);
         COUNTERS(z);
         SATURATE(z);
-        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = z;
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(z);
       }
     }
   }

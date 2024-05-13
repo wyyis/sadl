@@ -228,13 +228,13 @@ template<typename T> void GridSample<T>::gs_denormalize(T2 &x, int length)
   int shift = m_grid_quantizer;
   if (m_mode == gridsample_mode_nearest)
   {
-    T2 normalize_bias = 1 << shift;
+    T2 normalize_bias = (T)(1 << shift);
     x                 = (x + normalize_bias) * (length - 1);
     x                 = (x + normalize_bias) >> (shift + 1);   // round
   }
   else if (m_mode == gridsample_mode_bilinear)
   {
-    T2 normalize_bias = 1 << shift;
+    T2 normalize_bias = (T)(1 << shift);
     x                 = (x + normalize_bias) * (length - 1);   // shift later to to maintain precision in higher-order bits during computation
   }
 }
@@ -264,8 +264,8 @@ template<typename T> void GridSample<T>::get_bilinear_coeffs(T2 y, T2 x, int pos
   int &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
 
   int shift    = m_grid_quantizer + 1;
-  x_ori_left   = x >> shift;   // floor
-  y_ori_top    = y >> shift;
+  x_ori_left   = (int) (x >> shift);   // floor
+  y_ori_top    = (int) (y >> shift);
   x_ori_right  = x_ori_left + 1;
   y_ori_bottom = y_ori_top + 1;
   T2 dy2       = (y_ori_bottom << shift) - y;

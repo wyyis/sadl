@@ -129,7 +129,7 @@ void bilinear_in_channels_wo_simd(const Tensor<T> &data, const T2 coeffs[], cons
     T2 num = temp_buffer[im_c];
     ComputationType<T>::quantize(num, shift);
     SATURATE(num);
-    out(im_nb, im_i, im_j, im_c) = num;
+    out(im_nb, im_i, im_j, im_c) = static_cast<T>(num);
   }
 }
 
