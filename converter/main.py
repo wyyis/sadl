@@ -205,7 +205,24 @@ def transpose_tensor(raw_data, dims):
     tmp.append(dims[0])
 
     x = np.frombuffer(raw_data, dtype=np.float32)
+    # if verbose > 3: print(x)
     x = x.reshape(tmp[3], tmp[2], tmp[0] * tmp[1]).transpose().flatten()
+    # if verbose > 3: print("after",x)
+    return x.tobytes(), tmp
+
+
+def nchw_to_nhwc(raw_data, dims):
+    # print(dims)
+    assert (dims[0]==4)
+    tmp = []
+    tmp.append(dims[0])
+    x = np.frombuffer(raw_data, dtype=np.int32)
+    x2 = []
+    x2.append(x[0])
+    x2.append(x[2])
+    x2.append(x[3])
+    x2.append(x[1])
+    x = np.asarray(x2)
     return x.tobytes(), tmp
 
 
@@ -290,7 +307,6 @@ def extract_additional_data_from_node(data, to_transpose):
         tmp["raw_data"] = convert_int64_to_int32(tmp["raw_data"])
     else:
         raise ValueError("extract_additional_data: Unknown dtype")
-
     if to_transpose:
         if len(tmp["dims"]) == 4:
             tmp["raw_data"], tmp["dims"] = transpose_tensor(
@@ -300,7 +316,10 @@ def extract_additional_data_from_node(data, to_transpose):
             tmp["raw_data"], tmp["dims"] = transpose_matrix(
                 tmp["raw_data"], tmp["dims"]
             )
-
+        elif len(tmp["dims"]) == 1 and tmp["dtype"] == DTYPE_SADL.INT32:
+            tmp["raw_data"], tmp["dims"] = nchw_to_nhwc(tmp["raw_data"], tmp["dims"])
+        else:
+            raise ValueError("extract_additional_data_from_node")
     return tmp["dims"], tmp["raw_data"], tmp["dtype"]
 
 
@@ -774,9 +793,10 @@ def parse_graph_node(
         myGraph[node.input[1]]["op_type"] = OPTYPE.Const
         myGraph[node.input[1]]["inputs"] = []
         additional = {}
+        n2 = getNodesWithOutput(node.input[1], model_onnx)
         additional["dims"], additional["raw_data"], additional[
             "dtype"
-        ] = extract_additional_data(node.input[1], False, model_onnx.graph, verbose)
+        ] = extract_additional_data(node.input[1], node_annotation[n2.name].to_transpose, model_onnx.graph, verbose)
         additional["data"] = node
         myGraph[node.input[1]]["additional"] = additional
         map_onnx_to_myGraph[node.input[1]] = node.input[1]
@@ -1702,7 +1722,7 @@ def annotate_node(
             )
             initializer = attribute.t
         dims = getDims(initializer)
-
+        ignore_transpose = False       
         # detect if this reshape is actually added by onnx to emulate a transpose
         # we need to test more if reshpae is for transpose...
         if len(dims) == 4 and (dims[0] == 1 or dims[0] == -1):
@@ -1716,12 +1736,16 @@ def annotate_node(
                     if verbose > 1:
                         print("[WARNING] reshape unknown for", node, " dims", dims)
                     node_annotation[node.name].layout_onnx = None
-            elif data_layout == "ncwh":
+            elif data_layout == "nchw":
                 if dims[3] == 1:  # # or dims2 * dims3 == 1 nchw ->nhwc
+                    if verbose > 1:
+                        print("[WARNING] heuristic on reshape node for", node, " dims", dims)
                     node_annotation[node.name].to_remove = True  # will be removed
                     node_annotation[
                         node.name
                     ].layout_onnx = "nhwc"  # new layout at output
+                elif len(dims) == 4: # real reshape. currently lazy solution transpose before and after
+                    node_annotation[node.name].add_transpose_after =  True
                 else:
                     if verbose > 1:
                         print("[WARNING] reshape unknown for", node, " dims", dims)
@@ -1859,7 +1883,7 @@ def dumpModel(model_onnx, output_filename, data_layout, verbose, user_annotation
     output_filename : either str or None
         Path to the binary file to which the neural network model
         is written.
-    data_type: None, 'ncwh' or 'nwhc'
+    data_type: None, 'nchw' or 'nhwc'
     verbose : bool
         Is additional information printed?
     """
