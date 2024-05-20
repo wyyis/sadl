@@ -106,7 +106,7 @@ template<typename T> bool Reshape<T>::init(const std::vector<Tensor<T> *> &in)
   //
   if (cnt==1) {
     assert(dim.nbElements()!=0);
-    dim[pos]=in[0]->dims().nbElements()/dim.nbElements();
+    dim[pos]=(int)(in[0]->dims().nbElements()/dim.nbElements());
   }
   if (dim.nbElements() != in[0]->dims().nbElements())
   {
