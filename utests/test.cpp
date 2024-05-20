@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2023, ITU/ISO/IEC
+ * Copyright (c) 2010-2024, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@ using namespace std;
 
 namespace
 {
-int verbose = 0;
+int verbose = 2;
 // results file
 // nb inputs [int]
 // for all input:
