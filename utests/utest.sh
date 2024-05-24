@@ -16,20 +16,22 @@ if [ ! -f ${1} ]; then
  exit -1;
 fi;
 
+OPT2="--input_default_value=8"; # for graph with named inputs
+
 NAME=$(basename $1);
 BNAME=${NAME/.onnx/};
 
 rm -f ${BNAME}.results;
-python3 ${BDIR}/onnx_inference.py --input_onnx $1 --output ${BNAME}.results $OPT > /dev/null
+python3 ${BDIR}/onnx_inference.py --input_onnx $1 --output ${BNAME}.results $OPT $OPT2 > /dev/null
 if [ ! -f ${BNAME}.results ]; then
- echo " [ERROR] onnx inference failed";
+ echo " [ERROR] onnx inference failed for ${BNAME}";
  exit -1;
 fi
 
 rm -f ${BNAME}.sadl;
-python3 ${BDIR}/../converter/main.py --input_onnx $1  --output ${BNAME}.sadl > /dev/null
+python3 ${BDIR}/../converter/main.py --input_onnx $1  --output ${BNAME}.sadl $OPT2 > /dev/null
 if [ ! -f ${BNAME}.sadl ]; then
- echo " [ERROR] onnx to SADL conversion failed";
+ echo " [ERROR] onnx to SADL conversion failed for ${BNAME}";
  exit -1;
 fi
 
