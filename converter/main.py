@@ -4,7 +4,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2024, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -170,18 +170,20 @@ class DTYPE_ONNX(IntEnum):
 
 class Node_Annotation:
     to_remove = False
-    add_transpose_before = False
-    add_transpose_after = False
+    transpose_before_in0 = None
+    transpose_before_in1 = None
+    to_nhwc_after_out = False
     to_transpose = False
     layout_onnx = None
 
     def __repr__(self):
-        return "to_remove={}, to_transpose={}, layout_onnx={}, add_transpose_before={} add_transpose_after={}".format(
+        return "to_remove={}, to_transpose={}, layout_onnx={}, transpose_before_in0={} transpose_before_in1={} to_nhwc_after_out={}".format(
             self.to_remove,
             self.to_transpose,
             self.layout_onnx,
-            self.add_transpose_before,
-            self.add_transpose_after,
+            self.transpose_before_in0,
+            self.transpose_before_in1,
+            self.to_nhwc_after_out,
         )
 
 
@@ -257,7 +259,7 @@ def is_output(name, onnx_output):
     return False
 
 
-def parse_graph_input_node(input_node, map_onnx_to_myGraph, to_transpose):
+def parse_graph_input_node(input_node, map_onnx_to_myGraph, to_transpose, input_default_value):
     map_onnx_to_myGraph[input_node.name] = input_node.name
     struct = {}
     struct["inputs"] = []
@@ -275,6 +277,10 @@ def parse_graph_input_node(input_node, map_onnx_to_myGraph, to_transpose):
         struct["additional"]["dims"] = [
             d.dim_value for d in input_node.type.tensor_type.shape.dim
         ]
+    for i in range(len(struct["additional"]["dims"])):
+       if struct["additional"]["dims"][i] == 0:
+         struct["additional"]["dims"][i] = input_default_value
+    # print(struct["additional"]["dims"])
     struct["op_type"] = OPTYPE.Placeholder
     return struct
 
@@ -323,9 +329,30 @@ def extract_additional_data_from_node(data, to_transpose):
     return tmp["dims"], tmp["raw_data"], tmp["dtype"]
 
 
+def extract_attribute_values(node):
+    L = []
+    tmp = getAttribute(node, "value")
+    if tmp.t is None: return L
+    binary_data = tmp.t.raw_data
+    data = tmp.t
+    if data.data_type == DTYPE_ONNX.FLOAT:
+        x = np.frombuffer(binary_data, dtype=np.float) 
+    elif data.data_type == DTYPE_ONNX.INT8:
+        x = np.frombuffer(binary_data, dtype=np.int8) 
+    elif data.data_type == DTYPE_ONNX.INT16:
+        x = np.frombuffer(binary_data, dtype=np.int16) 
+    elif data.data_type == DTYPE_ONNX.INT32:
+        x = np.frombuffer(binary_data, dtype=np.int32) 
+    elif data.data_type == DTYPE_ONNX.INT64:
+        x = np.frombuffer(binary_data, dtype=np.int64) 
+    else:
+        raise ValueError("extract_attribute_values: Unknown dtype")
+    return x.tolist()
+
+
 def extract_additional_data(name, to_transpose, onnx_graph, verbose):
     if verbose:
-        print("[INFO] {} transpose={}".format(name, to_transpose))
+        print("[INFO] additional data {} transpose={}".format(name, to_transpose))
 
     for init in onnx_graph.initializer:
         if name == init.name:
@@ -375,9 +402,9 @@ def getNodesWithOutput(name, model):
     for node in model.graph.input:
         if node.name == name:
             return node
-    quit("[ERROR] not found: {}".format(name))
-
-
+    # print("[ERROR] not found: {}".format(name))
+    return None
+    
 # get the nodes with name as output
 def getNodesWithOutputNotConst(name, model):
     for node in model.graph.node:
@@ -407,32 +434,35 @@ def getInitializer(name, model_onnx):
     return None
 
 
-def add_transpose(node, myGraph, map_onnx_to_myGraph):
+def add_transpose_to_input(node, typet, i, myGraph, map_onnx_to_myGraph):      
     # Transpose inserted
-    # Const
-    reshape_coef_name = node.input[0] + "_COEF_TRANSPOSE_NOT_IN_GRAPH"
+    
+    in_node = node.input[i]
+    reshape_coef_name = in_node + "_COEF_TRANSPOSE_NOT_IN_GRAPH"
     myGraph[reshape_coef_name] = {}
     myGraph[reshape_coef_name]["op_type"] = OPTYPE.Const
     myGraph[reshape_coef_name]["inputs"] = []
     additional = {}
     additional["dims"] = [4]
-    additional["raw_data"] = np.array(
-        [0, 3, 1, 2], dtype=np.int32
-    ).tobytes()  # nhwc -> nchw
+    if typet == "nchw":
+       additional["raw_data"] = np.array([0, 3, 1, 2], dtype=np.int32).tobytes()  # nhwc -> nchw
+    else:
+       additional["raw_data"] = np.array([0, 2, 3, 1], dtype=np.int32).tobytes()  # nchw -> nhwc 
     additional["dtype"] = DTYPE_SADL.INT32
     additional["data"] = node
     myGraph[reshape_coef_name]["additional"] = additional
     map_onnx_to_myGraph[reshape_coef_name] = reshape_coef_name
 
-    nname = node.input[0] + "_TRANSPOSE_NOT_IN_GRAPH"
+    nname = in_node + "_TRANSPOSE_NOT_IN_GRAPH"
     myGraph[nname] = {}
     myGraph[nname]["op_type"] = OPTYPE.Transpose
-    myGraph[nname]["inputs"] = [map_onnx_to_myGraph[node.input[0]], reshape_coef_name]
+    myGraph[nname]["inputs"] = [map_onnx_to_myGraph[in_node], reshape_coef_name]
     map_onnx_to_myGraph[nname] = nname
+    
     return nname
 
 
-def add_transpose_after(node, myGraph, map_onnx_to_myGraph):
+def add_transpose_to_output(node, myGraph, map_onnx_to_myGraph):
     # Transpose inserted
     # Const
     reshape_coef_name = node.output[0] + "_COEF_TRANSPOSE_AFTER_NOT_IN_GRAPH"
@@ -441,9 +471,7 @@ def add_transpose_after(node, myGraph, map_onnx_to_myGraph):
     myGraph[reshape_coef_name]["inputs"] = []
     additional = {}
     additional["dims"] = [4]
-    additional["raw_data"] = np.array(
-        [0, 2, 3, 1], dtype=np.int32
-    ).tobytes()  # nchw -> nhwc
+    additional["raw_data"] = np.array([0, 2, 3, 1], dtype=np.int32).tobytes()  # nchw -> nhwc
     additional["dtype"] = DTYPE_SADL.INT32
     additional["data"] = node
     myGraph[reshape_coef_name]["additional"] = additional
@@ -462,17 +490,22 @@ def parse_graph_node(
     node, model_onnx, myGraph, node_annotation, map_onnx_to_myGraph, verbose
 ):
     if verbose > 1:
-        print("parse node", node.name)
+        print(f"parse node {node.name} remove={node_annotation[node.name].to_remove}")
 
-    if node_annotation[
-        node.name
-    ].add_transpose_before:  # layout_onnx == 'nchw' : # need to go back to original layout before reshape
-        n0name = add_transpose(node, myGraph, map_onnx_to_myGraph)
+    if node_annotation[node.name].transpose_before_in0 is not None:  # layout_onnx == 'nchw' : # need to go back to original layout before process
+        n0name = add_transpose_to_input(node, node_annotation[node.name].transpose_before_in0, 0, myGraph, map_onnx_to_myGraph)
     else:
         if len(node.input) >= 1:
             n0name = node.input[0]
         else:
             n0name = None
+    if len(node.input) > 1 and node_annotation[node.name].transpose_before_in1 is not None:  # layout_onnx == 'nchw' : # need to go back to original layout before process
+        n1name = add_transpose_to_input(node, node_annotation[node.name].transpose_before_in1, 1, myGraph, map_onnx_to_myGraph)
+    else:
+        if len(node.input) >= 2:
+            n1name = node.input[1]
+        else:
+            n1name = None
 
     if (
         node.op_type == "Conv"
@@ -485,25 +518,25 @@ def parse_graph_node(
         additional = {}
         # Const: weight
         additional["data"] = node
-        n2 = getNodesWithOutput(node.input[1], model_onnx)
+        n2 = getNodesWithOutput(n1name, model_onnx)
         additional["dims"], additional["raw_data"], additional[
             "dtype"
         ] = extract_additional_data(
-            node.input[1],
+            n1name,
             node_annotation[n2.name].to_transpose,
             model_onnx.graph,
             verbose,
         )
-        map_onnx_to_myGraph[node.input[1]] = node.input[1]
+        map_onnx_to_myGraph[n1name] = n1name
 
-        myGraph[node.input[1]] = {}
-        myGraph[node.input[1]]["inputs"] = []
-        myGraph[node.input[1]]["additional"] = additional
-        myGraph[node.input[1]]["op_type"] = OPTYPE.Const
+        myGraph[n1name] = {}
+        myGraph[n1name]["inputs"] = []
+        myGraph[n1name]["additional"] = additional
+        myGraph[n1name]["op_type"] = OPTYPE.Const
 
         # Conv2d
         inputs, additional = [], {}
-        inputs = [map_onnx_to_myGraph[n0name]] + [map_onnx_to_myGraph[node.input[1]]]
+        inputs = [map_onnx_to_myGraph[n0name]] + [map_onnx_to_myGraph[n1name]]
 
         additional["data"] = node
         if node.op_type == "Conv" or node.op_type == "ConvTranspose":
@@ -590,34 +623,34 @@ def parse_graph_node(
             myGraph[n0name]["additional"] = additional
             myGraph[n0name]["op_type"] = OPTYPE.Const
             swap_inputs = True
-        if is_constant(node.input[1], model_onnx.graph.initializer):
+        if is_constant(n1name, model_onnx.graph.initializer):
             additional = {}
             additional["data"] = node
             additional["dims"], additional["raw_data"], additional[
                 "dtype"
-            ] = extract_additional_data(node.input[1], False, model_onnx.graph, verbose)
-            map_onnx_to_myGraph[node.input[1]] = node.input[1]
-            myGraph[node.input[1]] = {}
-            myGraph[node.input[1]]["inputs"] = []
-            myGraph[node.input[1]]["additional"] = additional
-            myGraph[node.input[1]]["op_type"] = OPTYPE.Const
+            ] = extract_additional_data(n1name, False, model_onnx.graph, verbose)
+            map_onnx_to_myGraph[n1name] = n1name
+            myGraph[n1name] = {}
+            myGraph[n1name]["inputs"] = []
+            myGraph[n1name]["additional"] = additional
+            myGraph[n1name]["op_type"] = OPTYPE.Const
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Add
         if not swap_inputs:
             D1 = extract_dims(n0name, model_onnx.graph)
-            D2 = extract_dims(node.input[1], model_onnx.graph)
+            D2 = extract_dims(n1name, model_onnx.graph)
             if D1 is not None and D2 is not None and len(D1) < len(D2):
                 swap_inputs = True
 
         if swap_inputs:
             myGraph[node.output[0]]["inputs"] = [
-                map_onnx_to_myGraph[node.input[1]],
+                map_onnx_to_myGraph[n1name],
                 map_onnx_to_myGraph[n0name],
             ]
         else:
             myGraph[node.output[0]]["inputs"] = [
                 map_onnx_to_myGraph[n0name],
-                map_onnx_to_myGraph[node.input[1]],
+                map_onnx_to_myGraph[n1name],
             ]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
@@ -650,7 +683,7 @@ def parse_graph_node(
     elif node.op_type == "Mul":
         # check the inputs
         if is_constant(n0name, model_onnx.graph.initializer) and is_constant(
-            node.input[1], model_onnx.graph.initializer
+            n1name, model_onnx.graph.initializer
         ):
             quit("[ERROR] unsupported double constants Mul", node)
         swap_inputs = False
@@ -669,34 +702,34 @@ def parse_graph_node(
             myGraph[n0name]["additional"] = additional
             myGraph[n0name]["op_type"] = OPTYPE.Const
             swap_inputs = True
-        if is_constant(node.input[1], model_onnx.graph.initializer):
+        if is_constant(n1name, model_onnx.graph.initializer):
             additional = {}
             additional["data"] = node
-            n2 = getNodesWithOutput(node.input[1], model_onnx)
+            n2 = getNodesWithOutput(n1name, model_onnx)
             additional["dims"], additional["raw_data"], additional[
                 "dtype"
             ] = extract_additional_data(
-                node.input[1],
+                n1name,
                 node_annotation[n2.name].to_transpose,
                 model_onnx.graph,
                 verbose,
             )
-            map_onnx_to_myGraph[node.input[1]] = node.input[1]
-            myGraph[node.input[1]] = {}
-            myGraph[node.input[1]]["inputs"] = []
-            myGraph[node.input[1]]["additional"] = additional
-            myGraph[node.input[1]]["op_type"] = OPTYPE.Const
+            map_onnx_to_myGraph[n1name] = n1name
+            myGraph[n1name] = {}
+            myGraph[n1name]["inputs"] = []
+            myGraph[n1name]["additional"] = additional
+            myGraph[n1name]["op_type"] = OPTYPE.Const
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Mul
         if swap_inputs:
             myGraph[node.output[0]]["inputs"] = [
-                map_onnx_to_myGraph[node.input[1]],
+                map_onnx_to_myGraph[n1name],
                 map_onnx_to_myGraph[n0name],
             ]
         else:
             myGraph[node.output[0]]["inputs"] = [
                 map_onnx_to_myGraph[n0name],
-                map_onnx_to_myGraph[node.input[1]],
+                map_onnx_to_myGraph[n1name],
             ]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
@@ -738,20 +771,20 @@ def parse_graph_node(
     elif node.op_type == "PRelu":
         additional = {}
         additional["data"] = node
-        n2 = getNodesWithOutput(node.input[1], model_onnx)
+        n2 = getNodesWithOutput(n1name, model_onnx)
         additional["dims"], additional["raw_data"], additional[
             "dtype"
-        ] = extract_additional_data(node.input[1], False, model_onnx.graph, verbose)
-        myGraph[node.input[1]] = {}
-        myGraph[node.input[1]]["op_type"] = OPTYPE.Const
-        myGraph[node.input[1]]["inputs"] = []
-        myGraph[node.input[1]]["additional"] = additional
-        map_onnx_to_myGraph[node.input[1]] = node.input[1]
+        ] = extract_additional_data(n1name, False, model_onnx.graph, verbose)
+        myGraph[n1name] = {}
+        myGraph[n1name]["op_type"] = OPTYPE.Const
+        myGraph[n1name]["inputs"] = []
+        myGraph[n1name]["additional"] = additional
+        map_onnx_to_myGraph[n1name] = n1name
 
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.PReLU
         myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [
-            map_onnx_to_myGraph[node.input[1]]
+            map_onnx_to_myGraph[n1name]
         ]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
@@ -779,45 +812,48 @@ def parse_graph_node(
 
     elif node.op_type == "Expand":
         inputs, additional = [], {}
-        inputs = [map_onnx_to_myGraph[n0name], map_onnx_to_myGraph[node.input[1]]]
+        inputs = [map_onnx_to_myGraph[n0name], map_onnx_to_myGraph[n1name]]
         additional["data"] = node
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["inputs"] = inputs
         myGraph[node.output[0]]["additional"] = additional
         myGraph[node.output[0]]["op_type"] = OPTYPE.Expand
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
-
+    
     elif node.op_type == "Reshape":
-        # Const
-        myGraph[node.input[1]] = {}
-        myGraph[node.input[1]]["op_type"] = OPTYPE.Const
-        myGraph[node.input[1]]["inputs"] = []
-        additional = {}
-        n2 = getNodesWithOutput(node.input[1], model_onnx)
-        additional["dims"], additional["raw_data"], additional[
-            "dtype"
-        ] = extract_additional_data(node.input[1], node_annotation[n2.name].to_transpose, model_onnx.graph, verbose)
-        additional["data"] = node
-        myGraph[node.input[1]]["additional"] = additional
-        map_onnx_to_myGraph[node.input[1]] = node.input[1]
+        n2 = getNodesWithOutput(n1name, model_onnx)
+        if n2 is not None and (not hasattr(n2,'op_type') or n2.op_type == "Constant"):
+          # Const
+          myGraph[n1name] = {}
+          myGraph[n1name]["op_type"] = OPTYPE.Const
+          myGraph[n1name]["inputs"] = []
+          additional = {}
+          n2 = getNodesWithOutput(n1name, model_onnx)
+          additional["dims"], additional["raw_data"], additional[
+              "dtype"
+          ] = extract_additional_data(n1name, node_annotation[n2.name].to_transpose, model_onnx.graph, verbose)
+          additional["data"] = node
+          myGraph[n1name]["additional"] = additional
+          
+        map_onnx_to_myGraph[n1name] = n1name
         n2 = getNodesWithOutput(node.input[0], model_onnx)
         # Reshape
         inputs, additional = [], {}
-        inputs = [map_onnx_to_myGraph[n0name], node.input[1]]
+        inputs = [map_onnx_to_myGraph[n0name], n1name]
         additional["data"] = node
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["inputs"] = inputs
         myGraph[node.output[0]]["additional"] = additional
 
-        if node.op_type == "Reshape":
-            myGraph[node.output[0]]["op_type"] = OPTYPE.Reshape
+        # why this? if node.op_type == "Reshape":
+        myGraph[node.output[0]]["op_type"] = OPTYPE.Reshape
 
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
     elif node.op_type == "MatMul":
         # check the inputs
         if is_constant(n0name, model_onnx.graph.initializer) and is_constant(
-            node.input[1], model_onnx.graph.initializer
+            n1name, model_onnx.graph.initializer
         ):
             quit("[ERROR] unsupported double constants MatMul", node)
         swap_inputs = False
@@ -836,34 +872,34 @@ def parse_graph_node(
             myGraph[n0name]["additional"] = additional
             myGraph[n0name]["op_type"] = OPTYPE.Const
             swap_inputs = True
-        if is_constant(node.input[1], model_onnx.graph.initializer):
+        if is_constant(n1name, model_onnx.graph.initializer):
             additional = {}
             additional["data"] = node
-            n2 = getNodesWithOutput(node.input[1], model_onnx)
+            n2 = getNodesWithOutput(n1name, model_onnx)
             additional["dims"], additional["raw_data"], additional[
                 "dtype"
             ] = extract_additional_data(
-                node.input[1],
+                n1name,
                 node_annotation[n2.name].to_transpose,
                 model_onnx.graph,
                 verbose,
             )
-            map_onnx_to_myGraph[node.input[1]] = node.input[1]
-            myGraph[node.input[1]] = {}
-            myGraph[node.input[1]]["inputs"] = []
-            myGraph[node.input[1]]["additional"] = additional
-            myGraph[node.input[1]]["op_type"] = OPTYPE.Const
+            map_onnx_to_myGraph[n1name] = n1name
+            myGraph[n1name] = {}
+            myGraph[n1name]["inputs"] = []
+            myGraph[n1name]["additional"] = additional
+            myGraph[n1name]["op_type"] = OPTYPE.Const
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.MatMul
         if swap_inputs:
             myGraph[node.output[0]]["inputs"] = [
-                map_onnx_to_myGraph[node.input[1]],
+                map_onnx_to_myGraph[n1name],
                 map_onnx_to_myGraph[n0name],
             ]
         else:
             myGraph[node.output[0]]["inputs"] = [
                 map_onnx_to_myGraph[n0name],
-                map_onnx_to_myGraph[node.input[1]],
+                map_onnx_to_myGraph[n1name],
             ]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
@@ -900,7 +936,7 @@ def parse_graph_node(
         myGraph[node.output[0]]["op_type"] = OPTYPE.Maximum
         myGraph[node.output[0]]["inputs"] = [
             map_onnx_to_myGraph[n0name],
-            map_onnx_to_myGraph[node.input[1]],
+            map_onnx_to_myGraph[n1name],
         ]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
@@ -911,7 +947,7 @@ def parse_graph_node(
         myGraph[node.output[0]]["op_type"] = OPTYPE.Minimum
         myGraph[node.output[0]]["inputs"] = [
             map_onnx_to_myGraph[n0name],
-            map_onnx_to_myGraph[node.input[1]],
+            map_onnx_to_myGraph[n1name],
         ]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
@@ -974,9 +1010,9 @@ def parse_graph_node(
         myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]]
         # assume depth is the last one, assume axes are always 0, 1, 2, etc.
 
-        initializer = getInitializer(node.input[1], model_onnx)
+        initializer = getInitializer(n1name, model_onnx)
         if initializer is None:
-            attribute = getAttribute(getNodesWithOutput(node.input[1], model_onnx), "value")
+            attribute = getAttribute(getNodesWithOutput(n1name, model_onnx), "value")
             initializer = attribute.t
         start = getDims(initializer)
 
@@ -1000,9 +1036,9 @@ def parse_graph_node(
            if end[0] != 2147483647:
              quit("[ERROR] currently slicing not supported for first dimension")
            for i in range(1, len(start)):
-               initializer = getInitializer(node.input[1], model_onnx)
+               initializer = getInitializer(n1name, model_onnx)
                if initializer is None:
-                   attribute = getAttribute(getNodesWithOutput(node.input[1], model_onnx), "value")
+                   attribute = getAttribute(getNodesWithOutput(n1name, model_onnx), "value")
                    initializer = attribute.t
                start_d = getDims(initializer)[i]
 
@@ -1023,9 +1059,9 @@ def parse_graph_node(
               if end[i] < 2147483647:
                  quit("[ERROR] currently slicing only supported for last channel")
 
-           initializer = getInitializer(node.input[1], model_onnx)
+           initializer = getInitializer(n1name, model_onnx)
            if initializer is None:
-               attribute = getAttribute(getNodesWithOutput(node.input[1], model_onnx), "value")
+               attribute = getAttribute(getNodesWithOutput(n1name, model_onnx), "value")
                initializer = attribute.t
            start_d = getDims(initializer)[-1]
 
@@ -1043,20 +1079,20 @@ def parse_graph_node(
 
     elif node.op_type == "ScatterND":
         # The default input order for the ScatterND is data, indices, and updates.
-        if not is_constant(node.input[1], model_onnx.graph.initializer):
+        if not is_constant(n1name, model_onnx.graph.initializer):
             quit("[ERROR] The second input of the ScatterND must be indices.")
         # indices
         additional = {}
         additional["data"] = node
         additional["dims"], additional["raw_data"], additional[
             "dtype"
-        ] = extract_additional_data(node.input[1], False, model_onnx.graph, verbose)
+        ] = extract_additional_data(n1name, False, model_onnx.graph, verbose)
         if len(additional["dims"]) == 5:
             # When the tensor format is specified as NCHW4 (or NHWC4) and the value of N is 1, the format is transformed
             # to CHW4 (or HWC4). Here, the "4" indicates the position index within a 4-dimensional tensor.
             additional["dims"] = additional["dims"][1:]
             # transpose CHW4 to HWC4
-            if node_annotation[node.input[1]].to_transpose:
+            if node_annotation[n1name].to_transpose:
                 tmp = [
                     additional["dims"][1],
                     additional["dims"][2],
@@ -1080,18 +1116,18 @@ def parse_graph_node(
                 additional["raw_data"] = indices.flatten().tobytes()
         else:
             quit("[ERROR] Currently, ScatterND only supports indices of length 5.")
-        map_onnx_to_myGraph[node.input[1]] = node.input[1]
-        myGraph[node.input[1]] = {}
-        myGraph[node.input[1]]["inputs"] = []
-        myGraph[node.input[1]]["additional"] = additional
-        myGraph[node.input[1]]["op_type"] = OPTYPE.Const
+        map_onnx_to_myGraph[n1name] = n1name
+        myGraph[n1name] = {}
+        myGraph[n1name]["inputs"] = []
+        myGraph[n1name]["additional"] = additional
+        myGraph[n1name]["op_type"] = OPTYPE.Const
 
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.ScatterND
         myGraph[node.output[0]]["inputs"] = [
             map_onnx_to_myGraph[n0name],  # data
             map_onnx_to_myGraph[node.input[2]],  # updates
-            map_onnx_to_myGraph[node.input[1]],
+            map_onnx_to_myGraph[n1name],
         ]  # indices
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
@@ -1119,7 +1155,7 @@ def parse_graph_node(
         myGraph[node.output[0]]["op_type"] = OPTYPE.GridSample
         myGraph[node.output[0]]["inputs"] = [
             map_onnx_to_myGraph[n0name],
-            map_onnx_to_myGraph[node.input[1]],
+            map_onnx_to_myGraph[n1name],
         ]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
@@ -1201,25 +1237,25 @@ def parse_graph_node(
     elif node.op_type == "Less":
         additional = {}
         additional["data"] = node
-        if is_constant(node.input[1], model_onnx.graph.initializer):
-            n2 = getNodesWithOutput(node.input[1], model_onnx)      #constant
+        if is_constant(n1name, model_onnx.graph.initializer):
+            n2 = getNodesWithOutput(n1name, model_onnx)      #constant
             additional["dims"], additional["raw_data"], additional[
                 "dtype"
             ] = extract_additional_data(
-                node.input[1],
+                n1name,
                 False, 
                 model_onnx.graph,
                 verbose,
             )
-            myGraph[node.input[1]] = {}
-            myGraph[node.input[1]]["op_type"] = OPTYPE.Const
-            myGraph[node.input[1]]["inputs"] = []
-            myGraph[node.input[1]]["additional"] = additional
-            map_onnx_to_myGraph[node.input[1]] = node.input[1]
+            myGraph[n1name] = {}
+            myGraph[n1name]["op_type"] = OPTYPE.Const
+            myGraph[n1name]["inputs"] = []
+            myGraph[n1name]["additional"] = additional
+            map_onnx_to_myGraph[n1name] = n1name
         
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Compare
-        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [map_onnx_to_myGraph[node.input[1]]]
+        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [map_onnx_to_myGraph[n1name]]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
         myGraph[node.output[0]]["additional"]["mode"] = 0
@@ -1228,43 +1264,43 @@ def parse_graph_node(
     elif node.op_type == "Greater":
         additional = {}
         additional["data"] = node
-        if is_constant(node.input[1], model_onnx.graph.initializer):
-            n2 = getNodesWithOutput(node.input[1], model_onnx)      #constant
+        if is_constant(n1name, model_onnx.graph.initializer):
+            n2 = getNodesWithOutput(n1name, model_onnx)      #constant
             additional["dims"], additional["raw_data"], additional[
                 "dtype"
             ] = extract_additional_data(
-                node.input[1],
+                n1name,
                 False, 
                 model_onnx.graph,
                 verbose,
             )
-            myGraph[node.input[1]] = {}
-            myGraph[node.input[1]]["op_type"] = OPTYPE.Const
-            myGraph[node.input[1]]["inputs"] = []
-            myGraph[node.input[1]]["additional"] = additional
-            map_onnx_to_myGraph[node.input[1]] = node.input[1]
+            myGraph[n1name] = {}
+            myGraph[n1name]["op_type"] = OPTYPE.Const
+            myGraph[n1name]["inputs"] = []
+            myGraph[n1name]["additional"] = additional
+            map_onnx_to_myGraph[n1name] = n1name
         
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Compare
-        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [map_onnx_to_myGraph[node.input[1]]]
+        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [map_onnx_to_myGraph[n1name]]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
         myGraph[node.output[0]]["additional"]["mode"] = 1
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
         
     elif node.op_type == "Where":
-        if is_constant(node.input[1], model_onnx.graph.initializer):
+        if is_constant(n1name, model_onnx.graph.initializer):
             additional = {}
             additional["data"] = node
-            n2 = getNodesWithOutput(node.input[1], model_onnx)
+            n2 = getNodesWithOutput(n1name, model_onnx)
             additional["dims"], additional["raw_data"], additional[
                 "dtype"
-            ] = extract_additional_data(node.input[1], False, model_onnx.graph, verbose)
-            myGraph[node.input[1]] = {}
-            myGraph[node.input[1]]["op_type"] = OPTYPE.Const
-            myGraph[node.input[1]]["inputs"] = []
-            myGraph[node.input[1]]["additional"] = additional
-            map_onnx_to_myGraph[node.input[1]] = node.input[1]
+            ] = extract_additional_data(n1name, False, model_onnx.graph, verbose)
+            myGraph[n1name] = {}
+            myGraph[n1name]["op_type"] = OPTYPE.Const
+            myGraph[n1name]["inputs"] = []
+            myGraph[n1name]["additional"] = additional
+            map_onnx_to_myGraph[n1name] = n1name
         if is_constant(node.input[2], model_onnx.graph.initializer):
             additional = {}
             additional["data"] = node
@@ -1280,7 +1316,7 @@ def parse_graph_node(
         
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Where
-        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [map_onnx_to_myGraph[node.input[1]]]+[map_onnx_to_myGraph[node.input[2]]]
+        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [map_onnx_to_myGraph[n1name]]+[map_onnx_to_myGraph[node.input[2]]]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
@@ -1288,28 +1324,28 @@ def parse_graph_node(
     elif node.op_type == "Equal":
         additional = {}
         additional["data"] = node
-        if is_constant(node.input[1], model_onnx.graph.initializer):
-            n2 = getNodesWithOutput(node.input[1], model_onnx)  # constant
+        if is_constant(n1name, model_onnx.graph.initializer):
+            n2 = getNodesWithOutput(n1name, model_onnx)  # constant
             (
                 additional["dims"],
                 additional["raw_data"],
                 additional["dtype"],
             ) = extract_additional_data(
-                node.input[1],
+                n1name,
                 False,
                 model_onnx.graph,
                 verbose,
             )
-            myGraph[node.input[1]] = {}
-            myGraph[node.input[1]]["op_type"] = OPTYPE.Const
-            myGraph[node.input[1]]["inputs"] = []
-            myGraph[node.input[1]]["additional"] = additional
-            map_onnx_to_myGraph[node.input[1]] = node.input[1]
+            myGraph[n1name] = {}
+            myGraph[n1name]["op_type"] = OPTYPE.Const
+            myGraph[n1name]["inputs"] = []
+            myGraph[n1name]["additional"] = additional
+            map_onnx_to_myGraph[n1name] = n1name
 
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Compare
         myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]] + [
-            map_onnx_to_myGraph[node.input[1]]
+            map_onnx_to_myGraph[n1name]
         ]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
@@ -1319,17 +1355,18 @@ def parse_graph_node(
     else:
         raise Exception("[ERROR] node not supported:\n{})".format(node))
 
-    if node_annotation[node.name].add_transpose_after:
-        n0name = add_transpose_after(node, myGraph, map_onnx_to_myGraph)
+    if node_annotation[node.name].to_nhwc_after_out:
+        n0name = add_transpose_to_output(node, myGraph, map_onnx_to_myGraph)
 
 
-def parse_onnx(model_onnx, node_annotation, verbose=False):
+def parse_onnx(model_onnx, node_annotation, input_default_value, verbose=False):
     myGraph, map_onnx_to_myGraph = OrderedDict(), {}
 
     # Inputs
     for inp in model_onnx.graph.input:
         myGraph[inp.name] = parse_graph_input_node(
-            inp, map_onnx_to_myGraph, node_annotation[inp.name].to_transpose
+            inp, map_onnx_to_myGraph, node_annotation[inp.name].to_transpose,
+            input_default_value
         )
 
     # Nodes removal
@@ -1636,6 +1673,54 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
             if verbose:
                 print("")
 
+# adhoc to detect a reshape(x,shape(n)) which is transformed into reshape(x, concat(unsqueeze(gather(0,shape(n))),unsqueeze(gather(1,shape(n))),unsqueeze(gather(2,shape(n))),unsqueeze(gather(03shape(n))))) 
+def detect_silly_reshape(node,model_onnx, node_annotation,verbose):
+  if node.op_type != "Concat": return False
+  a = getAttribute(node, "axis")
+  if a.i != 0: return False
+  if len(node.input) != 4: return False
+  parent = None
+  shape = None
+  for i in range(4):
+    n2 = getNodesWithOutputNotConst(node.input[i], model_onnx)
+    # check all inputs are unsqueze
+    if n2.op_type != "Unsqueeze": return False
+    a = getAttribute(n2, "axes")
+    if a.ints != [0]: return False
+    n2 = getNodesWithOutputNotConst(n2.input[0], model_onnx)   
+    # check all inputs of unsqueze are gather with prm 0, 1 ,2 ,3
+    if n2.op_type != "Gather": return False
+    if len(n2.input)  != 2: return False
+    n2b = getNodesWithOutputNotConst(n2.input[1], model_onnx)
+    t = extract_attribute_values(n2b) 
+    if len(t) !=1 or int(t[0]) != i: return False
+    n3 = getNodesWithOutputNotConst(n2.input[0], model_onnx)
+    # check inputs of gather are shape
+    if n3.op_type != "Shape": return False
+    if parent is None: shape = n3
+    p = getNodesWithOutputNotConst(n3.input[0], model_onnx)
+    # check all shapes have same input
+    if parent is not None and p.name != parent.name: return False
+    parent = p
+  # pass all tests
+  node_annotation[node.name].to_remove = True
+  for i in range(4):
+    n2 = getNodesWithOutputNotConst(node.input[i], model_onnx) # unsqueeze
+    node_annotation[n2.name].to_remove = True
+    n2 = getNodesWithOutputNotConst(n2.input[0], model_onnx) # gather
+    node_annotation[n2.name].to_remove = True
+    n2b = getNodesWithOutputNotConst(n2.input[0], model_onnx) # shape
+    if n2b.name != shape.name:
+       node_annotation[n2b.name].to_remove = True
+    n2 = getNodesWithOutputNotConst(n2.input[1], model_onnx) # cst indices
+  # replace concat
+  for n in range(len(model_onnx.graph.node)):
+        for inp in range(len(model_onnx.graph.node[n].input)):
+            if model_onnx.graph.node[n].input[inp] == node.output[0]:
+               if verbose>2: print("Replace ", model_onnx.graph.node[n],  model_onnx.graph.node[n].input[inp],"->", shape.output[0])
+               model_onnx.graph.node[n].input[inp] = shape.output[0]
+  
+  return True
 
 # adatp (remove/add) the current node to the data_layout and
 # recurse in the output
@@ -1644,9 +1729,6 @@ def annotate_node(
 ):  # recusrive
     if node.name in node_annotation:
         return
-    if verbose > 1:
-        print("[INFO] annotate {}".format(node.name))
-
     if verbose:
         print("[INFO] annotate_node {} op={}".format(node.name, node.op_type))
     data_layout = None
@@ -1662,11 +1744,9 @@ def annotate_node(
                     node_annotation[n2.name].layout_onnx is not None
                     and node_annotation[n2.name].layout_onnx != data_layout
                 ):
-                    quit(
-                        "[ERROR] inputs with diferent layout for\n{}Layouts: {}".format(
-                            node, node_annotation
-                        )
-                    )
+                    print(f"[ERROR] inputs with different layout node={data_layout} input[{n2.name}]={node_annotation[n2.name].layout_onnx} for\n{node}\n")
+                    print("[INFO] annotations:\n{" + "\n".join("{!r}: {!r},".format(k, v) for k, v in node_annotation.items())+ "}")
+                    quit()  
             else:  # not ready yet
                 return
 
@@ -1679,7 +1759,7 @@ def annotate_node(
         node_annotation[node.name] = Node_Annotation()
     node_annotation[node.name].layout_onnx = data_layout  # default
 
-    if node.op_type == "Transpose":
+    if node.op_type == "Transpose": # to clean
         a = getAttribute(node, "perm")
         if data_layout == "nhwc":
             if (
@@ -1697,10 +1777,15 @@ def annotate_node(
                 node_annotation[node.name].to_remove = True  # will be removed
                 node_annotation[node.name].layout_onnx = "nhwc"  # new layout at output
             else:
-                if verbose > 1:
+              if verbose > 1:
                     print("[WARNING] transpose not for NCHW handling in\n", node)
-
-            if node_annotation[node.name].to_remove:
+        elif global_data_layout == "nchw":
+                if len(a.ints) == 4: # assume a user tranpose
+                  node_annotation[node.name].transpose_before_in0 = "nchw"
+                  node_annotation[node.name].to_nhwc_after_out = True      
+                  node_annotation[node.name].layout_onnx = "nhwc"            
+                
+        if node_annotation[node.name].to_remove:
                 # The GridSample is usually used with Transpose. Cause the optical-flow will be
                 # transposed from (N,2,H,W) to (N,H,W,2) and this operation should not be removed.
                 # Meanwhile there will not have other operations after transposed feature with
@@ -1712,66 +1797,75 @@ def annotate_node(
                         node_annotation[node.name].to_remove = False
                         node_annotation[node.name].layout_onnx = "nchw"
                         break
-
+                        
+    elif node.op_type == "Shape":
+        node_annotation[node.name].layout_onnx = None
+        
     elif node.op_type == "Reshape":
+       
         initializer = getInitializer(node.input[1], model_onnx)
         # Case: In pytorch, Reshape is not in model_onnx.graph.initializer but in model_onnx.graph.node
         if initializer is None:
             attribute = getAttribute(
                 getNodesWithOutput(node.input[1], model_onnx), "value"
             )
-            initializer = attribute.t
-        dims = getDims(initializer)
-        ignore_transpose = False       
-        # detect if this reshape is actually added by onnx to emulate a transpose
-        # we need to test more if reshpae is for transpose...
-        if len(dims) == 4 and (dims[0] == 1 or dims[0] == -1):
-            if data_layout == "nhwc":
-                if dims[1] == 1:  # or dims2 * dims3 == 1 # nhwc ->nchw
-                    node_annotation[node.name].to_remove = True  # will be removed
-                    node_annotation[
-                        node.name
-                    ].layout_onnx = "nchw"  # new layout at output
-                else:
-                    if verbose > 1:
-                        print("[WARNING] reshape unknown for", node, " dims", dims)
-                    node_annotation[node.name].layout_onnx = None
-            elif data_layout == "nchw":
-                if dims[3] == 1:  # # or dims2 * dims3 == 1 nchw ->nhwc
-                    if verbose > 1:
-                        print("[WARNING] heuristic on reshape node for", node, " dims", dims)
-                    node_annotation[node.name].to_remove = True  # will be removed
-                    node_annotation[
-                        node.name
-                    ].layout_onnx = "nhwc"  # new layout at output
-                elif len(dims) == 4: # real reshape. currently lazy solution transpose before and after
-                    node_annotation[node.name].add_transpose_after =  True
-                else:
-                    if verbose > 1:
-                        print("[WARNING] reshape unknown for", node, " dims", dims)
-                    node_annotation[node.name].layout_onnx = None
-            elif data_layout is None:
-                node_annotation[
-                    node.name
-                ].layout_onnx = global_data_layout  # back to org
-                if global_data_layout == "nchw":
-                    node_annotation[
-                        node.name
-                    ].add_transpose_after = True  # a bit too agressive
-        else:
-            node_annotation[node.name].layout_onnx = None
+            if attribute is not None: # maybe a shape node              
+              initializer = attribute.t
 
-        n2 = getNodesWithOutputNotConst(node.input[0], model_onnx)
-        if (
-            node_annotation[n2.name].layout_onnx == "nchw"
-        ):  # need to go back to original layout before reshape
-            node_annotation[node.name].add_transpose_before = True
-
+        if initializer is not None: # constant case     
+          dims = getDims(initializer)
+          # detect if this reshape is actually added by onnx to emulate a transpose
+          # we need to test more if reshpae is for transpose...
+          if len(dims) == 4: # general case should be fine now REMOVED: and (dims[0] == 1 or dims[0] == -1):
+              if len(dims) > 1 and data_layout == "nhwc":
+                  if dims[1] == 1:  # or dims2 * dims3 == 1 # nhwc ->nchw
+                      node_annotation[node.name].to_remove = True  # will be removed
+                      node_annotation[
+                          node.name
+                      ].layout_onnx = "nchw"  # new layout at output
+                  else:
+                      if global_data_layout == "nchw":
+                        node_annotation[node.name].transpose_before_in0 = "nchw"
+                        node_annotation[node.name].to_nhwc_after_out = True
+                        node_annotation[node.name].layout_onnx = None
+                      else:
+                        if verbose > 1:
+                           print("[WARNING] reshape unknown for NODE:\n", node, "\n shape: dims=", dims)
+                        node_annotation[node.name].layout_onnx = None
+              elif data_layout == "nchw": 
+                      node_annotation[node.name].to_nhwc_after_out =  True
+                      node_annotation[node.name].transpose_before_in0 = "nchw"
+                      node_annotation[node.name].layout_onnx = None
+                      if verbose > 1:
+                         print(" case nchw with cst shape")
+              elif data_layout is None:
+                  node_annotation[
+                      node.name
+                  ].layout_onnx = global_data_layout  # back to org
+                  if global_data_layout == "nchw":
+                      node_annotation[
+                          node.name
+                      ].to_nhwc_after_out = True  # a bit too agressive
+          else: 
+              node_annotation[node.name].layout_onnx = None
+          n2 = getNodesWithOutputNotConst(node.input[0], model_onnx)         
+          if (
+              node_annotation[n2.name].layout_onnx == "nchw"
+          ):  # need to go back to original layout before reshape
+              node_annotation[node.name].transpose_before_in0 = "nchw"
+              if node_annotation[node.name].to_nhwc_after_out is False:
+                node_annotation[node.name].layout_onnx = "nchw"
+        else: # case where shape is not a constant
+              if global_data_layout == "nchw": 
+                 node_annotation[node.name].transpose_before_in0 = "nhwc" # applying a channel last transfo will keep the reshape correct. 
+                 if verbose > 1:
+                   print(" case nchw with shape from a tensor")
+                 
     elif node.op_type == "Flatten":
         if (
             node_annotation[node.name].layout_onnx == "nchw"
         ):  # need to go back to original layout before reshape
-            node_annotation[node.name].add_transpose_before = True
+            node_annotation[node.name].transpose_before_in0 = "nchw"
 
     elif node.op_type == "Concat":
         if data_layout == "nchw":  # nhwc -> nhwc
@@ -1784,7 +1878,9 @@ def annotate_node(
                 a.i = 2
             elif a.i == -3:
                 a.i = -1
-
+        if detect_silly_reshape(node,model_onnx, node_annotation,verbose):
+          print("[WARNING] strange ONNX pattern detected and simplified")
+          
     elif node.op_type == "Unsqueeze":
         node_annotation[node.name].to_remove = True
 
@@ -1800,10 +1896,9 @@ def annotate_node(
 
     elif node.op_type == "MatMul":
         if global_data_layout == "nchw":
-            n2 = getNodesWithOutput(node.input[1], model_onnx)
-            node_annotation[n2.name].add_transpose_after = True
-            node_annotation[node.name].add_transpose_before = True
-            node_annotation[node.name].add_transpose_after = True
+            node_annotation[node.name].transpose_before_in1 = "nchw"
+            node_annotation[node.name].transpose_before_in0 = "nchw"
+            node_annotation[node.name].to_nhwc_after_out = True
 
     elif node.op_type == "Gemm":
         n2 = getInitializer(node.input[1], model_onnx)
@@ -1874,7 +1969,7 @@ def detectDataType(model):  # more adaptation to do here if tf is using nchw
         quit("[ERROR] unable to detect data layout")
 
 
-def dumpModel(model_onnx, output_filename, data_layout, verbose, user_annotation):
+def dumpModel(model_onnx, output_filename, data_layout, verbose, user_annotation, input_default_value):
     """Writes the neural network model in the \"sadl\" format to binary file.
 
     Parameters
@@ -1910,10 +2005,10 @@ def dumpModel(model_onnx, output_filename, data_layout, verbose, user_annotation
 
     for k, v in user_annotation.items():
         if k in node_annotation:
-            if v.add_transpose_before is not None:
-                node_annotation[k].add_transpose_before = v.add_transpose_before
-            if v.add_transpose_after is not None:
-                node_annotation[k].add_transpose_after = v.add_transpose_after
+            if v.transpose_before_in0 is not None:
+                node_annotation[k].transpose_before_in0 = v.transpose_before_in0
+            if v.to_nhwc_after_out is not None:
+                node_annotation[k].to_nhwc_after_out = v.to_nhwc_after_out
             if v.to_remove is not None:
                 node_annotation[k].to_remove = v.to_remove
             if v.to_transpose is not None:
@@ -1929,7 +2024,7 @@ def dumpModel(model_onnx, output_filename, data_layout, verbose, user_annotation
             + "}"
         )  # print("[INFO] node annotations:", node_annotation)
     my_graph, my_inputs, my_outputs = parse_onnx(
-        model_onnx_copy, node_annotation, verbose=verbose
+        model_onnx_copy, node_annotation, input_default_value, verbose=verbose
     )
     dump_onnx(my_graph, my_inputs, my_outputs, output_filename, verbose=verbose)
     if data_layout == "nchw":
@@ -1948,6 +2043,14 @@ if __name__ == "__main__":
         nargs="?",
         type=str,
         help="name of the onnx file",
+    )
+    parser.add_argument(
+        "--input_default_value",
+        action="store",
+        nargs="?",
+        type=int,
+        default=128,
+        help="default values to replace named inputs",
     )
     parser.add_argument(
         "--output",
@@ -1991,19 +2094,19 @@ if __name__ == "__main__":
         if node not in user_annotation:
             user_annotation[node] = Node_Annotation()
             user_annotation[node].to_remove = None
-            user_annotation[node].add_transpose_before = None
-            user_annotation[node].add_transpose_after = None
+            user_annotation[node].transpose_before_in0 = None
+            user_annotation[node].to_nhwc_after_out = None
             user_annotation[node].to_transpose = None
-        user_annotation[node].add_transpose_before = False
+        user_annotation[node].transpose_before_in0 = False
 
     for node in args.do_not_add_transpose_after:
         if node not in user_annotation:
             user_annotation[node] = Node_Annotation()
             user_annotation[node].to_remove = None
-            user_annotation[node].add_transpose_before = None
-            user_annotation[node].add_transpose_after = None
+            user_annotation[node].transpose_before_in0 = None
+            user_annotation[node].to_nhwc_after_out = None
             user_annotation[node].to_transpose = None
-        user_annotation[node].add_transpose_after = False
+        user_annotation[node].to_nhwc_after_out = False
 
     data_layout = None
     if args.nchw:
@@ -2011,4 +2114,4 @@ if __name__ == "__main__":
     elif args.nhwc:
         data_layout = "nhwc"
 
-    dumpModel(model_onnx, args.output, data_layout, args.verbose, user_annotation)
+    dumpModel(model_onnx, args.output, data_layout, args.verbose, user_annotation, args.input_default_value)
