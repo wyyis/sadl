@@ -18,13 +18,13 @@ parser.add_argument(
     help="do not transpose input/output",
 )
 parser.add_argument(
-        "--input_default_value",
-        action="store",
-        nargs="?",
-        type=int,
-        default=8,
-        help="default values to replace named inputs",
-    )
+    "--input_default_value",
+    action="store",
+    nargs="?",
+    type=int,
+    default=8,
+    help="default values to replace named inputs",
+)
 args = parser.parse_args()
 if args.input_onnx is None:
     quit("[ERROR] You should specify an onnx file")
@@ -34,10 +34,10 @@ session = onnxruntime.InferenceSession(args.input_onnx, None)
 inputs = {}
 v = []
 for n in session.get_inputs():
-    L = n.shape 
+    L = n.shape
     for i in range(len(L)):
-      if type(L[i]) is not int:
-        L[i] = args.input_default_value
+        if type(L[i]) is not int:
+            L[i] = args.input_default_value
     inputs[n.name] = np.random.uniform(size=L).astype("float32")
     v.append(inputs[n.name])
 outputs = []
