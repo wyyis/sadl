@@ -128,6 +128,7 @@ class OPTYPE(IntEnum):
     Compare = (25,)
     Where = (26,)
     Minimum = (27,)
+    AveragePool = (28,)
 
     # "BatchMatMulV2" did not exist in Tensorflow 1.9. It exists in
     # Tensorflow 1.15.
@@ -1413,6 +1414,30 @@ def parse_graph_node(
         myGraph[node.output[0]]["additional"]["mode"] = 2
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
+    elif node.op_type == "AveragePool":
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.AveragePool
+        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]]
+        myGraph[node.output[0]]["additional"] = {}
+        a = getAttribute(node, "strides")
+        myGraph[node.output[0]]["additional"]["strides"] = [1, a.ints[0], a.ints[1], 1]
+        a = getAttribute(node, "pads")
+        if a is None:
+            pp = [0, 0, 0, 0]
+        else:
+            pp = a.ints
+        myGraph[node.output[0]]["additional"]["pads"] = pp
+        a = getAttribute(node, "kernel_shape")
+        myGraph[node.output[0]]["additional"]["kernel_shape"] = [
+            1,
+            a.ints[0],
+            a.ints[1],
+            1,
+        ]
+        myGraph[node.output[0]]["additional"]["data"] = node
+        # todo: check pads?
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+
     else:
         raise Exception("[ERROR] node not supported:\n{})".format(node))
 
@@ -1725,6 +1750,34 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
                 if verbose:
                     print("#\t mode", node["additional"]["mode"])
                 f.write(struct.pack("i", int(node["additional"]["mode"])))
+
+            elif node["op_type"] == OPTYPE.AveragePool:
+                if verbose:
+                    print("#\t  nb_dim_strides", len(node["additional"]["strides"]))
+                f.write(struct.pack("i", int(len(node["additional"]["strides"]))))
+
+                for stride in node["additional"]["strides"]:
+                    if verbose:
+                        print(f"#\t\t {stride}")
+                    f.write(struct.pack("i", int(stride)))
+
+                if verbose:
+                    print("#\t  nb_dim_kernel", len(node["additional"]["kernel_shape"]))
+                f.write(struct.pack("i", int(len(node["additional"]["kernel_shape"]))))
+
+                for ks in node["additional"]["kernel_shape"]:
+                    if verbose:
+                        print(f"#\t\t {ks}")
+                    f.write(struct.pack("i", int(ks)))
+
+                if verbose:
+                    print("#\t  nb_dim_pads", len(node["additional"]["pads"]))
+                f.write(struct.pack("i", int(len(node["additional"]["pads"]))))
+
+                for p in node["additional"]["pads"]:
+                    if verbose:
+                        print(f"#\t\t {p}")
+                    f.write(struct.pack("i", int(p)))
 
             if (
                 node["op_type"] == OPTYPE.Conv2D

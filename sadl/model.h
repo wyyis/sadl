@@ -187,6 +187,8 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
     break;
   case layers::OperationType::Minimum:
     return std::unique_ptr<layers::Layer<T>>(new layers::Minimum<T>{ id, op });
+  case layers::OperationType::AveragePool:
+    return std::unique_ptr<layers::Layer<T>>(new layers::AveragePool<T>{ id, op });
     break;
   case layers::OperationType::OperationTypeCount:
     break;   // no default on purpose

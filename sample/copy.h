@@ -101,6 +101,11 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
     break;
   case sadl::layers::OperationType::Minimum:
     break;
+  case sadl::layers::OperationType::AveragePool:
+    dynamic_cast<sadl::layers::AveragePool<T> &>(layerQ).m_kernel  = dynamic_cast<const sadl::layers::AveragePool<float> &>(layer).m_kernel;
+    dynamic_cast<sadl::layers::AveragePool<T> &>(layerQ).m_strides = dynamic_cast<const sadl::layers::AveragePool<float> &>(layer).m_strides;
+    dynamic_cast<sadl::layers::AveragePool<T> &>(layerQ).m_pads    = dynamic_cast<const sadl::layers::AveragePool<float> &>(layer).m_pads;
+    break;
     // no default to get warning
   }
 
