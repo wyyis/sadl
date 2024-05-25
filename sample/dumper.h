@@ -74,6 +74,20 @@ template<typename T> bool sadl::layers::MaxPool<T>::dump(std::ostream &file)
   return true;
 }
 
+template<typename T> bool sadl::layers::AveragePool<T>::dump(std::ostream &file)
+{
+  int32_t x = m_strides.size();
+  file.write((const char *) &x, sizeof(int32_t));
+  file.write((const char *) m_strides.begin(), m_strides.size() * sizeof(int32_t));
+  x = m_kernel.size();
+  file.write((const char *) &x, sizeof(int32_t));
+  file.write((const char *) m_kernel.begin(), m_kernel.size() * sizeof(int32_t));
+  x = m_pads.size();
+  file.write((const char *) &x, sizeof(int32_t));
+  file.write((const char *) m_pads.begin(), m_pads.size() * sizeof(int32_t));
+  return true;
+}
+
 template<typename T> bool sadl::layers::Flatten<T>::dump(std::ostream &file)
 {
   int32_t x = m_axis;

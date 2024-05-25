@@ -78,7 +78,7 @@ bool toQuantize(sadl::layers::OperationType::Type type)
          && type != sadl::layers::OperationType::Slice && type != sadl::layers::OperationType::Transpose && type != sadl::layers::OperationType::PReLU
          && type != sadl::layers::OperationType::ScatterND && type != sadl::layers::OperationType::GridSample && type != sadl::layers::OperationType::Resize
          && type != sadl::layers::OperationType::Compare && type != sadl::layers::OperationType::Where && type != sadl::layers::OperationType::Maximum 
-         && type != sadl::layers::OperationType::Minimum;
+         && type != sadl::layers::OperationType::Minimum && type != sadl::layers::OperationType::AveragePool;
 }
 
 template<typename T> void quantizeTensor(const sadl::Tensor<float> &B, sadl::Tensor<T> &Bq)

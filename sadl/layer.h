@@ -75,7 +75,8 @@ struct OperationType
     Compare            = 25,
     Where              = 26,
     Minimum            = 27,
-    OperationTypeCount = 28
+    AveragePool        = 28,
+    OperationTypeCount = 29
   };
 };
 
