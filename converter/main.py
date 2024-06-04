@@ -260,6 +260,7 @@ def is_output(name, onnx_output):
     return False
 
 
+  
 def parse_graph_input_node(
     input_node, map_onnx_to_myGraph, to_transpose, input_default_value
 ):
@@ -377,7 +378,7 @@ def extract_dims(name, onnx_graph):
             if a is not None:
                 return a.t.dims
             else:
-                return None
+                return [] # None
     for node in onnx_graph.input:  # not found in initializaer, search in Constant
         if name == node.name:
             return node.type.tensor_type.shape.dim
@@ -393,6 +394,13 @@ def getNodesWithInput(name, model):
                 L.append(node)
     return L
 
+
+# 
+def isInitializer(name, model):
+    for node in model.graph.initializer:
+        if node.name == name:
+            return True
+    return False
 
 # get the nodes with name as output
 def getNodesWithOutput(name, model):
@@ -439,9 +447,20 @@ def getInitializer(name, model_onnx):
     return None
 
 
-def add_transpose_to_input(node, typet, i, myGraph, map_onnx_to_myGraph):
+def add_transpose_to_input(node, typet, i, myGraph, model_onnx, node_annotation, map_onnx_to_myGraph):
     # Transpose inserted
-
+    if isInitializer(node.input[i], model_onnx): # case of a constant input
+       if node.input[i] in myGraph:
+         quit(f"[ERROR] input already processed {node.input[i]} in processing node {node.name}")
+       node_annotation[node.input[i]].to_transpose = True
+       return node.input[i]
+       
+    n2 = getNodesWithOutputNotConst( node.input[i], model_onnx)  
+    if hasattr(n2,'type') and hasattr(n2.type,'tensor_type'):
+      if len(n2.type.tensor_type.shape.dim) != 4:
+        quit(f"[WARNING] cannot transpose tensor with dim !=4")
+        return node.input[i]
+    
     in_node = node.input[i]
     reshape_coef_name = in_node + "_COEF_TRANSPOSE_NOT_IN_GRAPH"
     myGraph[reshape_coef_name] = {}
@@ -505,14 +524,14 @@ def parse_graph_node(
 
     if (
         node_annotation[node.name].transpose_before_in0 is not None
-    ):  # layout_onnx == 'nchw' : # need to go back to original layout before process
-        n0name = add_transpose_to_input(
+    ):  # layout_onnx == 'nchw' : # need to go back to original layout before process            
+            n0name = add_transpose_to_input(
             node,
             node_annotation[node.name].transpose_before_in0,
             0,
-            myGraph,
+            myGraph,model_onnx,node_annotation,
             map_onnx_to_myGraph,
-        )
+            )
     else:
         if len(node.input) >= 1:
             n0name = node.input[0]
@@ -522,13 +541,13 @@ def parse_graph_node(
         len(node.input) > 1
         and node_annotation[node.name].transpose_before_in1 is not None
     ):  # layout_onnx == 'nchw' : # need to go back to original layout before process
-        n1name = add_transpose_to_input(
+          n1name = add_transpose_to_input(
             node,
             node_annotation[node.name].transpose_before_in1,
             1,
-            myGraph,
+            myGraph,model_onnx,node_annotation,
             map_onnx_to_myGraph,
-        )
+          )
     else:
         if len(node.input) >= 2:
             n1name = node.input[1]
@@ -2048,9 +2067,16 @@ def annotate_node(
 
     elif node.op_type == "MatMul":
         if global_data_layout == "nchw":
-            node_annotation[node.name].transpose_before_in1 = "nchw"
-            node_annotation[node.name].transpose_before_in0 = "nchw"
-            node_annotation[node.name].to_nhwc_after_out = True
+            dim0 = extract_dims(node.input[0], model_onnx.graph)
+            dim1 = extract_dims(node.input[1], model_onnx.graph)
+            # note: we assume len==0 is the output of a computing node (conv) and dim is 4.. to refine
+            if (len(dim0) == 4 or len(dim0) == 0 ):
+              node_annotation[node.name].transpose_before_in0 = "nchw"
+              node_annotation[node.name].to_nhwc_after_out = True
+            if (len(dim1) == 4 or len(dim1) == 0 ):
+              node_annotation[node.name].transpose_before_in1 = "nchw"
+              
+              
 
     elif node.op_type == "Gemm":
         n2 = getInitializer(node.input[1], model_onnx)
