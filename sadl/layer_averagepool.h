@@ -86,7 +86,7 @@ template<typename T> bool AveragePool<T>::apply(std::vector<Tensor<T> *> &in)
   assert(cnt != 0);
   const int acc_bits = (int)ceil(log2(cnt));
   int q = sizeof(T) * 8 - 1 - acc_bits;
-  const int divq = (1 << q) / cnt;
+  [[maybe_unused]] const int divq = (1 << q) / cnt;
 
   for (int im_nb = 0; im_nb < N; ++im_nb)
   {
