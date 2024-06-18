@@ -95,11 +95,17 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s_dis
   case 128:
     CONV_MOD32<128, s_h, s_w>(A, kernel);
     break;
+  case 144:
+    CONV_MOD16<144, s_h, s_w>(A, kernel);
+    break;
   case 160:
     CONV_MOD32<160, s_h, s_w>(A, kernel);
     break;
   case 192:
     CONV_MOD32<192, s_h, s_w>(A, kernel);
+    break;
+  case 272:
+    CONV_MOD16<272, s_h, s_w>(A, kernel);
     break;
   case 288:
     CONV_MOD32<288, s_h, s_w>(A, kernel);
@@ -162,7 +168,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s(con
 }
 
 template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s_d(const Tensor<T> &A, const Tensor<T> &kernel)
-{
+{ 
   const int     in_H{ A.dims()[1] };
   const int     in_W{ A.dims()[2] };
   const int     nb_filters{ kernel.dims()[2] };
