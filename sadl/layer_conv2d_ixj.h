@@ -603,6 +603,14 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
         conv2d_ixj_s11_gD_d_core<24, ki, kj>(A, kernel);
         return;
         break;
+      case 32:
+        conv2d_ixj_s11_gD_d_core<32, ki, kj>(A, kernel);
+        return;
+        break;
+      case 64:
+        conv2d_ixj_s11_gD_d_core<64, ki, kj>(A, kernel);
+        return;
+        break;
       default:   // do default
         break;
       }
@@ -625,11 +633,20 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
         conv2d_ixj_s11_gD_d_core<24, ki, kj>(A, kernel);
         return;
         break;
+      case 32:
+        conv2d_ixj_s11_gD_d_core<32, ki, kj>(A, kernel);
+        return;
+        break;
+      case 64:
+        conv2d_ixj_s11_gD_d_core<64, ki, kj>(A, kernel);
+        return;
+        break;
       default:   // do default
         break;
       }
     }
   }
+
 
   // no grouped conv with stride 1
   else if (m_groups == 1 && s_h == 1 && s_w == 1)
@@ -646,6 +663,10 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
         break;
       case 32:
         CONV_MOD32<32, ki, kj>(A, kernel);
+        return;
+        break;
+      case 48:
+        CONV_MOD16<48, ki, kj>(A, kernel);
         return;
         break;
       case 64:
@@ -668,6 +689,10 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
         break;
       case 32:
         CONV_MOD32<32, ki, kj>(A, kernel);
+        return;
+        break;
+      case 48:
+        CONV_MOD16<48, ki, kj>(A, kernel);
         return;
         break;
       case 64:

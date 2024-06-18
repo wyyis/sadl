@@ -461,6 +461,8 @@ template<typename T> void Conv2D<T>::conv2d(const Tensor<T> &A, const Tensor<T> 
   }
 }
 
+
+
 }   // namespace layers
 }   // namespace sadl
 #include "layer_conv2d_1x1.h"
