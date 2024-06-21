@@ -60,12 +60,12 @@ struct Dimensions
   int     size() const { return m_s; }
   int64_t nbElements() const
   {
-#if __GNUC__
+#if __GNUC__ && !__clang__
 #pragma GCC diagnostic push                             // from gcc 12... to remove later 
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #endif
     return std::accumulate(m_v, m_v + m_s, (int64_t) 1, [](int64_t a, int64_t b) { return a * b; });
-#if __GNUC__
+#if __GNUC__ && !__clang__
 #pragma GCC diagnostic pop
 #endif
   }

@@ -169,6 +169,11 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s(con
 
 template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s_d(const Tensor<T> &A, const Tensor<T> &kernel)
 { 
+  if (conv2d_core<s_h, s_w>(A, kernel))
+  {
+    return;
+  }
+  
   const int     in_H{ A.dims()[1] };
   const int     in_W{ A.dims()[2] };
   const int     nb_filters{ kernel.dims()[2] };
