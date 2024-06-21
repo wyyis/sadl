@@ -246,6 +246,11 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_pee
 
 template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_core(const Tensor<T> &A, const Tensor<T> &kernel)
 {
+  if (conv2d_core<s_h, s_w>(A, kernel))
+  {
+    return;
+  }
+
   const int     nb_filters{ kernel.dims()[2] };
   const int     in_H{ A.dims()[1] };
   const int     in_W{ A.dims()[2] };

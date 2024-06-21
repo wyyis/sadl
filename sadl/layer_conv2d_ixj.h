@@ -247,6 +247,10 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
 
 template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_core(const Tensor<T> &A, const Tensor<T> &kernel)
 {
+  if (conv2d_core<s_h, s_w>(A, kernel))
+  {
+    return;
+  }
   constexpr int im_nb = 0;
   const int     ihalf_size{ kernel.dims()[0] / 2 };
   const int     jhalf_size{ kernel.dims()[1] / 2 };
