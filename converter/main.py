@@ -693,7 +693,7 @@ def parse_graph_node(
         if not swap_inputs:
             D1 = extract_dims(n0name, model_onnx.graph)
             D2 = extract_dims(n1name, model_onnx.graph)
-            if D1 is not None and D2 is not None and len(D1) < len(D2):
+            if len(D1) and len(D2) and len(D1) < len(D2):
                 swap_inputs = True
 
         if swap_inputs:
