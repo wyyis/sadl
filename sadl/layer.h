@@ -76,7 +76,8 @@ struct OperationType
     Where              = 26,
     Minimum            = 27,
     AveragePool        = 28,
-    OperationTypeCount = 29
+    ReduceMean         = 29,
+    OperationTypeCount = 30
   };
 };
 

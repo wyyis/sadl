@@ -61,6 +61,7 @@
 #include "layer_where.h"
 #include "layer_minimum.h"
 #include "layer_averagepool.h"
+#include "layer_reduce_mean.h"
 
 namespace sadl
 {
@@ -104,6 +105,7 @@ inline std::string opName(const OperationType::Type op)
     DIRTYCASEPRINT(Minimum);
     DIRTYCASEPRINT(Where);
     DIRTYCASEPRINT(AveragePool);
+    DIRTYCASEPRINT(ReduceMean);
   default:
     oss << "??";
     break;

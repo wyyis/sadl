@@ -88,6 +88,15 @@ template<typename T> bool sadl::layers::AveragePool<T>::dump(std::ostream &file)
   return true;
 }
 
+template<typename T> bool sadl::layers::ReduceMean<T>::dump(std::ostream &file)
+{
+  int32_t x = axes.size();
+  file.write((const char *) &x, sizeof(int32_t));
+  file.write((const char *) axes.begin(), axes.size() * sizeof(int32_t));
+  file.write((const char *) &keepdims, sizeof(keepdims));
+  return true;
+}
+
 template<typename T> bool sadl::layers::Flatten<T>::dump(std::ostream &file)
 {
   int32_t x = m_axis;
