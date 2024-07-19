@@ -78,7 +78,7 @@ struct OperationType
     AveragePool        = 28,
     Sigmoid            = 29,
     Softmax            = 30,
-    OperationTypeCount = 29
+    OperationTypeCount = 31 
   };
 };
 
