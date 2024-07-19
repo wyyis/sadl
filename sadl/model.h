@@ -190,6 +190,9 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
   case layers::OperationType::AveragePool:
     return std::unique_ptr<layers::Layer<T>>(new layers::AveragePool<T>{ id, op });
     break;
+  case layers::OperationType::ReduceMean:
+    return std::unique_ptr<layers::Layer<T>>(new layers::ReduceMean<T>{ id, op });
+    break;
   case layers::OperationType::OperationTypeCount:
     break;   // no default on purpose
   }
