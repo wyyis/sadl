@@ -11,14 +11,14 @@ template<typename T> bool init_inputs(std::vector<sadl::Tensor<T>> &inputs, doub
 {
   unsigned                        seed = 5;
   std::mt19937                    gen(seed);
-  std::uniform_int_distribution<> distribution(inputs_range / 4.0, inputs_range);
+  std::uniform_int_distribution<> distribution((int) (inputs_range / 4.0), (int) inputs_range);
   for (auto &input: inputs)
   {
     for (auto &x: input)
     {
       double x0 = distribution(gen);
       // normalize inputs for float model
-      x = (std::is_same<T, float>::value) ? round(x0) / inputs_range : round(x0);
+      x = (T)((std::is_same<T, float>::value) ? round(x0) / inputs_range : round(x0));
     }
   }
   return true;
@@ -50,7 +50,7 @@ template<typename T> std::vector<sadl::Tensor<T>> infer(const std::string &filen
     exit(-1);
   }
   std::vector<sadl::Tensor<T>> outputs;
-  const int                    N = model.nbOutputs();
+  const int                    N = (int) model.nbOutputs();
   for (int i = 0; i < N; i++)
   {
     outputs.push_back(model.result(i));
@@ -69,7 +69,7 @@ int compare(const std::string &filename_model1, const std::string &filename_mode
     for (int j = 0; j < (int) results1[i].size(); j++)
     {
       nb_tested++;
-      int x1 = results1[i][j] * inputs_range;
+      int x1 = (int) (results1[i][j] * inputs_range);
       int x2 = results2[i][j];
       if (shift > 0)
         x2 <<= shift;
@@ -105,9 +105,9 @@ int main(int argc, char **argv)
   std::string filename_model1 = argv[1];         // Path to the float SADL model.
   std::string filename_model2 = argv[2];         // Path to the int16 SADL model.
   double      inputs_range    = atof(argv[3]);   // Should be a power of 2 (2^N), where N is the quantizer of Placeholder.
-  int         shift           = atof(argv[4]);   // Manually configured shift applied to the final output of the int16 model,
+  int         shift           = (int) atof(argv[4]);   // Manually configured shift applied to the final output of the int16 model,
                                                  // based on different quantizers in int16 SADL model.
-  int max_e = atof(argv[5]);                     // The maximum absolute error between the dequantized float model and the int16
+  int max_e = (int) atof(argv[5]);                     // The maximum absolute error between the dequantized float model and the int16
                                                  // model in the results.
 
   return compare(filename_model1, filename_model2, inputs_range, shift, max_e);

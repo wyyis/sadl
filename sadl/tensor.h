@@ -41,6 +41,7 @@
 #include <numeric>
 #include <vector>
 #include <limits>
+#include <utility>
 #include "options.h"
 
 #include "dimensions.h"
@@ -198,7 +199,7 @@ public:
   const_iterator end() const { return m_data.end(); }
 
   int                      quantizer   = 0;   // for int
-  int                      border_skip = 0;
+  std::pair<int,int>       border_skip = {0,0};
   static constexpr int64_t kMaxSize    = 32LL * 1024 * 1024 * 1024;
 
   Data &getData() { return m_data; }
@@ -309,7 +310,7 @@ template<> struct ComputationType<float>
 
 template<> struct ComputationType<int32_t>
 {
-  using type                = int64_t;
+  using type                = int64_t;  
   static constexpr type max = std::numeric_limits<int32_t>::max();
   static void           quantize(type &z, int q) { z >>= q; }
   static void           shift_left(type &z, int q) { z <<= q; }
@@ -317,9 +318,16 @@ template<> struct ComputationType<int32_t>
   static void           shift_left(int32_t &z, int q) { z <<= q; }
 };
 
+
 template<> struct ComputationType<int16_t>
 {
+#if DEBUG_OVERFLOW
+  using type                = int64_t;
+  static void           quantize(int32_t &z, int q) { z >>= q; }
+  static void           shift_left(int32_t &z, int q) { z <<= q; }
+#else
   using type                = int32_t;
+#endif
   static constexpr type max = std::numeric_limits<int16_t>::max();
   static void           quantize(type &z, int q) { z >>= q; }
   static void           shift_left(type &z, int q) { z <<= q; }

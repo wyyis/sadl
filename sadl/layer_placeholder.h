@@ -66,7 +66,7 @@ template<typename T> bool Placeholder<T>::apply(std::vector<Tensor<T> *> &in)
   {   // v2
     m_out.quantizer = m_q;
   }
-  m_out.border_skip = 0;
+  m_out.border_skip = {0,0};
   return true;
 }
 

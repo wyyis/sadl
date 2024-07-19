@@ -35,7 +35,15 @@
 #include <array>
 #include <cstdint>
 #include <iostream>
+#if defined (__ARM_NEON__) || defined(__ARM_NEON)
+#include <stdlib.h>
+#else
+#if _WIN32 || __USE_ISOC11
 #include <malloc.h>
+#else
+#include <malloc/malloc.h>
+#endif
+#endif
 #include <memory>
 #include <numeric>
 #include <sstream>

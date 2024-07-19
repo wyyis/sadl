@@ -107,7 +107,7 @@ void bilinear_in_channels_wo_simd(const Tensor<T> &data, const T2 coeffs[], cons
   constexpr int im_nb      = 0;
   int           in_D       = data.dims()[3];
   const int    &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
-  const int     pos_table[4][2] = { y_ori_top, x_ori_left, y_ori_top, x_ori_right, y_ori_bottom, x_ori_left, y_ori_bottom, x_ori_right };
+  const int     pos_table[4][2] = { {y_ori_top, x_ori_left}, {y_ori_top, x_ori_right}, {y_ori_bottom, x_ori_left}, {y_ori_bottom, x_ori_right} };
 
   static std::vector<T2> temp_buffer;
   temp_buffer.resize(in_D);
@@ -129,7 +129,7 @@ void bilinear_in_channels_wo_simd(const Tensor<T> &data, const T2 coeffs[], cons
     T2 num = temp_buffer[im_c];
     ComputationType<T>::quantize(num, shift);
     SATURATE(num);
-    out(im_nb, im_i, im_j, im_c) = num;
+    out(im_nb, im_i, im_j, im_c) = static_cast<T>(num);
   }
 }
 
@@ -142,7 +142,7 @@ inline void bilinear_in_channels_simd256(const Tensor<float> &data, const float 
   int           in_D  = data.dims()[3];
   assert(in_D % 8 == 0);   // Should be used with mod8 data.
   const int &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
-  const int  pos_table[4][2] = { y_ori_top, x_ori_left, y_ori_top, x_ori_right, y_ori_bottom, x_ori_left, y_ori_bottom, x_ori_right };
+  const int  pos_table[4][2] = { {y_ori_top, x_ori_left}, {y_ori_top, x_ori_right}, {y_ori_bottom, x_ori_left}, {y_ori_bottom, x_ori_right} };
 
   static std::vector<float> temp_buffer;
   temp_buffer.resize(in_D);
@@ -182,7 +182,7 @@ inline void bilinear_in_channels_simd256(const Tensor<int16_t> &data, const int3
   using T = int16_t;
 #endif
   const int &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
-  const int  pos_table[4][2] = { y_ori_top, x_ori_left, y_ori_top, x_ori_right, y_ori_bottom, x_ori_left, y_ori_bottom, x_ori_right };
+  const int  pos_table[4][2] = { {y_ori_top, x_ori_left}, {y_ori_top, x_ori_right}, {y_ori_bottom, x_ori_left}, {y_ori_bottom, x_ori_right} };
 
   static std::vector<int32_t> temp_buffer;
   temp_buffer.resize(in_D);
@@ -227,7 +227,7 @@ inline void bilinear_in_channels_simd512(const Tensor<float> &data, const float 
   int           in_D  = data.dims()[3];
   assert(in_D % 16 == 0);   // Should be used with mod16 data.
   const int &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
-  const int  pos_table[4][2] = { y_ori_top, x_ori_left, y_ori_top, x_ori_right, y_ori_bottom, x_ori_left, y_ori_bottom, x_ori_right };
+  const int  pos_table[4][2] = { {y_ori_top, x_ori_left}, {y_ori_top, x_ori_right}, {y_ori_bottom, x_ori_left}, {y_ori_bottom, x_ori_right} };
 
   static std::vector<float> temp_buffer;
   temp_buffer.resize(in_D);
@@ -269,7 +269,7 @@ inline void bilinear_in_channels_simd512(const Tensor<int16_t> &data, const int3
   using T = int16_t;
 #endif
   const int &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
-  const int  pos_table[4][2] = { y_ori_top, x_ori_left, y_ori_top, x_ori_right, y_ori_bottom, x_ori_left, y_ori_bottom, x_ori_right };
+  const int  pos_table[4][2] = { {y_ori_top, x_ori_left}, {y_ori_top, x_ori_right}, {y_ori_bottom, x_ori_left}, {y_ori_bottom, x_ori_right }};
 
   static std::vector<int32_t> temp_buffer;
   temp_buffer.resize(in_D);

@@ -22,7 +22,7 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
   case sadl::layers::OperationType::Const:
     layerQ.m_out.resize(layer.m_out.dims());
     for (int k = 0; k < layer.m_out.size(); ++k)
-      layerQ.m_out[k] = layer.m_out[k];
+      layerQ.m_out[k] = static_cast<T>(layer.m_out[k]);
     break;
   case sadl::layers::OperationType::Conv2D:
     dynamic_cast<sadl::layers::Conv2D<T> &>(layerQ).m_strides = dynamic_cast<const sadl::layers::Conv2D<float> &>(layer).m_strides;
@@ -99,10 +99,18 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
     break;
   case sadl::layers::OperationType::Where:
     break;
+  case sadl::layers::OperationType::Minimum:
+    break;
+  case sadl::layers::OperationType::AveragePool:
+    dynamic_cast<sadl::layers::AveragePool<T> &>(layerQ).m_kernel  = dynamic_cast<const sadl::layers::AveragePool<float> &>(layer).m_kernel;
+    dynamic_cast<sadl::layers::AveragePool<T> &>(layerQ).m_strides = dynamic_cast<const sadl::layers::AveragePool<float> &>(layer).m_strides;
+    dynamic_cast<sadl::layers::AveragePool<T> &>(layerQ).m_pads    = dynamic_cast<const sadl::layers::AveragePool<float> &>(layer).m_pads;
+    break;
   case sadl::layers::OperationType::Sigmoid:
     break;
   case sadl::layers::OperationType::Softmax:
     dynamic_cast<sadl::layers::Softmax<T> &>(layerQ).m_axis = dynamic_cast<const sadl::layers::Softmax<float> &>(layer).m_axis;
+
     // no default to get warning
   }
 
@@ -116,7 +124,7 @@ template<typename T> bool copy(const sadl::Model<float> &model, sadl::Model<T> &
   modelQ.m_data.resize(model.m_data.size());
   modelQ.m_ids_input  = model.m_ids_input;
   modelQ.m_ids_output = model.m_ids_output;
-  int nb_layers     = modelQ.m_data.size();
+  int nb_layers       = (int) modelQ.m_data.size();
   for (int k = 0; k < nb_layers; ++k)
   {
     modelQ.m_data[k].layer = sadl::createLayer<T>(model.m_data[k].layer->id(), model.m_data[k].layer->op());

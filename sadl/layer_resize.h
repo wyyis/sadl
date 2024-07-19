@@ -85,7 +85,7 @@ template<typename T> bool Resize<T>::loadInternal(std::istream &file, Version v)
   int32_t x = 0;
   file.read((char *) &x, sizeof(x));
   m_input_label = x;
-  SADL_DBG(std::cout << "  - input_lable: " << m_input_label << std::endl);
+  SADL_DBG(std::cout << "  - input_label: " << m_input_label << std::endl);
   file.read((char *) &x, sizeof(x));
   m_coordinate_transformation_mode = x;
   SADL_DBG(std::cout << "  - coordinate_transformation_mode: " << m_coordinate_transformation_mode << std::endl);
@@ -132,24 +132,28 @@ template<typename T> bool Resize<T>::init(const std::vector<Tensor<T> *> &in)
   int W_in = in[0]->dims()[2];
   int C    = in[0]->dims()[3];
   // scale factor
-  float scale_N = 0, scale_C = 0, scale_H = 0, scale_W = 0;
+  int scale_N = 0, scale_C = 0, scale_H = 0, scale_W = 0;
   if (m_input_label == 1)   // inputs are X and sizes
   {
-    scale_N = in[1]->data()[0] / (float)N;
-    scale_C = in[1]->data()[1] / (float)C;
-    scale_H = in[1]->data()[2] / (float)H_in;
-    scale_W = in[1]->data()[3] / (float)W_in;
+    scale_N = (int)round(in[1]->data()[0] / (float)N);
+    scale_C = (int)round(in[1]->data()[1] / (float)C);
+    scale_H = (int)round(in[1]->data()[2] / (float)H_in);
+    scale_W = (int)round(in[1]->data()[3] / (float)W_in);
   }
   else if (m_input_label == 2)   // inputs are X and scales
   {
-    scale_N = in[1]->data()[0];
-    scale_C = in[1]->data()[1];
-    scale_H = in[1]->data()[2];
-    scale_W = in[1]->data()[3];
+    scale_N = (int)round(in[1]->data()[0]);
+    scale_C = (int)round(in[1]->data()[1]);
+    scale_H = (int)round(in[1]->data()[2]);
+    scale_W = (int)round(in[1]->data()[3]);
+  } else {
+    std::cerr << "[ERROR] invalid type " << m_input_label<< std::endl;
+    return false;
   }
+
   if (scale_N != 1 || scale_H != 2 || scale_W != 2 || scale_C != 1)
   {
-    std::cerr << "[ERROR] invalid scale factor: (" << scale_N << ", " << scale_H << ", " << scale_W << ", " << scale_C << ")" << std::endl;
+    std::cerr << "[ERROR] invalid scale factor: input: "<<in[0]->dims()<<" scales: "<<*in[1]<<" result=(" << scale_N << ", " << scale_H << ", " << scale_W << ", " << scale_C << ")" << std::endl;
     return false;
   }
   scale_factors.resize(in[1]->dims());
@@ -292,7 +296,7 @@ template<typename T> void Resize<T>::calc_positions(int y, int x, int H, int W, 
   
   if (m_coordinate_transformation_mode == resize_coordinate_transformation_mode_half_pixel)
   {
-    T2 normalize_bias = 1 << (shift - 2);
+    T2 normalize_bias = (T)(1 << (shift - 2));
     x                 = x << shift;
     y                 = y << shift;
     x_ori             = ((x + 1) >> 1) - normalize_bias;
@@ -309,8 +313,8 @@ template<typename T> void Resize<T>::calc_positions(int y, int x, int H, int W, 
   y_ori_int = y_ori >> shift;
 
   // acquire the positions of adjacent pixels, prioritizing the left and top pixels
-  x_ori_left   = (x_ori == x_ori_int << shift) ? x_ori_int - 1 : x_ori_int;
-  y_ori_top    = (y_ori == y_ori_int << shift) ? y_ori_int - 1 : y_ori_int;
+  x_ori_left   = (int)((x_ori == x_ori_int << shift) ? x_ori_int - 1 : x_ori_int);
+  y_ori_top    = (int)((y_ori == y_ori_int << shift) ? y_ori_int - 1 : y_ori_int);
   x_ori_right  = x_ori_left + 1;
   y_ori_bottom = y_ori_top + 1;
   x_ori_left   = std::max(0, x_ori_left);   // boundary clamp
@@ -346,12 +350,12 @@ template<typename T> void Resize<T>::get_bilinear_coeffs(T2 y_ori, T2 x_ori, T2 
 
   T2 x_ori_int = x_ori >> shift;
   T2 y_ori_int = y_ori >> shift;
-  T2 x_ratio   = (x_ori == (x_ori_int << shift)) ? (1 << shift) : x_ori - (x_ori_int << shift);
-  T2 y_ratio   = (y_ori == (y_ori_int << shift)) ? (1 << shift) : y_ori - (y_ori_int << shift);
+  T2 x_ratio   = (x_ori == (x_ori_int << shift)) ? (T)(1 << shift) : x_ori - (x_ori_int << shift);
+  T2 y_ratio   = (y_ori == (y_ori_int << shift)) ? (T)(1 << shift) : y_ori - (y_ori_int << shift);
 
-  T2 x_coeff1 = (1 << shift) - x_ratio;
+  T2 x_coeff1 = (T)(1 << shift) - x_ratio;
   T2 x_coeff2 = x_ratio;
-  T2 y_coeff1 = (1 << shift) - y_ratio;
+  T2 y_coeff1 = (T)(1 << shift) - y_ratio;
   T2 y_coeff2 = y_ratio;
 
   coeff11 = (y_coeff1 * x_coeff1) >> shift;
@@ -393,9 +397,9 @@ template<typename T> void Resize<T>::get_nearest_coeffs(T2 ori, T2 &coeff_1, T2 
 {
   int shift   = m_quantizer;
   T2  ori_int = ori >> shift;   // floor
-  T2  ratio   = (ori == (ori_int << shift)) ? (1 << shift) : (ori - (ori_int << shift));
+  T2  ratio   = (ori == (ori_int << shift)) ? (T)(1 << shift) : (ori - (ori_int << shift));
 
-  if (ratio == (1 << shift))
+  if (ratio == (T)(1 << shift))
   {
     coeff_1 = 0;
     coeff_2 = 1;
@@ -409,7 +413,7 @@ template<typename T> void Resize<T>::get_nearest_coeffs(T2 ori, T2 &coeff_1, T2 
   }
   if (m_nearest_mode == resize_nearest_mode_round_prefer_ceil)
   {
-    if (ratio < (1 << (shift - 1)))
+    if (ratio < (T)(1 << (shift - 1)))
       coeff_1 = 1;
     else
       coeff_1 = 0;

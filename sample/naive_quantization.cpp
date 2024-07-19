@@ -35,7 +35,15 @@
 #include <array>
 #include <cstdint>
 #include <iostream>
+#if defined (__ARM_NEON__) || defined(__ARM_NEON)
+#include <stdlib.h>
+#else
+#if _WIN32 || __USE_ISOC11
 #include <malloc.h>
+#else
+#include <malloc/malloc.h>
+#endif
+#endif
 #include <memory>
 #include <numeric>
 #include <sstream>
@@ -73,7 +81,9 @@ bool toQuantize(sadl::layers::OperationType::Type type)
          && type != sadl::layers::OperationType::Relu && type != sadl::layers::OperationType::Reshape && type != sadl::layers::OperationType::Shape
          && type != sadl::layers::OperationType::Slice && type != sadl::layers::OperationType::Transpose && type != sadl::layers::OperationType::PReLU
          && type != sadl::layers::OperationType::ScatterND && type != sadl::layers::OperationType::GridSample && type != sadl::layers::OperationType::Resize
-         && type != sadl::layers::OperationType::Compare && type != sadl::layers::OperationType::Where && type != sadl::layers::OperationType::Sigmoid
+         && type != sadl::layers::OperationType::Compare && type != sadl::layers::OperationType::Where && type != sadl::layers::OperationType::Maximum 
+         && type != sadl::layers::OperationType::Minimum && type != sadl::layers::OperationType::AveragePool
+         && type != sadl::layers::OperationType::Sigmoid
          && type != sadl::layers::OperationType::Softmax;
 }
 

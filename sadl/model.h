@@ -57,7 +57,7 @@ private:
   std::vector<LayerData>                     m_data;
   int32_t                                    m_nb_inputs       = 0;
   static constexpr int                       kMaxInputByLayer = 2;
-  static constexpr int                       kMaxLayers       = 2048;
+  static constexpr int                       kMaxLayers       = 8192;
   std::vector<typename layers::Layer<T>::Id> getLayerIdsWithInput(typename layers::Layer<T>::Id id) const;
   void                                       insertCopyLayers();
   void                                       reshapeConv2DFilters();
@@ -75,7 +75,7 @@ public:
   // aditionnal info
   std::vector<Tensor<T>>                            getInputsTemplate() const;
   const std::vector<typename layers::Layer<T>::Id> &getIdsOutput() const { return m_ids_output; }
-  int                                               nbOutputs() const { return m_ids_output.size(); }
+  size_t                                            nbOutputs() const { return m_ids_output.size(); }
   std::vector<typename layers::Layer<T>::Id>        getLayersId() const;
   const LayerData &                                 getLayer(const typename layers::Layer<T>::Id &id) const;
   LayerData &                                getLayer(const typename layers::Layer<T>::Id &id);
@@ -185,6 +185,11 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
   case layers::OperationType::Where:
     return std::unique_ptr<layers::Layer<T>>(new layers::Where<T>{ id, op });
     break;
+  case layers::OperationType::Minimum:
+    return std::unique_ptr<layers::Layer<T>>(new layers::Minimum<T>{ id, op });
+  case layers::OperationType::AveragePool:
+    return std::unique_ptr<layers::Layer<T>>(new layers::AveragePool<T>{ id, op });
+    break;
   case layers::OperationType::Sigmoid:
     return std::unique_ptr<layers::Layer<T>>(new layers::Sigmoid<T>{ id, op });
     break;
@@ -252,7 +257,7 @@ template<typename T> bool Model<T>::load(std::istream &file)
     if ((std::is_same<T, float>::value && x != layers::TensorInternalType::Float) || (std::is_same<T, int32_t>::value && x != layers::TensorInternalType::Int32)
         || (std::is_same<T, int16_t>::value && x != layers::TensorInternalType::Int16))
     {
-      std::cerr << "[ERROR] wrong model type and Model<T>" << std::endl;
+      std::cerr << "[ERROR] wrong model type and Model<T> " << std::endl;
       return false;
     }
     SADL_DBG(std::cout << "[INFO] Model type: " << (int) x << std::endl);
@@ -513,7 +518,7 @@ template<typename T> bool Model<T>::apply(std::vector<Tensor<T>> &in)
       }
       else
       {
-        float Q = (1 << m_data[layer_cnt].layer->m_out.quantizer);
+        float Q = (float) (1 << m_data[layer_cnt].layer->m_out.quantizer);
         for (int k = 0; k < 8 && k < (int) m_data[layer_cnt].layer->m_out.size(); ++k)
           std::cout << m_data[layer_cnt].layer->m_out[k] / Q << ' ';
         std::cout << "]\t";
@@ -584,7 +589,7 @@ template<typename T> bool Model<T>::apply(std::vector<Tensor<T>> &in)
       }
       else
       {
-        float Q = (1 << m_data[layer_cnt].layer->m_out.quantizer);
+        float Q = (float)(1 << m_data[layer_cnt].layer->m_out.quantizer);
         for (int k = 0; k < 8 && k < (int) m_data[layer_cnt].layer->m_out.size(); ++k)
           std::cout << m_data[layer_cnt].layer->m_out[k] / Q << ' ';
         if (m_data[layer_cnt].layer->m_out.size() > 8)
@@ -628,10 +633,13 @@ template<typename T> typename Model<T>::Stat Model<T>::printOverflow(bool printi
                 << "]: overflow: " << m_data[layer_cnt].layer->cpt_overflow << '/' << m_data[layer_cnt].layer->cpt_op << " ("
                 << m_data[layer_cnt].layer->cpt_overflow * 100. / m_data[layer_cnt].layer->cpt_op << "%)" << std::endl;
     }
-    else if (printinfo && m_data[layer_cnt].layer->cpt_op > 0)
-    {
-      std::cout << "[INFO] layer " << m_data[layer_cnt].layer->id() << ' ' << m_data[layer_cnt].layer->name() << " [" << opName(m_data[layer_cnt].layer->op())
-                << "]: " << m_data[layer_cnt].layer->cpt_op << " op" << std::endl;
+    else {
+      if (printinfo && (m_data[layer_cnt].layer->cpt_op > 0 || m_data[layer_cnt].layer->cpt_mac > 0 ) )
+      {
+        std::cout << "[INFO] layer " << m_data[layer_cnt].layer->id() << ' ' << m_data[layer_cnt].layer->name() << " [" << opName(m_data[layer_cnt].layer->op()) << "]: "
+                  << m_data[layer_cnt].layer->cpt_mac << " mac, "
+                  << m_data[layer_cnt].layer->cpt_op << " op" << std::endl;
+      }
     }
   }
 #if DEBUG_COUNTERS && __AVX2__
@@ -715,14 +723,16 @@ template<typename T> void Model<T>::insertCopyLayers()
     for (auto id: layer_with_current_as_input)
     {
       const auto &L = getLayer(id);
-      if (L.layer->mutateInput())
+      if (L.layer->mutateInput()) { 
         layer_with_current_as_mutable_input.push_back(id);
+      }
     }
-    if (layer_with_current_as_mutable_input.size() > 1)
+    if (layer_with_current_as_input.size()>1 && !layer_with_current_as_mutable_input.empty())
     {                                                           // need copy layer
       // for current layer L, insert copy layers C just after: x x x L C C xxxx
       std::vector<typename layers::Layer<T>::Id> id_copy_layers;
-      for (int n = 0; n < (int) layer_with_current_as_mutable_input.size() - 1; ++n)
+      const int offset=layer_with_current_as_input.size()==layer_with_current_as_mutable_input.size();
+      for (int n = 0; n < (int) layer_with_current_as_mutable_input.size() - offset; ++n)
       {
         LayerData copy_layer;
         id_copy_layers.push_back(cnt_id);
@@ -735,11 +745,11 @@ template<typename T> void Model<T>::insertCopyLayers()
       }
       // now change inputs of the layers to a copy of the output of the current layer (except the first one which keep
       // the output of the current layer)
-      for (int n = 1; n < (int) layer_with_current_as_mutable_input.size(); ++n)
+      for (int n = offset; n < (int) layer_with_current_as_mutable_input.size(); ++n)
       {
         auto &L = getLayer(layer_with_current_as_mutable_input[n]);
         SADL_DBG(std::cout << "[INFO] replace id=" << current_layer.id() << " by id=" << id_copy_layers[n - 1] << " in layer " << L.layer->id() << std::endl);
-        L.layer->replaceInputId(current_layer.id(), id_copy_layers[n - 1]);
+        L.layer->replaceInputId(current_layer.id(), id_copy_layers[n - offset]);
       }
     }
   }

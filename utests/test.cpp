@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2023, ITU/ISO/IEC
+ * Copyright (c) 2010-2024, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@ using namespace std;
 
 namespace
 {
-int verbose = 0;
+int verbose = 2;
 // results file
 // nb inputs [int]
 // for all input:
@@ -126,14 +126,12 @@ template<typename T> bool checkResults(const std::vector<float> &gt, const sadl:
   double max_a       = 0.;
   int    nb_e        = 0;
   double max_fabs    = 0.;
-  double mae         = 0.;
   auto   check_value = [&](auto x_test, auto x_gt)
   {
     float  x  = (float) x_test;
     double a  = fabs(x - x_gt);
     double fb = fabs(x_gt);
     max_fabs  = max(max_fabs, fb);
-    mae += fb;
     max_a = max(a, max_a);
     if (a > abs_tol)
     {

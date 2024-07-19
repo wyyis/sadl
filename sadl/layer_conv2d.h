@@ -64,6 +64,11 @@ protected:
   // should never be used
   void conv2d(const Tensor<T> &A, const Tensor<T> &kernel);
 
+  template<int s_h, int s_w> bool conv2d_core(const Tensor<T> &A, const Tensor<T> &kernel);
+
+  template<int n> void multiply_add_n_points(const T* input, const T coeff, typename ComputationType<T>::type* sum);
+  void simd_multiply_add_16_points(const T* input, const T coeff, typename ComputationType<T>::type* sum);
+
   template<int s_h, int s_w> void conv2d_5x5_s(const Tensor<T> &A, const Tensor<T> &kernel);
 
   // 1x1
@@ -158,11 +163,11 @@ template<typename T> bool Conv2D<T>::apply(std::vector<Tensor<T> *> &in)
   {
     return apply_s<1, 1>(A, kernel);
   }
-  else if (m_strides[1] == 1 && m_strides[2] == 2 && m_groups == 1)
+  else if (m_strides[1] == 1 && m_strides[2] == 2)
   {
     return apply_s<1, 2>(A, kernel);
   }
-  else if ((m_strides[1] == 2 && m_strides[2] == 1) && m_groups == 1)
+  else if (m_strides[1] == 2 && m_strides[2] == 1)
   {
     return apply_s<2, 1>(A, kernel);
   }
@@ -209,11 +214,12 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
       {   // skip border
         if (s_h == 1 && s_w == 1)
         {
-          start_h += m_out.border_skip;
-          start_w += m_out.border_skip;
-          in_H -= m_out.border_skip;
-          in_W -= m_out.border_skip;
-          m_out.border_skip++;
+          start_h += m_out.border_skip.first;
+          start_w += m_out.border_skip.second;
+          in_H -= m_out.border_skip.first;
+          in_W -= m_out.border_skip.second;
+          m_out.border_skip.first++;
+          m_out.border_skip.second++;
         }
       }
       conv2d_3x3_s_core_dispatch<s_h, s_w>(A, kernel);
@@ -458,6 +464,146 @@ template<typename T> void Conv2D<T>::conv2d(const Tensor<T> &A, const Tensor<T> 
       }
     }
   }
+}
+
+template<typename T> template<int n> void Conv2D<T>::multiply_add_n_points(const T* input, const T coeff, typename ComputationType<T>::type* sum)
+{
+  for (int i = 0; i < n; ++i)
+  {
+    sum[i] += input[i] * coeff;
+  }
+}
+
+#if __AVX2__
+template<> inline void Conv2D<int16_t>::simd_multiply_add_16_points(const int16_t* input, const int16_t coeff, typename ComputationType<int16_t>::type* sum)
+{
+  __m256i coeff1 = _mm256_set1_epi16(coeff);
+  __m256i data = _mm256_loadu_si256((__m256i*)input);
+  __m256i hi = _mm256_mulhi_epi16(coeff1, data);
+  __m256i lo = _mm256_mullo_epi16(coeff1, data);
+  __m256i tmp1 = _mm256_unpacklo_epi16(lo, hi);
+  __m256i tmp2 = _mm256_unpackhi_epi16(lo, hi);
+  __m256i sum1 = _mm256_permute2x128_si256(tmp1, tmp2, 0x20);
+  __m256i sum2 = _mm256_permute2x128_si256(tmp1, tmp2, 0x31);
+  sum1 = _mm256_add_epi32(sum1, _mm256_loadu_si256((__m256i*)(sum + 0)));
+  sum2 = _mm256_add_epi32(sum2, _mm256_loadu_si256((__m256i*)(sum + 8)));
+  _mm256_storeu_si256((__m256i*)(sum + 0), sum1);
+  _mm256_storeu_si256((__m256i*)(sum + 8), sum2);
+}
+#endif
+
+template<typename T> inline void Conv2D<T>::simd_multiply_add_16_points(const T* input, const T coeff, typename ComputationType<T>::type* sum)
+{
+  for (int i = 0; i < 16; ++i)
+  {
+    sum[i] += input[i] * coeff;
+  }
+}
+
+template<typename T> template<int s_h, int s_w> bool Conv2D<T>::conv2d_core(const Tensor<T> &A, const Tensor<T> &kernel)
+{
+  if constexpr (s_w != 1) // data is not continous for SIMD
+    return false;
+  
+  constexpr int im_nb = 0;
+  const int     ihalf_size{ kernel.dims()[0] / 2 };
+  const int     jhalf_size{ kernel.dims()[1] / 2 };
+  const int     in_D{ A.dims()[3] };
+  const int     nb_filters{ kernel.dims()[2] };
+  const int     shift     = kernel.quantizer + m_q;
+  const int     cout_by_g = nb_filters / m_groups;
+  const int     cin_by_g  = in_D / m_groups;
+  const int     top{ m_pads[0] };
+  const int     left{ m_pads[1] };
+  int           in_H{ A.dims()[1] };
+  int           in_W{ A.dims()[2] };
+  int           start_h{ ihalf_size - top };
+  int           start_w{ jhalf_size - left };
+#if DEBUG_SIMD && __AVX2__
+  std::cout << "\n[WARN] generic version conv2d_core (stride known) " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D << " outD=" << nb_filters
+            << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
+            << "?? kMAC" << std::endl;
+#endif
+  assert(start_h + s_h - ihalf_size >= 0);
+  assert(start_w + s_w - jhalf_size >= 0);
+  
+  constexpr int bufSize = 256 + 8 * 2;
+  constexpr int vectorSize = 16; // has to be 16 for the current SIMD optimization
+  constexpr int dSize = 7;
+  const int maxD = in_D / m_groups;
+
+  if (maxD > dSize || in_H > bufSize || in_W > bufSize
+    || (ihalf_size == 0 && jhalf_size == 0)) // when both are 0, SIMD may be achieved along in_D
+  {
+    // unsupported cases
+    return false;
+  }
+
+  // for the case the block width is not vector(simd)-size aligned
+  T input[dSize][bufSize][bufSize + vectorSize]; 
+  for (int filter = 0; filter < nb_filters; ++filter)
+  {
+    int offset = (filter / cout_by_g) * cin_by_g;
+    // group source by filter
+    for (int filter_d = 0; filter_d < maxD; ++filter_d)
+    {
+      for (int im_i = start_h; im_i < in_H; ++im_i)
+      {
+        for (int im_j = start_w; im_j < in_W; ++im_j)
+        {
+          input[filter_d][im_i][im_j] = A(im_nb, im_i, im_j, offset + filter_d);
+        }
+      }
+    }
+    // convolution
+    const bool startWithWH = ihalf_size > 0 || jhalf_size > 0;
+    const int start_h2 = start_h + (startWithWH ? s_h : 0);
+    const int start_w2 = start_w + (startWithWH ? s_w : 0);
+    for (int im_i = start_h2; im_i < in_H - ihalf_size; im_i += s_h)
+    {
+      for (int im_jv = start_w2; im_jv < in_W - jhalf_size; im_jv += vectorSize)
+      {
+        typename ComputationType<T>::type x[vectorSize] = {0};
+        const int max_j = std::min(im_jv + vectorSize, in_W - jhalf_size);
+        for (int filter_d = 0; filter_d < maxD; ++filter_d)
+        {
+          for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
+          {
+            int ii = im_i + filter_i;
+            int ki = ihalf_size + filter_i;
+            for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
+            {
+              const int kj = jhalf_size + filter_j;
+#if __AVX2__ 
+              if constexpr (std::is_same_v<T, int16_t> && vectorSize == 16)
+              {
+                simd_multiply_add_16_points(&input[filter_d][ii][im_jv + filter_j], kernel(ki, kj, filter, filter_d), &x[0]);
+              }
+              else
+#endif
+              {
+                multiply_add_n_points<vectorSize>(&input[filter_d][ii][im_jv + filter_j], kernel(ki, kj, filter, filter_d), &x[0]);
+              }
+              for (int im_j = im_jv; im_j < max_j; im_j += s_w)
+              {
+                COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
+              }
+            }
+          }
+        }      
+        // only keep valid data here
+        for (int im_j = im_jv; im_j < max_j; im_j += s_w)
+        {
+          ComputationType<T>::quantize(x[im_j - im_jv], shift);
+          COUNTERS(x[im_j - im_jv]);
+          SATURATE(x[im_j - im_jv]);
+          m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(x[im_j - im_jv]);
+        }
+      }
+    }
+  }
+
+  return true;
 }
 
 }   // namespace layers

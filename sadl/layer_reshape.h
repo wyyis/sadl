@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2023, ITU/ISO/IEC
+ * Copyright (c) 2010-2024, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -80,16 +80,33 @@ template<typename T> bool Reshape<T>::init(const std::vector<Tensor<T> *> &in)
     std::cerr << "[ERROR] quantizer on reshape dimensions data layer" << std::endl;
     return false;
   }
+  int cnt=0;
+  for (int k = 0; k < in[1]->size(); ++k)
+  {
+    if ((*in[1]) (k) == -1) ++cnt;
+  }
+  if (cnt>=2) // to be  checked
+  {
+    std::cerr << "[ERROR] more than one -1" << std::endl;
+    return false;
+  }
+  int pos=0;  
   for (int k = 0; k < in[1]->size(); ++k)
   {
     if ((*in[1]) (k) == -1)
-    {   // keep dim of org
-      dim[k] = in[0]->dims()[k];
+    { 
+      dim[k] = 1; 
+      pos = k;
     }
     else
     {
       dim[k] = (int) ((*in[1]) (k));
     }
+  }
+  //
+  if (cnt==1) {
+    assert(dim.nbElements()!=0);
+    dim[pos]=(int)(in[0]->dims().nbElements()/dim.nbElements());
   }
   if (dim.nbElements() != in[0]->dims().nbElements())
   {

@@ -72,35 +72,10 @@ template<typename T> bool MaxPool<T>::apply(std::vector<Tensor<T> *> &in)
   const int        offset_end   = m_kernel[1] / 2;
   const int        offset_start = m_kernel[1] - 1 - offset_end;
   const int        step         = m_strides[1];
-  const int        in_H         = in[0]->dims()[1];
 
   // currently adhoc start
-  int start = 0;
-  if (step == 1)
-  {
-    start = 0;
-  }
-  else if (step == 2)
-  {
-    //  if (in_H % 2 == 0)
-    //    start = 1;
-    //  else
-    start = 0;
-  }
-  else if (step == 3)
-  {
-    if (in_H % 2 == 0)
-      start = 0;
-    else
-      start = 1;
-  }
-  else
-  {
-    std::cerr << "[ERROR] to do" << std::endl;
-    assert(false);
-    exit(-1);
-  }
-
+  int start = offset_start;
+  
   m_out.quantizer   = in[0]->quantizer;     // adapt output width to bias
   m_out.border_skip = in[0]->border_skip;   // to check
 

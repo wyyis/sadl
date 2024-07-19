@@ -73,8 +73,10 @@ template<typename T> bool Concat<T>::apply(std::vector<Tensor<T> *> &in)
   }
   m_out.quantizer   = qmin;   // adapt output width to last input
   m_out.border_skip = in[0]->border_skip;
-  for (int i = 1; i < nb_in; ++i)
-    m_out.border_skip = std::max(m_out.border_skip, in[i]->border_skip);
+  for (int i = 1; i < nb_in; ++i) {
+    m_out.border_skip.first = std::max(m_out.border_skip.first, in[i]->border_skip.first);
+    m_out.border_skip.second = std::max(m_out.border_skip.second, in[i]->border_skip.second);
+  }
 
   const Dimensions dim = in[0]->dims();
   if (dim.size() == 2)

@@ -74,8 +74,10 @@ struct OperationType
     Resize             = 24,
     Compare            = 25,
     Where              = 26,
-    Sigmoid            = 27,
-    Softmax            = 28,
+    Minimum            = 27,
+    AveragePool        = 28,
+    Sigmoid            = 29,
+    Softmax            = 30,
     OperationTypeCount = 29
   };
 };

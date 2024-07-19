@@ -91,7 +91,7 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
         z += *it1;
         COUNTERS(z);
         SATURATE(z);
-        *it0 = z;
+        *it0 = static_cast<T>(z);
       }
     }
     else
@@ -107,7 +107,7 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
           z += value;
           COUNTERS(z);
           SATURATE(z);
-          x = z;
+          x = static_cast<T>(z);
         }
       }
       else if (in[0]->dims().size() == 2)
@@ -124,7 +124,7 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
             z += B[i];
             COUNTERS(z);
             SATURATE(z);
-            m_out(n, i) = z;
+            m_out(n, i) = static_cast<T>(z);
           }
       }
       else if (in[0]->dims().size() == 3)
@@ -143,7 +143,7 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
               z += B[j];
               COUNTERS(z);
               SATURATE(z);
-              m_out(n, i, j) = z;
+              m_out(n, i, j) = static_cast<T>(z);
             }
       }
       else if (in[0]->dims().size() == 4)
@@ -164,7 +164,7 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
                 z += B[k];
                 COUNTERS(z);
                 SATURATE(z);
-                m_out(n, i, j, k) = z;
+                m_out(n, i, j, k) = static_cast<T>(z);
               }
       }
     }
@@ -181,7 +181,7 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
         z += *it0;
         COUNTERS(z);
         SATURATE(z);
-        *it0 = z;
+        *it0 = static_cast<T>(z);
       }
     }
     else
@@ -198,7 +198,7 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
           z += value;
           COUNTERS(z);
           SATURATE(z);
-          x = z;
+          x = static_cast<T>(z);
         }
       }
       else if (in[0]->dims().size() == 2)
@@ -215,7 +215,7 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
             z += m_out(n, i);
             COUNTERS(z);
             SATURATE(z);
-            m_out(n, i) = z;
+            m_out(n, i) = static_cast<T>(z);
           }
       }
       else if (in[0]->dims().size() == 3)
@@ -235,7 +235,7 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
               z += m_out(n, i, j);
               COUNTERS(z);
               SATURATE(z);
-              m_out(n, i, j) = z;
+              m_out(n, i, j) = static_cast<T>(z);
             }
       }
       else if (in[0]->dims().size() == 4)
@@ -257,7 +257,7 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
                 z += m_out(n, i, j, k);
                 COUNTERS(z);
                 SATURATE(z);
-                m_out(n, i, j, k) = z;
+                m_out(n, i, j, k) = static_cast<T>(z);
               }
       }
     }
