@@ -60,76 +60,143 @@ template<typename T> bool Maximum<T>::apply(std::vector<Tensor<T> *> &in)
     std::cerr << "  input aliasing" << std::endl;
     return false;
   }
-  const int shift = -(in[1]->quantizer - in[0]->quantizer);
   swap(*in[0], m_out);
+  const int shift = std::abs(in[1]->quantizer - m_out.quantizer);
+  const bool shift_mout = in[1]->quantizer > m_out.quantizer;
+  m_out.quantizer = std::max(m_out.quantizer, in[1]->quantizer);
 
   /*
   Looking at the initialization, if the condition
   below is false, necessarily, `in[1]->dims().size()`
   is equal to 1.
   */
-  if (in[0]->dims() == in[1]->dims())
-  {
-    for (auto it0 = m_out.begin(), it1 = in[1]->begin(); it0 != m_out.end(); ++it0, ++it1)
+  if (shift_mout) {
+    if (in[0]->dims() == in[1]->dims())
     {
-      T z = *it1;
-      ComputationType<T>::shift_left(z, shift);
-      *it0 = std::max(*it0, z);
-    }
-  }
-  else
-  {
-    const Tensor<T> &B{ *in[1] };
-    if (B.size() == 1)
-    {
-      T value{ B[0] };
-      ComputationType<T>::shift_left(value, shift);
-      for (auto it0 = m_out.begin(); it0 != m_out.end(); ++it0)
+      for (auto it0 = m_out.begin(), it1 = in[1]->begin(); it0 != m_out.end(); ++it0, ++it1)
       {
-        *it0 = std::max(*it0, value);
+        T z = *it1;
+        ComputationType<T>::shift_left(*it0, shift);
+        *it0 = std::max(*it0, z);
       }
     }
-    else if (in[0]->dims().size() == 2)
+    else
     {
-      const int N{ in[0]->dims()[0] };
-      const int H{ in[0]->dims()[1] };
-      for (int n = 0; n < N; ++n)
-        for (int i = 0; i < H; ++i)
+      const Tensor<T> &B{ *in[1] };
+      if (B.size() == 1)
+      {
+        T value{ B[0] };
+        for (auto it0 = m_out.begin(); it0 != m_out.end(); ++it0)
         {
-          T z = B[i];
-          ComputationType<T>::shift_left(z, shift);
-          m_out(n, i) = std::max(m_out(n, i), z);
+          ComputationType<T>::shift_left(*it0, shift);
+          *it0 = std::max(*it0, value);
         }
-    }
-    else if (in[0]->dims().size() == 3)
-    {
-      const int N{ in[0]->dims()[0] };
-      const int H{ in[0]->dims()[1] };
-      const int W{ in[0]->dims()[2] };
-      for (int n = 0; n < N; ++n)
-        for (int i = 0; i < H; ++i)
-          for (int j = 0; j < W; ++j)
+      }
+      else if (in[0]->dims().size() == 2)
+      {
+        const int N{ in[0]->dims()[0] };
+        const int H{ in[0]->dims()[1] };
+        for (int n = 0; n < N; ++n)
+          for (int i = 0; i < H; ++i)
           {
-            T z = B[j];
-            ComputationType<T>::shift_left(z, shift);
-            m_out(n, i, j) = std::max(m_out(n, i, j), z);
+            T z = B[i];
+            ComputationType<T>::shift_left(m_out(n, i), shift);
+            m_out(n, i) = std::max(m_out(n, i), z);
           }
-    }
-    else if (in[0]->dims().size() == 4)
-    {
-      const int N{ in[0]->dims()[0] };
-      const int H{ in[0]->dims()[1] };
-      const int W{ in[0]->dims()[2] };
-      const int K{ in[0]->dims()[3] };
-      for (int n = 0; n < N; ++n)
-        for (int i = 0; i < H; ++i)
-          for (int j = 0; j < W; ++j)
-            for (int k = 0; k < K; ++k)
+      }
+      else if (in[0]->dims().size() == 3)
+      {
+        const int N{ in[0]->dims()[0] };
+        const int H{ in[0]->dims()[1] };
+        const int W{ in[0]->dims()[2] };
+        for (int n = 0; n < N; ++n)
+          for (int i = 0; i < H; ++i)
+            for (int j = 0; j < W; ++j)
             {
-              T z = B[k];
-              ComputationType<T>::shift_left(z, shift);
-              m_out(n, i, j, k) = std::max(m_out(n, i, j, k), z);
+              T z = B[j];
+              ComputationType<T>::shift_left(m_out(n, i, j), shift);
+              m_out(n, i, j) = std::max(m_out(n, i, j), z);
             }
+      }
+      else if (in[0]->dims().size() == 4)
+      {
+        const int N{ in[0]->dims()[0] };
+        const int H{ in[0]->dims()[1] };
+        const int W{ in[0]->dims()[2] };
+        const int K{ in[0]->dims()[3] };
+        for (int n = 0; n < N; ++n)
+          for (int i = 0; i < H; ++i)
+            for (int j = 0; j < W; ++j)
+              for (int k = 0; k < K; ++k)
+              {
+                T z = B[k];
+                ComputationType<T>::shift_left(m_out(n, i, j, k), shift);
+                m_out(n, i, j, k) = std::max(m_out(n, i, j, k), z);
+              }
+      }
+    }
+  } else {
+    if (in[0]->dims() == in[1]->dims())
+    {
+      for (auto it0 = m_out.begin(), it1 = in[1]->begin(); it0 != m_out.end(); ++it0, ++it1)
+      {
+        T z = *it1;
+        ComputationType<T>::shift_left(z, shift);
+        *it0 = std::max(*it0, z);
+      }
+    }
+    else
+    {
+      const Tensor<T> &B{ *in[1] };
+      if (B.size() == 1)
+      {
+        T value{ B[0] };
+        ComputationType<T>::shift_left(value, shift);
+        for (auto it0 = m_out.begin(); it0 != m_out.end(); ++it0)
+          *it0 = std::max(*it0, value);
+      }
+      else if (in[0]->dims().size() == 2)
+      {
+        const int N{ in[0]->dims()[0] };
+        const int H{ in[0]->dims()[1] };
+        for (int n = 0; n < N; ++n)
+          for (int i = 0; i < H; ++i)
+          {
+            T z = B[i];
+            ComputationType<T>::shift_left(z, shift);
+            m_out(n, i) = std::max(m_out(n, i), z);
+          }
+      }
+      else if (in[0]->dims().size() == 3)
+      {
+        const int N{ in[0]->dims()[0] };
+        const int H{ in[0]->dims()[1] };
+        const int W{ in[0]->dims()[2] };
+        for (int n = 0; n < N; ++n)
+          for (int i = 0; i < H; ++i)
+            for (int j = 0; j < W; ++j)
+            {
+              T z = B[j];
+              ComputationType<T>::shift_left(z, shift);
+              m_out(n, i, j) = std::max(m_out(n, i, j), z);
+            }
+      }
+      else if (in[0]->dims().size() == 4)
+      {
+        const int N{ in[0]->dims()[0] };
+        const int H{ in[0]->dims()[1] };
+        const int W{ in[0]->dims()[2] };
+        const int K{ in[0]->dims()[3] };
+        for (int n = 0; n < N; ++n)
+          for (int i = 0; i < H; ++i)
+            for (int j = 0; j < W; ++j)
+              for (int k = 0; k < K; ++k)
+              {
+                T z = B[k];
+                ComputationType<T>::shift_left(z, shift);
+                m_out(n, i, j, k) = std::max(m_out(n, i, j, k), z);
+              }
+      }
     }
   }
   return true;
