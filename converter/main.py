@@ -982,6 +982,24 @@ def parse_graph_node(
         map_onnx_to_myGraph[node.output[0]] = node.output[0] + "_NOT_IN_GRAPH"
 
     elif node.op_type == "Max":
+        for node_input in [n0name, n1name]:
+            if is_constant(node_input, model_onnx.graph.initializer):
+                additional = {}
+                additional["data"] = node
+                n2 = getNodesWithOutput(node_input, model_onnx)
+                additional["dims"], additional["raw_data"], additional[
+                    "dtype"
+                ] = extract_additional_data(
+                    node_input,
+                    node_annotation[n2.name].to_transpose,
+                    model_onnx.graph,
+                    verbose,
+                )
+                map_onnx_to_myGraph[node_input] = node_input
+                myGraph[node_input] = {}
+                myGraph[node_input]["inputs"] = []
+                myGraph[node_input]["additional"] = additional
+                myGraph[node_input]["op_type"] = OPTYPE.Const
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Maximum
         myGraph[node.output[0]]["inputs"] = [
@@ -993,6 +1011,24 @@ def parse_graph_node(
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
     elif node.op_type == "Min":
+        for node_input in [n0name, n1name]:
+            if is_constant(node_input, model_onnx.graph.initializer):
+                additional = {}
+                additional["data"] = node
+                n2 = getNodesWithOutput(node_input, model_onnx)
+                additional["dims"], additional["raw_data"], additional[
+                    "dtype"
+                ] = extract_additional_data(
+                    node_input,
+                    node_annotation[n2.name].to_transpose,
+                    model_onnx.graph,
+                    verbose,
+                )
+                map_onnx_to_myGraph[node_input] = node_input
+                myGraph[node_input] = {}
+                myGraph[node_input]["inputs"] = []
+                myGraph[node_input]["additional"] = additional
+                myGraph[node_input]["op_type"] = OPTYPE.Const
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Minimum
         myGraph[node.output[0]]["inputs"] = [
