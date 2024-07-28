@@ -110,6 +110,11 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
     dynamic_cast<sadl::layers::ReduceMean<T> &>(layerQ).axes     = dynamic_cast<const sadl::layers::ReduceMean<float> &>(layer).axes;
     dynamic_cast<sadl::layers::ReduceMean<T> &>(layerQ).keepdims = dynamic_cast<const sadl::layers::ReduceMean<float> &>(layer).keepdims;
     break;
+  case sadl::layers::OperationType::OperationExperimentalStart:
+    break;
+  case sadl::layers::OperationType::OperationExperimentalEnd:
+    break;
+
     // no default to get warning
   }
 
