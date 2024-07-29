@@ -62,7 +62,7 @@ template<> inline bool Sigmoid<float>::apply(std::vector<Tensor<float> *> &in) {
 
   swap(*in[0], m_out);
   for (auto &x : m_out)
-    x = (x < 0) ? std::exp(x) / (1.0 + std::exp(x)) : 1.0 / (1.0 + std::exp(-x)); // Overflow prevention
+    x = (float)((x < 0) ? std::exp(x) / (1.0 + std::exp(x)) : 1.0 / (1.0 + std::exp(-x))); // Overflow prevention
   return true;
 }
 

@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2023, ITU/ISO/IEC
+ * Copyright (c) 2010-2024, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -187,16 +187,32 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
     break;
   case layers::OperationType::Minimum:
     return std::unique_ptr<layers::Layer<T>>(new layers::Minimum<T>{ id, op });
+    break;
   case layers::OperationType::AveragePool:
     return std::unique_ptr<layers::Layer<T>>(new layers::AveragePool<T>{ id, op });
     break;
+  case layers::OperationType::ReduceMean:
+    return std::unique_ptr<layers::Layer<T>>(new layers::ReduceMean<T>{ id, op });
+    break;    
+  case layers::OperationType::OperationTypeCount:
+    std::cerr << "[ERROR] unknown layer " << op << std::endl;
+    exit(-1);
+    break;   // no default on purpose
+  case layers::OperationType::OperationExperimentalStart:
+    std::cerr << "[ERROR] unknown layer " << op << std::endl;
+    exit(-1);
+    break;   // no default on purpose
+
   case layers::OperationType::Sigmoid:
     return std::unique_ptr<layers::Layer<T>>(new layers::Sigmoid<T>{ id, op });
     break;
   case layers::OperationType::Softmax:
     return std::unique_ptr<layers::Layer<T>>(new layers::Softmax<T>{ id, op });
     break;
-  case layers::OperationType::OperationTypeCount:
+
+  case layers::OperationType::OperationExperimentalEnd:
+    std::cerr << "[ERROR] unknown layer " << op << std::endl;
+    exit(-1);
     break;   // no default on purpose
   }
   std::cerr << "[ERROR] unknown layer " << op << std::endl;
@@ -304,13 +320,17 @@ template<typename T> bool Model<T>::load(std::istream &file)
     file.read((char *) &id, sizeof(int32_t));
     int32_t op = 0;
     file.read((char *) &op, sizeof(int32_t));
-    if (!(op > 0 && op < layers::OperationType::OperationTypeCount))
+    if (!(op > 0 && op < layers::OperationType::OperationTypeCount)
+        && !(op > layers::OperationType::OperationExperimentalStart && op < layers::OperationType::OperationExperimentalEnd+1)) // +1 to avoid warning
     {
       std::cerr << "[ERROR] Pb reading model: layer op " << op << std::endl;
       return false;
     }
-    SADL_DBG(std::cout << "[INFO] id: " << id << " op " << ' ' << layers::opName((layers::OperationType::Type) op)
-                       << std::endl);   // opName((layers::OperationType::Type)op)<<std::endl);
+    SADL_DBG(std::cout << "[INFO] id: " << id << " op " << ' ' << layers::opName((layers::OperationType::Type) op) << std::endl);
+    if (op > layers::OperationType::OperationExperimentalStart)
+    {
+      SADL_DBG(std::cout << "[WARN] experimental layer " << std::endl);
+    }
     m_data[k].layer = createLayer<T>(id, (layers::OperationType::Type) op);
     m_data[k].inputs.clear();
     if (!m_data[k].layer->load(file, m_version))
@@ -318,7 +338,7 @@ template<typename T> bool Model<T>::load(std::istream &file)
       m_data.clear();
       return false;
     }
-  }
+    }
 
   if (m_data.empty())
   {

@@ -106,11 +106,21 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
     dynamic_cast<sadl::layers::AveragePool<T> &>(layerQ).m_strides = dynamic_cast<const sadl::layers::AveragePool<float> &>(layer).m_strides;
     dynamic_cast<sadl::layers::AveragePool<T> &>(layerQ).m_pads    = dynamic_cast<const sadl::layers::AveragePool<float> &>(layer).m_pads;
     break;
+  
+  case sadl::layers::OperationType::ReduceMean:
+    dynamic_cast<sadl::layers::ReduceMean<T> &>(layerQ).axes     = dynamic_cast<const sadl::layers::ReduceMean<float> &>(layer).axes;
+    dynamic_cast<sadl::layers::ReduceMean<T> &>(layerQ).keepdims = dynamic_cast<const sadl::layers::ReduceMean<float> &>(layer).keepdims;
+    break;
+  case sadl::layers::OperationType::OperationExperimentalStart:
+    break;
+  case sadl::layers::OperationType::OperationExperimentalEnd:
+    break;
+
   case sadl::layers::OperationType::Sigmoid:
     break;
   case sadl::layers::OperationType::Softmax:
     dynamic_cast<sadl::layers::Softmax<T> &>(layerQ).m_axis = dynamic_cast<const sadl::layers::Softmax<float> &>(layer).m_axis;
-
+    break;
     // no default to get warning
   }
 

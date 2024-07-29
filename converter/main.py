@@ -129,8 +129,9 @@ class OPTYPE(IntEnum):
     Where = (26,)
     Minimum = (27,)
     AveragePool = (28,)
-    Sigmoid = (29,)
-    Softmax = (30,)
+    ReduceMean = (29,)
+    Sigmoid = (65536,)
+    Softmax = (65537,)
 
     # "BatchMatMulV2" did not exist in Tensorflow 1.9. It exists in
     # Tensorflow 1.15.
@@ -983,6 +984,24 @@ def parse_graph_node(
         map_onnx_to_myGraph[node.output[0]] = node.output[0] + "_NOT_IN_GRAPH"
 
     elif node.op_type == "Max":
+        for node_input in [n0name, n1name]:
+            if is_constant(node_input, model_onnx.graph.initializer):
+                additional = {}
+                additional["data"] = node
+                n2 = getNodesWithOutput(node_input, model_onnx)
+                additional["dims"], additional["raw_data"], additional[
+                    "dtype"
+                ] = extract_additional_data(
+                    node_input,
+                    node_annotation[n2.name].to_transpose,
+                    model_onnx.graph,
+                    verbose,
+                )
+                map_onnx_to_myGraph[node_input] = node_input
+                myGraph[node_input] = {}
+                myGraph[node_input]["inputs"] = []
+                myGraph[node_input]["additional"] = additional
+                myGraph[node_input]["op_type"] = OPTYPE.Const
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Maximum
         myGraph[node.output[0]]["inputs"] = [
@@ -994,6 +1013,24 @@ def parse_graph_node(
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
     elif node.op_type == "Min":
+        for node_input in [n0name, n1name]:
+            if is_constant(node_input, model_onnx.graph.initializer):
+                additional = {}
+                additional["data"] = node
+                n2 = getNodesWithOutput(node_input, model_onnx)
+                additional["dims"], additional["raw_data"], additional[
+                    "dtype"
+                ] = extract_additional_data(
+                    node_input,
+                    node_annotation[n2.name].to_transpose,
+                    model_onnx.graph,
+                    verbose,
+                )
+                map_onnx_to_myGraph[node_input] = node_input
+                myGraph[node_input] = {}
+                myGraph[node_input]["inputs"] = []
+                myGraph[node_input]["additional"] = additional
+                myGraph[node_input]["op_type"] = OPTYPE.Const
         myGraph[node.output[0]] = {}
         myGraph[node.output[0]]["op_type"] = OPTYPE.Minimum
         myGraph[node.output[0]]["inputs"] = [
@@ -1468,6 +1505,20 @@ def parse_graph_node(
         myGraph[node.output[0]]["additional"]["data"] = node
         # todo: check pads?
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
+        
+    elif node.op_type == "ReduceMean":
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.ReduceMean
+        myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]]
+        myGraph[node.output[0]]["additional"] = {}
+        a = getAttribute(node, "keepdims")
+        if a.i == 0:
+            quit("[ERROR] Currently, the value of keepdims in ReduceMean can not be set to 0.")
+        myGraph[node.output[0]]["additional"]["keepdims"] = a.i
+        a = getAttribute(node, "axes")
+        myGraph[node.output[0]]["additional"]["axes"] = a.ints
+        myGraph[node.output[0]]["additional"]["data"] = node
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
     elif node.op_type == 'Sigmoid':
         myGraph[node.output[0]] = {}
@@ -1475,7 +1526,7 @@ def parse_graph_node(
         myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]]
         myGraph[node.output[0]]["additional"] = {}
         myGraph[node.output[0]]["additional"]["data"] = node
-        map_onnx_to_myGraph[node.output[0]] = n0name
+        map_onnx_to_myGraph[node.output[0]] = node.output[0] 
 
     elif node.op_type == 'Softmax':
         inputs, additional = [], {}
@@ -1491,7 +1542,7 @@ def parse_graph_node(
         myGraph[node.output[0]]["inputs"] = inputs
         myGraph[node.output[0]]["additional"] = additional
         myGraph[node.output[0]]["op_type"] = OPTYPE.Softmax
-        map_onnx_to_myGraph[node.output[0]] = n0name
+        map_onnx_to_myGraph[node.output[0]] = node.output[0] 
 
     else:
         raise Exception("[ERROR] node not supported:\n{})".format(node))
@@ -1834,6 +1885,25 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
                         print(f"#\t\t {p}")
                     f.write(struct.pack("i", int(p)))
 
+            elif node["op_type"] == OPTYPE.ReduceMean:
+                if verbose:
+                    print("#\t  nb_dim_axes", len(node["additional"]["axes"]))
+                f.write(struct.pack("i", int(len(node["additional"]["axes"]))))
+
+                for axis in node["additional"]["axes"]:
+                    if verbose:
+                        print(f"#\t\t {axis}")
+                    f.write(struct.pack("i", int(axis)))
+
+                if verbose:
+                    print("#\t keepdims", node["additional"]["keepdims"])
+                f.write(struct.pack("?", bool(node["additional"]["keepdims"])))
+
+            elif node["op_type"] == OPTYPE.Softmax:
+                if verbose:
+                    print("#\t axis", node["additional"]["axis"])
+                f.write(struct.pack("i", int(node["additional"]["axis"])))
+ 
             if (
                 node["op_type"] == OPTYPE.Conv2D
                 or node["op_type"] == OPTYPE.Conv2DTranspose
@@ -2128,6 +2198,11 @@ def annotate_node(
         n2 = getInitializer(node.input[1], model_onnx)
         if global_data_layout == "nchw":
             node_annotation[n2.name].to_transpose = True
+            
+    elif node.op_type == "ReduceMean":
+        if global_data_layout == "nchw":
+            node_annotation[node.name].transpose_before_in0 = "nchw"
+            node_annotation[node.name].to_nhwc_after_out = True
 
     nexts = getNodesWithInput(node.output[0], model_onnx)
 
