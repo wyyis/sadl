@@ -73,15 +73,22 @@ template<typename T> bool Slice<T>::apply(std::vector<Tensor<T> *> &in)
   
   m_out.quantizer = A.quantizer;
 
-  for (int im_i = m_start_h; im_i < end_h; im_i++)
-  {
-    for (int im_j = m_start_w; im_j < end_w; im_j++)
+  if (m_out.dims().size() == 4) {
+    for (int im_i = m_start_h; im_i < end_h; im_i++)
     {
-      for (int im_d = m_start_c; im_d < end_c; im_d++)
+      for (int im_j = m_start_w; im_j < end_w; im_j++)
       {
-        m_out(im_nb, im_i - m_start_h, im_j - m_start_w, im_d - m_start_c) = A(im_nb, im_i, im_j, im_d);
+        for (int im_d = m_start_c; im_d < end_c; im_d++)
+        {
+          m_out(im_nb, im_i - m_start_h, im_j - m_start_w, im_d - m_start_c) = A(im_nb, im_i, im_j, im_d);
+        }
       }
     }
+  } else if (m_out.dims().size() == 2) {
+    for (int im_d = m_start_c; im_d < end_c; im_d++)
+      m_out(im_nb, im_d - m_start_c) = A(im_nb, im_d);
+  } else {
+    return false;
   }
   return true;
 }
@@ -94,7 +101,7 @@ template<typename T> bool Slice<T>::init(const std::vector<Tensor<T> *> &in)
   SADL_DBG(std::cout << " - input Slice " << in[0]->dims() << std::endl);
 
   Dimensions dim;
-  dim.resize(4);
+  dim.resize(in[0]->dims().size());
   dim[0] = in[0]->dims()[0];
 
   m_start_h = m_init[0];
@@ -105,27 +112,45 @@ template<typename T> bool Slice<T>::init(const std::vector<Tensor<T> *> &in)
   m_end_w = m_init[3];
   m_end_c = m_init[5];
   // ONNX is sending 2^31 - 1 as value if end index is last channel
-  if (m_end_h == pow2_31)
-  {
-    m_end_h = in[0]->dims()[1];
-  } else if ( m_end_h < 0) {
-    m_end_h = in[0]->dims()[1]+m_end_h;
+  if (dim.size() == 4) {
+    if (m_end_h == pow2_31)
+    {
+      m_end_h = in[0]->dims()[1];
+    } else if ( m_end_h < 0) {
+      m_end_h = in[0]->dims()[1]+m_end_h;
+    }
+    dim[1] = m_end_h - m_start_h;
+    if (m_end_w == pow2_31)
+    {
+      m_end_w = in[0]->dims()[2];
+    } else if ( m_end_w < 0 ) {
+      m_end_w = in[0]->dims()[2]+m_end_w;
+    }
+    dim[2] = m_end_w - m_start_w;
+    if (m_end_c == pow2_31)
+    {
+      m_end_c = in[0]->dims()[3];
+    } else if (m_end_c<0) {
+      m_end_c = in[0]->dims()[3]+m_end_c;
+    }
+    dim[3] = m_end_c - m_start_c;
+  } else if (dim.size() == 2) {
+    if (
+      m_start_h != 0 || m_end_h != pow2_31 ||
+      m_start_w != 0 || m_end_w != pow2_31
+    )
+      return false;
+
+    if (m_end_c == pow2_31)
+    {
+      m_end_c = in[0]->dims()[1];
+    } else if (m_end_c<0) {
+      m_end_c = in[0]->dims()[1]+m_end_c;
+    }
+    dim[1] = m_end_c - m_start_c;
+  } else {
+    return false;
   }
-  dim[1] = m_end_h - m_start_h;
-  if (m_end_w == pow2_31)
-  {
-    m_end_w = in[0]->dims()[2];
-  } else if ( m_end_w < 0 ) {
-    m_end_w = in[0]->dims()[2]+m_end_w;
-  }
-  dim[2] = m_end_w - m_start_w;
-  if (m_end_c == pow2_31)
-  {
-    m_end_c = in[0]->dims()[3];
-  } else if (m_end_c<0) {
-    m_end_c = in[0]->dims()[3]+m_end_c;
-  }
-  dim[3] = m_end_c - m_start_c;
 
   m_out.resize(dim);
   SADL_DBG(std::cout << "  - output Slice: " << m_out.dims() << std::endl);
