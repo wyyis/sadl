@@ -33,7 +33,7 @@ L="conv2d_4_8x8x4_k1x1s1,1_g1_p0,0 conv2d_4_8x8x4_k1x1s1,1_g4_p0,0 conv2d_4_8x8x
   compare_less compare_greater where_constA_less where_constA_greater where_constB_less where_constB_greater \
   maxpool_k2_s2 maxpool_k3_s3 global_maxpool conv3x1_1x3_s2_g4 clip reshape_1234 reshape_minusone mult_4dx4d \
   mult_reshape_by_transpose_reshape attention_block_fixed reshape_withshape attention_block_dyn avgpool conv_slice \
-  reduce_mean slice_2d hard_sigmoid"
+  reduce_mean slice_2d hard_sigmoid prelu2d"
 # mini_model_bb_mult 
 for F in $L; do
   ../utest.sh ../models/${F}.onnx;

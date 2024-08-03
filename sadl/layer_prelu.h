@@ -128,35 +128,68 @@ template<typename T> bool PReLU<T>::apply(std::vector<Tensor<T> *> &in)
 
 template<typename T> template<bool multialpha> bool PReLU<T>::apply_scalar(std::vector<Tensor<T> *> &in)   // without simd
 {
-  const int in_N{ in[0]->dims()[0] };
-  const int in_H{ in[0]->dims()[1] };
-  const int in_W{ in[0]->dims()[2] };
-  const int in_C{ in[0]->dims()[3] };
-
   const Tensor<T> &A = *in[1];
   swap(*in[0], m_out);
-  // keep same qunatiz as input
   const int alpha_q = A.quantizer;
   if (multialpha)
   {
-    for (int n_nb = 0; n_nb < in_N; n_nb++)
-    {
-      for (int c_nb = 0; c_nb < in_C; c_nb++)
-      {
-        // A.dims()[0] == 1, means all channels share the same alpha parameter
-        const typename ComputationType<T>::type alpha = (A.dims()[0] == 1) ? A(0, 0, 0) : A(c_nb, 0, 0);
-        for (int h_nb = 0; h_nb < in_H; h_nb++)
+    switch (in[0]->dims().size()) {
+      case 4: {
+        const int in_N{ in[0]->dims()[0] };
+        const int in_H{ in[0]->dims()[1] };
+        const int in_W{ in[0]->dims()[2] };
+        const int in_C{ in[0]->dims()[3] };
+
+        // keep same qunatiz as input
+        for (int n_nb = 0; n_nb < in_N; n_nb++)
         {
-          for (int w_nb = 0; w_nb < in_W; w_nb++)
+          for (int c_nb = 0; c_nb < in_C; c_nb++)
           {
-            if (m_out(n_nb, h_nb, w_nb, c_nb) < 0)
+            // A.dims()[0] == 1, means all channels share the same alpha parameter
+            const typename ComputationType<T>::type alpha = (A.dims()[0] == 1) ? A(0, 0, 0) : A(c_nb, 0, 0);
+            for (int h_nb = 0; h_nb < in_H; h_nb++)
             {
-              typename ComputationType<T>::type z = m_out(n_nb, h_nb, w_nb, c_nb) * alpha;
+              for (int w_nb = 0; w_nb < in_W; w_nb++)
+              {
+                if (m_out(n_nb, h_nb, w_nb, c_nb) < 0)
+                {
+                  typename ComputationType<T>::type z = m_out(n_nb, h_nb, w_nb, c_nb) * alpha;
+                  ComputationType<T>::quantize(z, alpha_q);
+                  COUNTERS(z);
+                  COUNTERS_MAC(z);
+                  SATURATE(z);
+                  m_out(n_nb, h_nb, w_nb, c_nb) = static_cast<T>(z);
+                }
+                else
+                {
+                  COUNTERS_MAC_NOP(1);
+                }
+              }
+            }
+          }
+        }
+        break;
+      }
+      case 2: {
+        const int in_N{ in[0]->dims()[0] };
+        const int in_C{ in[0]->dims()[1] };
+        
+        // keep same qunatiz as input
+        const int alpha_q = A.quantizer;
+        for (int n_nb = 0; n_nb < in_N; n_nb++)
+        {
+          for (int c_nb = 0; c_nb < in_C; c_nb++)
+          {
+            // A.dims()[0] == 1, means all channels share the same alpha parameter
+            const typename ComputationType<T>::type alpha = A(A.dims()[0] == 1 ? 0 : c_nb);
+            if (m_out(n_nb, c_nb) < 0)
+            {
+              typename ComputationType<T>::type z = m_out(n_nb, c_nb) * alpha;
               ComputationType<T>::quantize(z, alpha_q);
               COUNTERS(z);
               COUNTERS_MAC(z);
               SATURATE(z);
-              m_out(n_nb, h_nb, w_nb, c_nb) = static_cast<T>(z);
+              m_out(n_nb, c_nb) = static_cast<T>(z);
             }
             else
             {
@@ -164,7 +197,10 @@ template<typename T> template<bool multialpha> bool PReLU<T>::apply_scalar(std::
             }
           }
         }
+        break;
       }
+      default:
+        return false;
     }
   }
   else
@@ -389,6 +425,8 @@ template<typename T> template<bool multialpha> bool PReLU<T>::apply_simd512(std:
 template<typename T> bool PReLU<T>::init(const std::vector<Tensor<T> *> &in)
 {
   if (in.size() != 2)
+    return false;
+  if (in[0]->dims().size()!=2 && in[0]->dims().size()!=4)
     return false;
   m_out.resize(in[0]->dims());
   m_initDone = true;
