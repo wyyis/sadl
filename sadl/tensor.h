@@ -168,7 +168,6 @@ public:
   value_type &      operator()(int i, int j, int k, int l);
   value_type        operator()(int i, int j, int k, int l) const;
   const value_type *addr(int i, int j, int k, int l) const;
-
   bool in(int i) const;
   bool in(int i, int j) const;
   bool in(int i, int j, int k) const;
