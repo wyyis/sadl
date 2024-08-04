@@ -548,27 +548,40 @@ template<typename T> template<int in_D, int ihalf_size, int jhalf_size> void Con
   {
     for (int im_j = start_w + left; im_j < in_W - jhalf_size; im_j += s_w)
     {
-      for (int filter = 0; filter < nb_filters; ++filter)
-      { // fixed
-        typename ComputationType<T>::type x = 0;
+      typename ComputationType<T>::type x[in_D] = {};
 
-        for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
+      for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
+      {   // fixed
+        int ii = im_i + filter_i;
+        int ki = ihalf_size + filter_i;
+        for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
         {   // fixed
-          for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
-          {   // fixed
-            int ii = im_i + filter_i;
-            int jj = im_j + filter_j;
-            int ki = ihalf_size + filter_i;
-            int kj = jhalf_size + filter_j;
-            x += (typename ComputationType<T>::type) A(im_nb, ii, jj, filter) * kernel(ki, kj, filter, 0);
+          int jj = im_j + filter_j;
+          int kj = jhalf_size + filter_j;
+#if __AVX2__ // optimized code with inversed loop and unchecked access
+          const auto a = A.addr(im_nb, ii, jj, 0);
+          const auto k = kernel.addr(ki, kj, 0, 0);
+          for (int filter = 0; filter < nb_filters; ++filter)
+          { // fixed
+            x[filter] += a[filter] * k[filter];
             COUNTERS_MAC(kernel(ki, kj, filter, 0));
           }
+#else
+          for (int filter = 0; filter < in_D; ++filter)
+          { // fixed
+            x[filter] += A(im_nb, ii, jj, filter) * kernel(ki, kj, filter, 0);
+            COUNTERS_MAC(kernel(ki, kj, filter, 0));
+          }
+#endif
         }
+      }
 
-        ComputationType<T>::quantize(x, shift);
-        COUNTERS(x);
-        SATURATE(x);
-        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(x);
+      for (int filter = 0; filter < nb_filters; ++filter)
+      {
+        ComputationType<T>::quantize(x[filter], shift);
+        COUNTERS(x[filter]);
+        SATURATE(x[filter]);
+        m_out(im_nb, im_i / s_h, im_j / s_w,filter) = static_cast<T>(x[filter]);
       }
     }
   }
