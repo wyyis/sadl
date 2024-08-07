@@ -46,7 +46,7 @@ for F in $LEXP; do
   ../utest.sh ../models/${F}.onnx --no_transpose;
 done
 
-LEXP="sigmoid softmax_axis0 softmax_axis1 softmax_axis2 softmax_axis3";
+LEXP="sigmoid softmax_axis0 softmax_axis1 softmax_axis2 softmax_axis3 batchnorm";
 for F in $LEXP; do
   ../utest.sh ../models/${F}.onnx;
 done

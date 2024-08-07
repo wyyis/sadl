@@ -65,6 +65,7 @@
 
 #include "layer_sigmoid.h"
 #include "layer_softmax.h"
+#include "layer_batchnorm.h"
 
 namespace sadl
 {
@@ -112,6 +113,7 @@ inline std::string opName(const OperationType::Type op)
 
     DIRTYCASEPRINT(Sigmoid);
     DIRTYCASEPRINT(Softmax);
+    DIRTYCASEPRINT(BatchNorm);
   default:
     oss << "??";
     break;

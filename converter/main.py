@@ -132,6 +132,7 @@ class OPTYPE(IntEnum):
     ReduceMean = (29,)
     Sigmoid = (65536,)
     Softmax = (65537,)
+    BatchNorm = (65538,)
 
     # "BatchMatMulV2" did not exist in Tensorflow 1.9. It exists in
     # Tensorflow 1.15.
@@ -1544,6 +1545,83 @@ def parse_graph_node(
         myGraph[node.output[0]]["op_type"] = OPTYPE.Softmax
         map_onnx_to_myGraph[node.output[0]] = node.output[0] 
 
+    elif node.op_type == "BatchNormalization":
+        node.input.append(node.output[0]+"_epsilon")
+        if is_constant(n1name, model_onnx.graph.initializer):
+            additional = {}
+            additional["data"] = node
+            n2 = getNodesWithOutput(n1name, model_onnx)
+            additional["dims"], additional["raw_data"], additional[
+                "dtype"
+            ] = extract_additional_data(n1name, node_annotation[n2.name].to_transpose, model_onnx.graph, verbose)
+            myGraph[n1name] = {}
+            myGraph[n1name]["op_type"] = OPTYPE.Const
+            myGraph[n1name]["inputs"] = []
+            myGraph[n1name]["additional"] = additional
+            map_onnx_to_myGraph[n1name] = n1name
+        if is_constant(node.input[2], model_onnx.graph.initializer):
+            additional = {}
+            additional["data"] = node
+            n2 = getNodesWithOutput(node.input[2], model_onnx)
+            additional["dims"], additional["raw_data"], additional[
+                "dtype"
+            ] = extract_additional_data(node.input[2], node_annotation[n2.name].to_transpose, model_onnx.graph, verbose)
+            myGraph[node.input[2]] = {}
+            myGraph[node.input[2]]["op_type"] = OPTYPE.Const
+            myGraph[node.input[2]]["inputs"] = []
+            myGraph[node.input[2]]["additional"] = additional
+            map_onnx_to_myGraph[node.input[2]] = node.input[2]
+        if is_constant(node.input[3], model_onnx.graph.initializer):
+            additional = {}
+            additional["data"] = node
+            n2 = getNodesWithOutput(node.input[3], model_onnx)
+            additional["dims"], additional["raw_data"], additional[
+                "dtype"
+            ] = extract_additional_data(node.input[3], node_annotation[n2.name].to_transpose, model_onnx.graph, verbose)
+            myGraph[node.input[3]] = {}
+            myGraph[node.input[3]]["op_type"] = OPTYPE.Const
+            myGraph[node.input[3]]["inputs"] = []
+            myGraph[node.input[3]]["additional"] = additional
+            map_onnx_to_myGraph[node.input[3]] = node.input[3]
+        if is_constant(node.input[4], model_onnx.graph.initializer):
+            additional = {}
+            additional["data"] = node
+            n2 = getNodesWithOutput(node.input[4], model_onnx)
+            additional["dims"], additional["raw_data"], additional[
+                "dtype"
+            ] = extract_additional_data(node.input[4], node_annotation[n2.name].to_transpose, model_onnx.graph, verbose)
+            myGraph[node.input[4]] = {}
+            myGraph[node.input[4]]["op_type"] = OPTYPE.Const
+            myGraph[node.input[4]]["inputs"] = []
+            myGraph[node.input[4]]["additional"] = additional
+            map_onnx_to_myGraph[node.input[4]] = node.input[4]
+
+        additional = {}
+        additional["data"] = node
+        a = getAttribute(node, "epsilon")
+        additional["dims"], additional["raw_data"], additional["dtype"] = [
+            1], struct.pack('f', a.f), a.type
+        myGraph[node.output[0]+"_epsilon"] = {}
+        myGraph[node.output[0]+"_epsilon"]["op_type"] = OPTYPE.Const
+        myGraph[node.output[0]+"_epsilon"]["inputs"] = []
+        myGraph[node.output[0]+"_epsilon"]["additional"] = additional
+        map_onnx_to_myGraph[node.output[0] +
+                            "_epsilon"] = node.output[0]+"_epsilon"
+
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.BatchNorm
+        myGraph[node.output[0]]["inputs"] = [
+            map_onnx_to_myGraph[n0name],
+            map_onnx_to_myGraph[n1name],
+            map_onnx_to_myGraph[node.input[2]],
+            map_onnx_to_myGraph[node.input[3]],
+            map_onnx_to_myGraph[node.input[4]],
+            map_onnx_to_myGraph[node.output[0]+"_epsilon"]
+        ]
+        myGraph[node.output[0]]["additional"] = {}
+        myGraph[node.output[0]]["additional"]["data"] = node
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+
     else:
         raise Exception("[ERROR] node not supported:\n{})".format(node))
 
@@ -1856,6 +1934,11 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
                 if verbose:
                     print("#\t mode", node["additional"]["mode"])
                 f.write(struct.pack("i", int(node["additional"]["mode"])))
+
+            elif node["op_type"] == OPTYPE.Softmax:
+                if verbose:
+                    print("#\t axis", node["additional"]["axis"])
+                f.write(struct.pack("i", int(node["additional"]["axis"])))
 
             elif node["op_type"] == OPTYPE.AveragePool:
                 if verbose:
