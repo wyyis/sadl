@@ -81,7 +81,8 @@ struct OperationType
     OperationExperimentalStart = 65535,
     Sigmoid            = 65536,
     Softmax            = 65537,
-    OperationExperimentalEnd = 65538 // 
+    BatchNorm          = 65538,
+    OperationExperimentalEnd = 65539 // 
   };
 };
 

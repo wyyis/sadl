@@ -120,6 +120,7 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
     break;
   case sadl::layers::OperationType::Softmax:
     dynamic_cast<sadl::layers::Softmax<T> &>(layerQ).m_axis = dynamic_cast<const sadl::layers::Softmax<float> &>(layer).m_axis;
+  case sadl::layers::OperationType::BatchNorm:
     break;
     // no default to get warning
   }

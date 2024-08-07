@@ -208,6 +208,8 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
     break;
   case layers::OperationType::Softmax:
     return std::unique_ptr<layers::Layer<T>>(new layers::Softmax<T>{ id, op });
+  case layers::OperationType::BatchNorm:
+    return std::unique_ptr<layers::Layer<T>>(new layers::BatchNorm<T>{ id, op });
     break;
 
   case layers::OperationType::OperationExperimentalEnd:
