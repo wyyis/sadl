@@ -69,7 +69,9 @@ protected:
   template<int n> void multiply_add_n_points(const T* input, const T coeff, typename ComputationType<T>::type* sum);
   void simd_multiply_add_16_points(const T* input, const T coeff, typename ComputationType<T>::type* sum);
 
+
   template<int s_h, int s_w> void conv2d_5x5_s(const Tensor<T> &A, const Tensor<T> &kernel);
+  template<int s_h, int s_w> void conv2d_2x2_s(const Tensor<T> &A, const Tensor<T> &kernel);
 
   // 1x1
   template<int s_h, int s_w> void conv2d_1x1_s_dispatch(const Tensor<T> &A, const Tensor<T> &kernel);
@@ -191,6 +193,9 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
   int       in_W{ A.dims()[2] };
   const int half_size_h{ kernel.dims()[0] / 2 };
   const int half_size_w{ kernel.dims()[1] / 2 };
+  const int k_size_h{ kernel.dims()[0] };
+  const int k_size_w{ kernel.dims()[1] };
+
   const int top{ m_pads[0] };
   const int left{ m_pads[1] };
   int       start_h{ half_size_h - top };
@@ -204,6 +209,11 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
     {
       conv2d_1x1_s_dispatch<s_h, s_w>(A, kernel);
     }
+    else if (k_size_h == 2 && k_size_w == 2)   // 1x1
+    {
+      conv2d_2x2_s<s_h, s_w>(A, kernel);
+    }
+
     else if (half_size_h == 1 && half_size_w == 1)   // 3x3
     {
       if (!Tensor<T>::skip_border)
@@ -290,8 +300,8 @@ template<typename T> bool Conv2D<T>::init(const std::vector<Tensor<T> *> &in)
     return false;
   if (in[1]->dims().size() != 4)
     return false;
-  if ((in[1]->dims()[0]) % 2 == 0)   // even kernel
-    return false;
+  //if ((in[1]->dims()[0]) % 2 == 0)   // even kernel
+  //  return false;
   if (in[0]->dims()[0] != 1)
     return false;
   if (in[0]->dims()[0] != 1)
@@ -606,9 +616,11 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::conv2d_core(cons
   return true;
 }
 
+
 }   // namespace layers
 }   // namespace sadl
 #include "layer_conv2d_1x1.h"
 #include "layer_conv2d_3x3.h"
 #include "layer_conv2d_5x5.h"
 #include "layer_conv2d_ixj.h"
+#include "layer_conv2d_2x2.h"

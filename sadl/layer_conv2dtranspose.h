@@ -60,6 +60,7 @@ protected:
   int          m_q = 0;
   // should never be used
   void conv2dtranspose(int nb_filters, int in_D, const Tensor<T> &A, const Tensor<T> &kernel);
+  void conv2dtranspose_2x2(int nb_filters, int in_D, const Tensor<T> &A, const Tensor<T> &kernel);
 #if __AVX2__
   template<int in_D> void conv2dtranspose_simd256(int nb_filters, const Tensor<T> &A, const Tensor<T> &kernel);
 #endif
@@ -96,6 +97,11 @@ template<typename T> bool Conv2DTranspose<T>::apply(std::vector<Tensor<T> *> &in
   // const int left{ m_pads[1] };
   // int       start_h{ half_size - top };
   // int       start_w{ half_size - left };
+  if (in[1]->dims()[0] ==2)
+  {
+    conv2dtranspose_2x2(nb_filters, in_D, A, kernel);
+    return true;
+  }
 
 #if __AVX512F__
   switch (in_D)
@@ -159,11 +165,11 @@ template<typename T> bool Conv2DTranspose<T>::init(const std::vector<Tensor<T> *
   if (in[1]->dims()[0] != in[1]->dims()[1])
     return false;
 
-  // The spatial dimensions of a convolutional kernel must be 3, 4 or 5
-  if ((in[1]->dims()[0] != 3) && (in[1]->dims()[0] != 4) && (in[1]->dims()[0] != 5))
+  // The spatial dimensions of a convolutional kernel must be 2, 3, 4 or 5
+  if ((in[1]->dims()[0] != 2) && (in[1]->dims()[0] != 3) && (in[1]->dims()[0] != 4) && (in[1]->dims()[0] != 5))
     return false;
 
-  if (!((in[1]->dims()[0] == 3 && m_pads[1] == 1 && m_out_pads[1] == 1) || (in[1]->dims()[0] == 4 && m_pads[1] == 1 && m_out_pads[1] == 0)
+  if (!((in[1]->dims()[0] == 2 && m_pads[1] == 0 && m_out_pads[1] == 0) ||(in[1]->dims()[0] == 3 && m_pads[1] == 1 && m_out_pads[1] == 1) || (in[1]->dims()[0] == 4 && m_pads[1] == 1 && m_out_pads[1] == 0)
         || (in[1]->dims()[0] == 5 && m_pads[1] == 2 && m_out_pads[1] == 1)))
   {
     return false;
@@ -178,6 +184,11 @@ template<typename T> bool Conv2DTranspose<T>::init(const std::vector<Tensor<T> *
   SADL_DBG(std::cout << "  - output Conv2DTranspose: " << m_out.dims() << std::endl);
   // init tempo
   int half_size = (in[1]->dims()[0] - 1) / 2;
+  if (in[1]->dims()[0] == 2)
+  {
+      half_size = (in[1]->dims()[0]) / 2;
+  }
+
   dim[1] += half_size * 2;
   dim[2] += half_size * 2;
   m_tempo.resize(dim);
@@ -237,7 +248,7 @@ template<typename T> bool Conv2DTranspose<T>::loadInternal(std::istream &file, V
   {
     file.read((char *) &x, sizeof(x));
     m_pads[k] = x;
-    if (x != 1 && x != 2)
+    if (x != 0 && x != 1 && x != 2)
     {
       std::cerr << "[ERROR] pads values not supported: " << x << std::endl;
       return false;
@@ -341,6 +352,70 @@ template<typename T> void Conv2DTranspose<T>::conv2dtranspose(int nb_filters, in
     }
   }
 }
+
+// should never be used for perf reasons
+template<typename T> void Conv2DTranspose<T>::conv2dtranspose_2x2(int nb_filters, int in_D, const Tensor<T> &A, const Tensor<T> &kernel)
+{
+#if DEBUG_SIMD && __AVX2__
+  const int in_H{ A.dims()[1] };
+  const int in_W{ A.dims()[2] };
+  std::cout << "\n[WARN] debug generic version convtranspose inD=" << in_D << " outD=" << nb_filters <<
+    //" s=[" << s_w << ' ' << s_h << "] "
+    in_H << 'x' << in_W << " " <<
+    // << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H /) * (in_W / s_w) / 1000 << " kMAC"
+    std::endl;
+#endif
+
+  constexpr int im_nb = 0;
+  assert(m_strides[1] == 2);
+  assert(m_strides[2] == 2);
+  constexpr int sw        = 2;
+  constexpr int sh        = 2;
+
+  const int shift = kernel.quantizer + m_q;
+  const int out_h = m_out.dims()[1];
+  const int out_w = m_out.dims()[2];
+  m_tempo.fill(T2{});
+
+  int i,j;
+  for (int filter = 0; filter < nb_filters; ++filter)
+  {i=0;
+    for (int im_i = 0; im_i < out_h; im_i += 1)
+    {
+      j=0;
+      for (int im_j = 0; im_j < out_w; im_j += 1)
+      {
+        const int i1 = im_i / sh;
+        const int j1 = im_j / sw;
+        assert(A.in(im_nb, i1, j1, 0));
+        T2        s{};
+        for (int filter_d = 0; filter_d < in_D; ++filter_d)
+        {
+          s += A(im_nb, i1, j1, filter_d) * kernel(i, j, filter, filter_d);
+          COUNTERS_MAC(kernel(i, j, filter, filter_d));
+        }
+        m_tempo(im_nb, im_i, im_j, filter)= s;
+        j++;
+        if (j>1) j=0;
+      }
+      i++;
+      if (i>1) i=0;
+    }
+    for (int im_i = 0; im_i < out_h; ++im_i)
+    {
+      for (int im_j = 0; im_j < out_w; ++im_j)
+      {
+        auto x = m_tempo(im_nb, im_i, im_j, filter);
+        ComputationType<T>::quantize(x, shift);
+        COUNTERS(x);
+        SATURATE(x);
+        m_out(im_nb, im_i, im_j, filter) = static_cast<T>(x);
+      }
+    }
+  }
+}
+
+
 
 #if __AVX2__
 template<> 
