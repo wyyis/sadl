@@ -30,12 +30,10 @@ template<typename T> bool sadl::layers::Conv2DTranspose<T>::dump(std::ostream &f
 
 template<typename T> bool sadl::layers::Slice<T>::dump(std::ostream &file)
 {
-  file.write((const char *) &m_start_h, sizeof(m_start_h));
-  file.write((const char *) &m_end_h, sizeof(m_end_h));
-  file.write((const char *) &m_start_w, sizeof(m_start_w));
-  file.write((const char *) &m_end_w, sizeof(m_end_w));
-  file.write((const char *) &m_start_c, sizeof(m_start_c));
-  file.write((const char *) &m_end_c, sizeof(m_end_c));
+  for (auto init: m_init)
+  {
+    file.write((const char *) &init, sizeof(init));
+  }
   return true;
 }
 
