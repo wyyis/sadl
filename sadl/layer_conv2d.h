@@ -153,6 +153,9 @@ template<typename T> bool Conv2D<T>::apply(std::vector<Tensor<T> *> &in)
   m_out.quantizer          = A.quantizer - m_q;
   m_out.border_skip        = A.border_skip;
 
+#if DEBUG_MODEL_ANALYZE
+  std::cout << "\n[ANALYZE] conv (in/out):\t"<<A.dims()[3]<<'\t'<<kernel.dims()[2]<<std::endl;
+#endif
   assert(m_out.quantizer >= 0);
   assert(kernel.quantizer + m_q >= 0);
 #define DEBUG_CONV2D 0

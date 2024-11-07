@@ -79,6 +79,9 @@ template<typename T> bool Mul<T>::apply(std::vector<Tensor<T> *> &in)
   assert(in[1]->quantizer + m_q >= 0);
 
   const int last = in[0]->dims().back();
+  #if DEBUG_MODEL_ANALYZE
+  std::cout << "\n[ANALYZE] mult (in/out):\t"<<last<<std::endl;
+#endif
   if (last % 16 == 0)
   {
     constexpr int NN = 16;

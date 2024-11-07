@@ -119,6 +119,9 @@ template<typename T> bool MatMul<T>::apply(std::vector<Tensor<T> *> &in)
       return SPARSE_MATMULT(in);
     else
 #endif
+#if DEBUG_MODEL_ANALYZE
+      std::cout << "[ANALYZE] matmult (in):\t"<<H<<std::endl;
+#endif
       if (H % 16 == 0)
       return MULT16_DIM2(in);
     else if (H % 8 == 0)

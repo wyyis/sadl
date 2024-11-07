@@ -63,6 +63,9 @@ template<typename T> bool PReLU<T>::apply(std::vector<Tensor<T> *> &in)
 {
   assert(in.size() == 2);
   assert(in[0]->dims() == m_out.dims());
+#if DEBUG_MODEL_ANALYZE
+  std::cout << "\n[ANALYZE] prelu (in):\t" << m_out.size() << std::endl;
+#endif
 #if __AVX512F__
   if (std::is_same<T, float>::value && in[0]->size() % 16 == 0)
   {
