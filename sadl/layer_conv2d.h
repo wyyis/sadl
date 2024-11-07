@@ -137,6 +137,11 @@ protected:
     simd16_conv2d_ixj_s11_g1_d_core<in_D,ihalf_size,jhalf_size>(A,kernel);
   }
 #endif
+  static constexpr int bufSize = 256 + 8 * 2;
+  static constexpr int vectorSize = 16; // has to be 16 for the current SIMD optimization
+  static constexpr int dSize = 7;
+  T input_tempo[dSize][bufSize][bufSize + vectorSize]; 
+
   DUMP_MODEL_EXT;
 };
 
@@ -537,9 +542,6 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::conv2d_core(cons
   assert(start_h + s_h - ihalf_size >= 0);
   assert(start_w + s_w - jhalf_size >= 0);
   
-  constexpr int bufSize = 256 + 8 * 2;
-  constexpr int vectorSize = 16; // has to be 16 for the current SIMD optimization
-  constexpr int dSize = 7;
   const int maxD = in_D / m_groups;
 
   if (maxD > dSize || in_H > bufSize || in_W > bufSize
@@ -550,7 +552,6 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::conv2d_core(cons
   }
 
   // for the case the block width is not vector(simd)-size aligned
-  T input[dSize][bufSize][bufSize + vectorSize]; 
   for (int filter = 0; filter < nb_filters; ++filter)
   {
     int offset = (filter / cout_by_g) * cin_by_g;
@@ -561,7 +562,7 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::conv2d_core(cons
       {
         for (int im_j = start_w; im_j < in_W; ++im_j)
         {
-          input[filter_d][im_i][im_j] = A(im_nb, im_i, im_j, offset + filter_d);
+          input_tempo[filter_d][im_i][im_j] = A(im_nb, im_i, im_j, offset + filter_d);
         }
       }
     }
@@ -587,12 +588,12 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::conv2d_core(cons
 #if __AVX2__ 
               if constexpr (std::is_same_v<T, int16_t> && vectorSize == 16)
               {
-                simd_multiply_add_16_points(&input[filter_d][ii][im_jv + filter_j], kernel(ki, kj, filter, filter_d), &x[0]);
+                simd_multiply_add_16_points(&input_tempo[filter_d][ii][im_jv + filter_j], kernel(ki, kj, filter, filter_d), &x[0]);
               }
               else
 #endif
               {
-                multiply_add_n_points<vectorSize>(&input[filter_d][ii][im_jv + filter_j], kernel(ki, kj, filter, filter_d), &x[0]);
+                multiply_add_n_points<vectorSize>(&input_tempo[filter_d][ii][im_jv + filter_j], kernel(ki, kj, filter, filter_d), &x[0]);
               }
               for (int im_j = im_jv; im_j < max_j; im_j += s_w)
               {
