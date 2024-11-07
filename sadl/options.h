@@ -59,6 +59,8 @@ static constexpr float kSparsifySizeThreshold = 1000.0f;
 // #define DEBUG_SIMD          1 // tell about non simd version
 // #define DEBUG_KEEP_OUTPUT   1 // keep a copy of the output tensor
 // #define DEBUG_OVERFLOW      1 // set all accumulator to int16 to detect overflow in accumulator as well
+// #define DEBUG_MODEL_ANALYZE 1 // output layers info for hw friendly aspects
+
 #if SATURATE_RESULT
 #define SATURATE(X)                                                                                                                                            \
   if (!std::is_same<T, float>::value)                                                                                                                          \

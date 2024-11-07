@@ -35,6 +35,7 @@
 #define DEBUG_MODEL 1    // show pb with model
 #define DEBUG_PRINT 1    // print model info
 #define DEBUG_SIMD 1     // tell about non simd version
+#define DEBUG_MODEL_ANALYZE 1 
 
 #include <sadl/model.h>
 #include <cmath>
