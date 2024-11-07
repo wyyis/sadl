@@ -534,6 +534,13 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::conv2d_core(cons
             << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << "?? kMAC" << std::endl;
 #endif
+  
+  // TODO: SIMD version for kernel size larger than 3
+  if (ihalf_size > 1 || jhalf_size > 1)
+  {
+    return false;
+  }
+
   assert(start_h + s_h - ihalf_size >= 0);
   assert(start_w + s_w - jhalf_size >= 0);
   

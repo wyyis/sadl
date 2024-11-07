@@ -100,18 +100,19 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
           loop_with_cond(-start_h, ihalf_size, -start_w, jhalf_size);
         }
         im_i = ((in_H - ihalf_size - start_h) / s_h) * s_h + start_h;
-        if (im_i > 0 && im_i < in_H && im_i != start_h)
-        {   // bottom left corner
-          const int end_i = (im_i + 1 < in_H) ? 1 : 0;
+        while (im_i > 0 && im_i < in_H && im_i != start_h)
+        {   // bottom left corners
+          const int end_i = in_H - im_i - 1;
           loop_with_cond(-ihalf_size, end_i, -start_w, jhalf_size);
+          im_i += 1;
         }
       }
 
       im_j            = ((in_W - jhalf_size - start_w) / s_w) * s_w + start_w;
-      const int end_j = (im_j + 1 < in_W) ? 1 : 0;
-      if (im_j > 0 && im_j < in_W && im_j != start_w)
-      {   // rihgt side
-        im_i = start_h;
+      while (im_j > 0 && im_j < in_W && im_j != start_w)
+      {// right side
+          const int end_j = in_W - im_j - 1;
+          im_i = start_h;
         if (im_i < in_H)
         {   // top right corner
           loop_with_cond(-start_h, ihalf_size, -jhalf_size, end_j);
@@ -123,6 +124,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
           const int end_i = (im_i + 1 < in_H) ? 1 : 0;
           loop_with_cond(-ihalf_size, end_i, -jhalf_size, end_j);
         }
+        im_j += 1;
       }
     }
 
@@ -144,8 +146,11 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
                 int jj = im_j + filter_j;
                 int ki = ihalf_size + filter_i;
                 int kj = jhalf_size + filter_j;
-                x += (typename ComputationType<T>::type) A(im_nb, ii, jj, offset + filter_d) * kernel(ki, kj, filter_nb, filter_d);
-                COUNTERS_MAC(kernel(ki, kj, filter_nb, filter_d));
+                if (A.in(im_nb, ii, jj, offset + filter_d))
+                {
+                  x += (typename ComputationType<T>::type) A(im_nb, ii, jj, offset + filter_d) * kernel(ki, kj, filter_nb, filter_d);
+                  COUNTERS_MAC(kernel(ki, kj, filter_nb, filter_d));
+                }
               }
             }
           }
@@ -157,10 +162,10 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
         }
 
         im_j = ((in_W - jhalf_size - start_w) / s_w) * s_w + start_w;
-        if (im_j > 0 && im_j < in_W && im_j != start_w)
-        {   // rihgt side
+        while (im_j > 0 && im_j < in_W && im_j != start_w)
+        {   // right side
           typename ComputationType<T>::type x          = 0;
-          const int                         end_filter = (im_j + 1) < in_W ? 1 : 0;
+          const int                         end_filter = in_W - im_j - 1;
           for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
           {
             for (int filter_j = -jhalf_size; filter_j <= end_filter; ++filter_j)
@@ -181,6 +186,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
           SATURATE(x);
           COUNTERS_MAC_NOP(in_D / m_groups*(kernel.dims()[0]*kernel.dims()[1]-(ihalf_size+ihalf_size+1)*(jhalf_size+end_filter+1)));
           m_out(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
+          im_j += 1;
         }
       }
     }
@@ -202,8 +208,11 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
                 int jj = im_j + filter_j;
                 int ki = ihalf_size + filter_i;
                 int kj = jhalf_size + filter_j;
-                x += (typename ComputationType<T>::type) A(im_nb, ii, jj, offset + filter_d) * kernel(ki, kj, filter_nb, filter_d);
-                COUNTERS_MAC(kernel(ki, kj, filter_nb, filter_d));
+                if (A.in(im_nb, ii, jj, offset + filter_d))
+                {
+                  x += (typename ComputationType<T>::type) A(im_nb, ii, jj, offset + filter_d) * kernel(ki, kj, filter_nb, filter_d);
+                  COUNTERS_MAC(kernel(ki, kj, filter_nb, filter_d));
+                }
               }
             }
           }
@@ -215,10 +224,10 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
           m_out(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
         }
         im_i = ((in_H - ihalf_size - start_h) / s_h) * s_h + start_h;
-        if (im_i > 0 && im_i < in_H && im_i != start_h)
+        while (im_i > 0 && im_i < in_H && im_i != start_h)
         {   // bottom line
           typename ComputationType<T>::type x          = 0;
-          const int                         end_filter = (im_i + 1) < in_H ? 1 : 0;
+          const int                         end_filter = in_H - im_i - 1;
           for (int filter_i = -ihalf_size; filter_i <= end_filter; ++filter_i)
           {
             for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
@@ -239,6 +248,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
           SATURATE(x);
           COUNTERS_MAC_NOP(in_D / m_groups*(kernel.dims()[0]*kernel.dims()[1]-(ihalf_size+end_filter+1)*(jhalf_size+jhalf_size+1)));
           m_out(im_nb, im_i / s_h, im_j / s_w, filter_nb) = static_cast<T>(x);
+          im_i += 1;
         }
       }
     }
@@ -270,8 +280,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
             << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << "?? kMAC" << std::endl;
 #endif
-  assert(start_h + s_h - ihalf_size >= 0);
-  assert(start_w + s_w - jhalf_size >= 0);
+
   for (int im_i = start_h + s_h; im_i < in_H - ihalf_size; im_i += s_h)
   {
     for (int im_j = start_w + s_w; im_j < in_W - jhalf_size; im_j += s_w)
@@ -290,8 +299,11 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
               int jj = im_j + filter_j;
               int ki = ihalf_size + filter_i;
               int kj = jhalf_size + filter_j;
-              x += (typename ComputationType<T>::type) A(im_nb, ii, jj, offset + filter_d) * kernel(ki, kj, filter, filter_d);
-              COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
+              if (A.in(im_nb, ii, jj, offset + filter_d))
+              {
+                x += (typename ComputationType<T>::type) A(im_nb, ii, jj, offset + filter_d) * kernel(ki, kj, filter, filter_d);
+                COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
+              }
             }
           }
         }
