@@ -96,6 +96,7 @@ enum class Version
   sadl02  = 2,
   sadl03  = 3,
   sadl04  = 4,
-  sadl05  = 5, // please update dumper.h accordingly
+  sadl05  = 5, // please update sadl::Model<T>::dump and copy, converter
+  sadl_new = 5
 };
 }

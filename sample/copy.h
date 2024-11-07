@@ -129,11 +129,12 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
 
 template<typename T> bool copy(const sadl::Model<float> &model, sadl::Model<T> &modelQ)
 {
-  modelQ.m_version = sadl::Version::sadl03;
+  modelQ.m_version = sadl::Version::sadl_new;
   modelQ.m_data.clear();
   modelQ.m_data.resize(model.m_data.size());
   modelQ.m_ids_input  = model.m_ids_input;
   modelQ.m_ids_output = model.m_ids_output;
+  modelQ.m_info = model.m_info;
   int nb_layers       = (int) modelQ.m_data.size();
   for (int k = 0; k < nb_layers; ++k)
   {
