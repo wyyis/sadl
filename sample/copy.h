@@ -9,6 +9,14 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
   // from loadPrefix
   layerQ.m_name      = layer.m_name;
   layerQ.m_inputs_id = layer.m_inputs_id;
+#if SPARSE_SUPPORT
+  if (layer.m_out.isSparse())
+  {
+    cerr << "[ERROR] input layer " << layer.m_id << ": " << layer.m_name << 
+      " has been sparsified. The model should be quantized before being pre-processed " << endl;
+    exit(-1);
+  }
+#endif
   // WARNING: SHOULD BE SYNC BY HAND WITH NEW LAYERS
   // IF LOADINTERNAL IMPLEMENTED FOR A LAYER
   switch (layerQ.op())

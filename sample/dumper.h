@@ -108,6 +108,21 @@ template<typename T> bool sadl::layers::Const<T>::dump(std::ostream &file)
   int32_t x = m_out.dims().size();
   file.write((const char *) &x, sizeof(x));
   file.write((const char *) m_out.dims().begin(), x * sizeof(int));
+#if SPARSE_SUPPORT
+  uint8_t s = m_out.isSparse() ? 1 : 0;
+#else
+  uint8_t s = 0;
+#endif
+  file.write((const char *) &s, sizeof(uint8_t));
+#if SPARSE_SUPPORT
+  if (m_out.isSparse())
+  {
+    int32_t sx = (int) m_out.getDataSparse().size();
+    file.write((const char *) &sx, sizeof(int32_t));
+    file.write((const char *) &m_out.m_packed_sparsity_size, sizeof(m_out.m_packed_sparsity_size));
+  }
+#endif
+  file.write((const char *) &m_out.m_transposed, sizeof(m_out.m_transposed));
   if (std::is_same<T, int16_t>::value)
   {
     x = TensorInternalType::Int16;
@@ -129,7 +144,18 @@ template<typename T> bool sadl::layers::Const<T>::dump(std::ostream &file)
 
   if (!std::is_same<T, float>::value)
     file.write((const char *) &m_out.quantizer, sizeof(m_out.quantizer));
-  file.write((const char *) m_out.data(), m_out.size() * sizeof(T));
+#if SPARSE_SUPPORT
+  if (m_out.isSparse())
+  {
+    file.write((const char *) m_out.getNbNonzerosCol().data(), m_out.getNbNonzerosCol().size() * sizeof(uint16_t));
+    file.write((const char *) m_out.getIndices().data(), m_out.getIndices().size() * sizeof(uint16_t));
+    file.write((const char *) m_out.getDataSparse().data(), m_out.getDataSparse().size() * sizeof(T));
+  }
+  else
+#endif
+  {
+    file.write((const char *) m_out.data(), m_out.size() * sizeof(T));
+  }
   return true;
 }
 
@@ -175,7 +201,7 @@ template<typename T> bool sadl::Model<T>::dump(std::ostream &file)
     return false;
   }
 
-  char magic[9] = "SADL0004";
+  char magic[9] = "SADL0005";
   file.write(magic, 8);
   int32_t x = 0;
   if (std::is_same<T, float>::value)
@@ -199,6 +225,7 @@ template<typename T> bool sadl::Model<T>::dump(std::ostream &file)
   nb = (int) m_ids_output.size();
   file.write((const char *) &nb, sizeof(int32_t));
   file.write((const char *) m_ids_output.data(), sizeof(int32_t) * nb);
+  file.write((const char *) &m_sparsityComputed, sizeof(m_sparsityComputed));
 
   for (int k = 0; k < nb_layers; ++k)
   {

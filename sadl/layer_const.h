@@ -51,7 +51,8 @@ public:
 
 protected:
   virtual bool              loadInternal(std::istream &file, Version v) override;
-  template<typename U> void readTensor(std::istream &file, Tensor<T> &out);
+  template<typename U> void readTensor(std::istream &file, Tensor<T> &out
+    , const int32_t sizeSparse, const int32_t packedSparsitySize, Version v);
   DUMP_MODEL_EXT;
 };
 
@@ -71,17 +72,48 @@ template<typename T> bool Const<T>::init(const std::vector<Tensor<T> *> &in)
   return true;
 }
 
-template<typename T> template<typename U> void Const<T>::readTensor(std::istream &file, Tensor<T> &out)
+template<typename T> template<typename U> void Const<T>::readTensor(std::istream &file, Tensor<T> &out, 
+  const int32_t sizeSparse, const int32_t packedSparsitySize, Version v)
 {
+#if SPARSE_SUPPORT
+  std::vector<T> &dataSparse = out.getDataSparse();
+  std::vector<uint16_t> &indices = out.getIndices();
+  std::vector<uint16_t> &nbNonzerosCol = out.getNbNonzerosCol();
+#else
+  std::vector<T> dataSparse;
+  std::vector<uint16_t> indices;
+  std::vector<uint16_t> nbNonzerosCol;
+#endif
+  if (sizeSparse > 0)
+  {
+#if !SPARSE_SUPPORT
+    dataSparse.resize(sizeSparse);
+    indices.resize(sizeSparse / packedSparsitySize);
+    nbNonzerosCol.resize(out.dims()[1]);
+#endif
+    file.read((char*)nbNonzerosCol.data(), sizeof(uint16_t) * nbNonzerosCol.size());
+    file.read((char*)indices.data(), sizeof(uint16_t) * indices.size());
+    SADL_DBG(std::cout << "\t\t\t\t read sparse " << sizeof(U) * dataSparse.size() << ", " << sizeof(uint16_t) * indices.size() << ", " << nbNonzerosCol.size() * sizeof(uint16_t) << " sparsity packing: " << packedSparsitySize << std::endl);
+  }
+  T *dstData = (sizeSparse > 0) ? dataSparse.data() : out.data();
+  size_t sizeData = (sizeSparse > 0) ? dataSparse.size(): out.size();
   if (std::is_same<T, U>::value)
-    file.read((char *) out.data(), sizeof(T) * out.size());
+  {
+    file.read((char *) dstData, sizeof(T) * sizeData);
+  }
   else
   {
-    std::vector<U> data(out.size());
-    file.read((char *) data.data(), sizeof(U) * data.size());
+    std::vector<U> data(sizeData);
+    file.read((char *) data.data(), sizeof(U) * sizeData);
     for (int k = 0; k < (int) data.size(); ++k)
-      out[k] = static_cast<T>(data[k]);
+      dstData[k] = static_cast<T>(data[k]);
   }
+#if !SPARSE_SUPPORT
+  if (sizeSparse > 0)
+  {
+    out.redensifySparseData(dataSparse, nbNonzerosCol, packedSparsitySize, indices);
+  }
+#endif
 }
 
 template<typename T> bool Const<T>::loadInternal(std::istream &file, Version v)
@@ -107,7 +139,22 @@ template<typename T> bool Const<T>::loadInternal(std::istream &file, Version v)
     std::cerr << "[ERROR] tensor too large? " << d.nbElements() << std::endl;
     return false;
   }
-  m_out.resize(d);
+  uint8_t isSparse = 0;
+  int32_t sizeSparse = 0;
+  int16_t packedSparsitySize = 1;
+  if (v >= Version::sadl05)
+  {
+    file.read((char*)&isSparse, sizeof(uint8_t));
+    if (isSparse != 0)
+    {
+      file.read((char*)&sizeSparse, sizeof(int32_t));
+      file.read((char *)&packedSparsitySize, sizeof(packedSparsitySize));
+    }
+    bool transposed = false;
+    file.read((char*)&transposed, sizeof(transposed));
+    m_out.setTransposed(transposed);
+  }
+  m_out.resize(d, sizeSparse, packedSparsitySize);
   SADL_DBG(std::cout << "  - tensor: " << m_out.dims() << std::endl);
 
   file.read((char *) &x, sizeof(x));
@@ -118,16 +165,16 @@ template<typename T> bool Const<T>::loadInternal(std::istream &file, Version v)
   case TensorInternalType::Int32:
     // assert((std::is_same<T,int32_t>::value));
     file.read((char *) &m_out.quantizer, sizeof(m_out.quantizer));
-    readTensor<int32_t>(file, m_out);
+    readTensor<int32_t>(file, m_out, sizeSparse, packedSparsitySize, v);
     break;
   case TensorInternalType::Float:
     // assert((std::is_same<T, float>::value));
-    readTensor<float>(file, m_out);
+    readTensor<float>(file, m_out, sizeSparse, packedSparsitySize, v);
     break;
   case TensorInternalType::Int16:
     // assert((std::is_same<T, int16_t>::value));
     file.read((char *) &m_out.quantizer, sizeof(m_out.quantizer));
-    readTensor<int16_t>(file, m_out);
+    readTensor<int16_t>(file, m_out, sizeSparse, packedSparsitySize, v);
     break;
   default:
     std::cerr << "[ERROR] unknown internal type " << x << std::endl;
