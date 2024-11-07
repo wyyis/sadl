@@ -65,7 +65,7 @@ private:
   Version                                    m_version = Version::unknown;
   std::vector<typename layers::Layer<T>::Id> m_ids_input, m_ids_output;
   bool                                       m_initDone = false;
-
+  bool                                       m_sparsityComputed = false;
 public:
   bool             load(std::istream &in);
   bool             init(std::vector<Tensor<T>> &in);
@@ -81,6 +81,7 @@ public:
   LayerData &                                getLayer(const typename layers::Layer<T>::Id &id);
   Version                                           version() const { return m_version; }
 #if SPARSE_SUPPORT
+  bool             compute_sparsity(std::vector<Tensor<T>>& in);
   float sparsity_threshold      = kSparsifyThreshold;
   float sparsity_size_threshold = kSparsifySizeThreshold;
 #endif
@@ -248,6 +249,10 @@ template<typename T> bool Model<T>::load(std::istream &file)
   {
     m_version = Version::sadl04;
   }
+  else if (magic_s == "SADL0005")
+  {
+    m_version = Version::sadl05;
+  }
   else
   {
     if (!file)
@@ -304,6 +309,10 @@ template<typename T> bool Model<T>::load(std::istream &file)
       (void) id;
     }
     SADL_DBG(std::cout << std::endl);
+  }
+  if (m_version >= Version::sadl05)
+  {
+    file.read((char*)&m_sparsityComputed, sizeof(m_sparsityComputed));
   }
 
   for (int k = 0; k < nb_layers; ++k)
@@ -454,16 +463,34 @@ template<typename T> bool Model<T>::init(std::vector<Tensor<T>> &in)
 
       Tensor<T> *tmp = &(L.layer->output());
 #if SPARSE_SUPPORT
-      if (sparsity_threshold >= 0 && sparsity_threshold <= 1.)
+      if (!m_sparsityComputed && sparsity_threshold >= 0 && sparsity_threshold <= 1.)
       {
         if (m_data[layer_cnt].layer->op() == layers::OperationType::MatMul && L.layer->op() == layers::OperationType::Const)
         {
+          if (!L.layer->output().isDenseDataAvailable())
+          {
+            L.layer->output().redensifySparseData();
+          }
           if (isFullMatrixSparse(L.layer->output(), sparsity_threshold, sparsity_size_threshold))
           {
-            SADL_DBG(std::cout << "[INFO] Sparsify layer " << m_data[layer_cnt].layer->id() << " " << m_data[layer_cnt].layer->name() << std::endl;);
-            sparsify(*tmp);
+            SADL_DBG(std::cout << "[INFO] Sparsify layer " << m_data[layer_cnt].layer->id() << " " << m_data[layer_cnt].layer->name() << std::endl);
+            int packedSparsitySize = computePackedSparsity(*tmp);
+            if (packedSparsitySize > 1)
+            {
+              SADL_DBG(std::cout << "[INFO] Sparsify with packing " << packedSparsitySize << " layer " << m_data[layer_cnt].layer->id() << " " << m_data[layer_cnt].layer->name() << std::endl);
+              sparsifyWithPacking(*tmp, packedSparsitySize);
+            }
+            else
+            {
+              sparsify(*tmp);
+            }
           }
         }
+      }
+      else if (m_sparsityComputed && tmp->isSparse())
+      {
+        SADL_DBG(std::cout << "[INFO] Sparse layer " << m_data[layer_cnt].layer->id() << " " << m_data[layer_cnt].layer->name() << " with block sparsity " << tmp->getPackedSparsitySize() << std::endl;);
+        tmp->checkSimdAlignment();
       }
 #endif
 
@@ -496,6 +523,73 @@ template<typename T> bool Model<T>::init(std::vector<Tensor<T>> &in)
   m_initDone = true;
   return true;
 }
+#if SPARSE_SUPPORT
+template<typename T> bool Model<T>::compute_sparsity(std::vector<Tensor<T>> &in)
+{
+  SADL_DBG(std::cout << "[INFO] == start model sparsity computation ==" << std::endl);
+
+  if (m_data.empty())
+  {
+    std::cerr << "[ERROR] Empty model" << std::endl;
+    return false;
+  }
+  m_nb_inputs = (int) in.size();
+  if (m_nb_inputs != (int) m_ids_input.size())
+  {
+    std::cerr << "[ERROR] inconsistent input dimension" << std::endl;
+    return false;
+  }
+
+  bool ok               = true;
+  if (!m_initDone)
+  {
+    reshapeMatrix();
+  }
+  if (sparsity_threshold >= 0 && sparsity_threshold <= 1.)
+  {
+    // then solve inputs of other layers: make the link between id of inputs and tensor ptr
+    for (int layer_cnt = 0; layer_cnt < (int)m_data.size() && ok; ++layer_cnt)
+    {
+      if (m_data[layer_cnt].layer->op() == layers::OperationType::Placeholder)
+        continue;
+      int nb_inputs = (int)m_data[layer_cnt].layer->inputsId().size();
+      for (int inputs_cnt = 0; inputs_cnt < nb_inputs; ++inputs_cnt)
+      {
+        typename layers::Layer<T>::Id id_input = m_data[layer_cnt].layer->inputsId()[inputs_cnt];
+        auto& L = getLayer(id_input);
+
+        Tensor<T>* tmp = &(L.layer->output());
+        if (m_data[layer_cnt].layer->op() == layers::OperationType::MatMul && L.layer->op() == layers::OperationType::Const)
+        {
+          if (!L.layer->output().isDenseDataAvailable())
+          {
+            L.layer->output().redensifySparseData();
+          }
+          if (isFullMatrixSparse(L.layer->output(), sparsity_threshold, sparsity_size_threshold))
+          {
+            SADL_DBG(std::cout << "[INFO] Sparsify layer " << m_data[layer_cnt].layer->id() << " " << m_data[layer_cnt].layer->name() << std::endl);
+            int packedSparsitySize = computePackedSparsity(*tmp);
+            if (packedSparsitySize > 1)
+            {
+              SADL_DBG(std::cout << "[INFO] Sparsify with packing " << packedSparsitySize << " layer " << m_data[layer_cnt].layer->id() << " " << m_data[layer_cnt].layer->name() << std::endl);
+              sparsifyWithPacking(*tmp, packedSparsitySize);
+            }
+            else 
+            {
+              sparsify(*tmp);
+            }
+          }
+        }
+      }
+    }
+    m_sparsityComputed = true;
+  }
+  SADL_DBG(std::cout << "[INFO] == end model sparsity computation ==\n" << std::endl);
+  if (!ok)
+    return false;
+  return true;
+}
+#endif
 
 template<typename T> bool Model<T>::apply(std::vector<Tensor<T>> &in)
 {
@@ -782,18 +876,26 @@ template<typename T> void Model<T>::reshapeMatrix()
       }
       auto &L = getLayer(v.layer->inputsId()[1]);
       auto &R = L.layer->output();
-      // invert k and l dimensions
-      Dimensions d = R.dims();
-      if (d.size() == 2)
-      {   // only transpose dim 2 for now
-        // do not swap dim, just data
-        SADL_DBG(std::cout << "[INFO] transpose data " << L.layer->id() << ' ' << L.layer->name() << " " << R.dims() << std::endl);
-        Tensor<T> T2(d);
-        T2.quantizer = R.quantizer;
-        for (int i = 0; i < d[0]; ++i)
-          for (int j = 0; j < d[1]; ++j)
-            T2[j * d[0] + i] = R(i, j);
-        swap(R, T2);
+      if (R.getTransposed())
+      {
+        SADL_DBG(std::cout << "[INFO] data already transposed " << L.layer->id() << ' ' << L.layer->name() << " " << R.dims() << std::endl);
+      }
+      else
+      {
+        // invert k and l dimensions
+        Dimensions d = R.dims();
+        if (d.size() == 2)
+        {   // only transpose dim 2 for now
+          // do not swap dim, just data
+          SADL_DBG(std::cout << "[INFO] transpose data " << L.layer->id() << ' ' << L.layer->name() << " " << R.dims() << std::endl);
+          Tensor<T> T2(d);
+          T2.quantizer = R.quantizer;
+          for (int i = 0; i < d[0]; ++i)
+            for (int j = 0; j < d[1]; ++j)
+              T2[j * d[0] + i] = R(i, j);
+          swap(R, T2);
+          R.setTransposed(true);
+        }
       }
     }
   }

@@ -6,11 +6,6 @@ set(SPARSE_MATMULT_SUPPORT OFF CACHE BOOL "add support for sparse matrix multipl
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if (SPARSE_MATMULT_SUPPORT)
- add_definitions(-DSPARSE_SUPPORT=1) 
- message("Build with sparse matrix multiplication support")
-endif()
-
 include_directories(..)
 file(GLOB HEADER_FILES helper.h ../sadl/*.h )
 
@@ -32,6 +27,23 @@ add_executable(naive_quantization   naive_quantization.cpp ${HEADER_FILES} dumpe
 add_executable(update_model_version update_model_version.cpp ${HEADER_FILES} dumper.h)
 
 add_executable(quantization_test quantization_test.cpp ${HEADER_FILES})
+
+add_executable(sparsify_with_packing sparsify_with_packing.cpp ${HEADER_FILES})
+
+if (SPARSE_MATMULT_SUPPORT)
+  set_target_properties(sample_generic  PROPERTIES COMPILE_FLAGS "-DSPARSE_SUPPORT=1" )
+if( NOT (CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64") )
+  set_target_properties(sample_simd256  PROPERTIES COMPILE_FLAGS "-DSPARSE_SUPPORT=1" )
+  set_target_properties(sample_simd512  PROPERTIES COMPILE_FLAGS "-DSPARSE_SUPPORT=1" )
+endif()
+  set_target_properties(debug_model  PROPERTIES COMPILE_FLAGS "-DSPARSE_SUPPORT=1" )
+  set_target_properties(update_model_version  PROPERTIES COMPILE_FLAGS "-DSPARSE_SUPPORT=1" )
+  set_target_properties(quantization_test  PROPERTIES COMPILE_FLAGS "-DSPARSE_SUPPORT=1" )
+  set_target_properties(sparsify_with_packing  PROPERTIES COMPILE_FLAGS "-DSPARSE_SUPPORT=1" )
+  message("Build with sparse matrix multiplication support")
+  #set_target_properties(naive_quantization  PROPERTIES COMPILE_FLAGS "-DSPARSE_SUPPORT=0" ) # sparse support deactivated for naive quantization
+  set_target_properties(count_mac  PROPERTIES COMPILE_FLAGS "-DSPARSE_SUPPORT=1" )
+endif()
 
 if( UNIX OR MINGW )
  set(CMAKE_CXX_FLAGS_RELEASE "-O3")

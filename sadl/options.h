@@ -96,5 +96,6 @@ enum class Version
   sadl02  = 2,
   sadl03  = 3,
   sadl04  = 4,
+  sadl05  = 5, // please update dumper.h accordingly
 };
 }
