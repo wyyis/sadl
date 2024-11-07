@@ -49,7 +49,8 @@ public:
 
 protected:
   using T2 = typename ComputationType<T>::type;
-  T2           bitwise_sqrt(T2 x, int q);
+  T2           integer_sqrt(T2 x, int q);
+  T2           bit_width(T2 num);
   Tensor<T2>   std_var;
   virtual bool loadInternal(std::istream &file, Version v) override;
 };
@@ -80,7 +81,7 @@ template<typename T> bool BatchNorm<T>::apply(std::vector<Tensor<T> *> &in)
     if constexpr (std::is_same<T, float>::value)
       std_var(im_d) = sqrt(var(im_d) + eps(0));
     else
-      std_var(im_d) = bitwise_sqrt(var(im_d) + eps(0), q);
+      std_var(im_d) = integer_sqrt(var(im_d) + eps(0), q);
   }
 
   for (int im_nb = 0; im_nb < N; ++im_nb)
@@ -120,7 +121,36 @@ template<typename T> bool BatchNorm<T>::apply(std::vector<Tensor<T> *> &in)
   return true;
 }
 
-template<typename T> typename BatchNorm<T>::T2 BatchNorm<T>::bitwise_sqrt(typename BatchNorm<T>::T2 x, int q)
+template<typename T> typename BatchNorm<T>::T2 BatchNorm<T>::bit_width(T2 num)
+{
+  if (num == 0)
+    return 0;
+
+  T2       width = 1;
+  using UT2 = typename std::make_unsigned<T2>::type;
+  UT2          ux = static_cast<UT2>(num);
+
+  width += (ux >= (1ULL << 32)) ? 32 : 0;
+  ux >>= (ux >= (1ULL << 32)) ? 32 : 0;
+
+  width += (ux >= (1ULL << 16)) ? 16 : 0;
+  ux >>= (ux >= (1ULL << 16)) ? 16 : 0;
+
+  width += (ux >= (1ULL << 8)) ? 8 : 0;
+  ux >>= (ux >= (1ULL << 8)) ? 8 : 0;
+
+  width += (ux >= (1ULL << 4)) ? 4 : 0;
+  ux >>= (ux >= (1ULL << 4)) ? 4 : 0;
+
+  width += (ux >= (1ULL << 2)) ? 2 : 0;
+  ux >>= (ux >= (1ULL << 2)) ? 2 : 0;
+
+  width += (ux >= (1ULL << 1)) ? 1 : 0;
+
+  return width;
+}
+
+template<typename T> typename BatchNorm<T>::T2 BatchNorm<T>::integer_sqrt(typename BatchNorm<T>::T2 x, int q)
 {
   /*
    * This function computes the square root of x as an integer type.
@@ -146,14 +176,24 @@ template<typename T> typename BatchNorm<T>::T2 BatchNorm<T>::bitwise_sqrt(typena
   T2 num = x;
   ComputationType<T>::shift_left(num, shift_left_bits);
 
-  // Square root
-  T2 bit = T2(1) << (sizeof(T2) * 8 / 2 - 1); // initial bit=2^15
-  while (bit > 0)
+  if (num < 2)
   {
-    T2 temp = result | bit;
-    if (temp * temp <= num)
-      result = temp;
-    bit >>= 1;   // Move to the next lower bit
+    // sqrt(0) = 0 and sqrt(1) = 1
+    result = num;
+  }
+  else
+  {
+    // Rough estimation, sqrt(x) == x^1/2 == 2^(log2(x)/2)
+    T2 log2x = bit_width(num) - 1;
+    T2 log2y = log2x >> 1;
+    result = 1 << log2y;
+    // Using Newton's method for refinement, two iterations can give satisfactory results
+    T2 result_squared    = result * result;
+    T2 sqr_diff          = num - result_squared;
+    result += sqr_diff / (result << 1);
+    result_squared = result * result;
+    sqr_diff       = num - result_squared;
+    result += sqr_diff / (result << 1) - 1;
   }
 
   // Shift back
