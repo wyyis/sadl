@@ -99,7 +99,6 @@ public:
   };
   void resetCounters();
   Stat printOverflow(bool printinfo = false) const;
-
 #endif
 
   DUMP_MODEL_EXT;
@@ -226,6 +225,16 @@ template<typename T> bool Model<T>::load(std::istream &file)
   // reset model
   m_info.clear();
 
+  // clear current object
+  m_data.clear();
+  m_nb_inputs = 0;
+  m_version   = Version::unknown;
+  m_ids_input.clear();
+  m_ids_output.clear();
+  m_initDone = false;
+#if DEBUG_COUNTERS
+  resetCounters();
+#endif
   SADL_DBG(std::cout << "[INFO] == start model loading ==" << std::endl);
   char magic[9];
   file.read(magic, 8);
