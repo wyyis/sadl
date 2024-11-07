@@ -78,7 +78,7 @@ std::string showMagic(const std::string &in) {
 
 
 template<typename T>
-void load_save(const std::string &in,const std::string &out) {
+void load_save(const std::string &in,const std::string &out,const std::string &info) {
   sadl::Model<T> model;
   ifstream           file(in, ios::binary);
   cout << "[INFO] Model loading" << endl;
@@ -87,8 +87,12 @@ void load_save(const std::string &in,const std::string &out) {
     cerr << "[ERROR] Unable to read model " << in << endl;
     exit(-1);
   }
-  std::cout<<"Input version: "<<showMagic(in)<<std::endl;
-
+  std::cout << "Input version: " << showMagic(in) << std::endl;
+  std::cout << "Input info: '" << model.info() << "'" << std::endl;
+  if (!info.empty()) {
+    std::cout << "Overwrite info string: " << info << std::endl;
+    model.m_info = info;
+  }
   // dump to file
   ofstream file_out(out, ios::binary);
   model.dump(file_out);
@@ -100,26 +104,29 @@ void load_save(const std::string &in,const std::string &out) {
 
 int main(int argc, char **argv)
 {
-  if (argc != 3)
+  if (argc != 3 && argc != 4)
   {
-    cout << "[ERROR] update_model_version old_model.sadl new_model.sadl" << endl;
+    cout << "[ERROR] update_model_version old_model.sadl new_model.sadl [info_string]" << endl;
     return 1;
   }
 
   const string filename_model     = argv[1];
   const string filename_model_out = argv[2];
+  std::string info;
+  if (argc == 4)
+    info = argv[3];
 
   sadl::layers::TensorInternalType::Type type_model = getModelType(filename_model); 
   switch (type_model)
   {
   case sadl::layers::TensorInternalType::Float:
-    load_save<float>(filename_model,filename_model_out);
+    load_save<float>(filename_model,filename_model_out, info);
     break;
   case sadl::layers::TensorInternalType::Int32:
-    load_save<int32_t>(filename_model,filename_model_out);
+    load_save<int32_t>(filename_model,filename_model_out, info);
     break;
   case sadl::layers::TensorInternalType::Int16:
-    load_save<int16_t>(filename_model,filename_model_out);
+    load_save<int16_t>(filename_model,filename_model_out, info);
     break;
   default:
     cerr << "[ERROR] unsupported type" << endl;

@@ -203,6 +203,7 @@ template<typename T> bool sadl::Model<T>::dump(std::ostream &file)
 
   char magic[9] = "SADL0005";
   file.write(magic, 8);
+
   int32_t x = 0;
   if (std::is_same<T, float>::value)
     x = layers::TensorInternalType::Float;
@@ -216,6 +217,12 @@ template<typename T> bool sadl::Model<T>::dump(std::ostream &file)
     exit(-1);
   }
   file.write((const char *) &x, sizeof(int32_t));
+
+  int16_t n = std::min((int)m_info.size(), 1024);
+  file.write((const char *) &n, sizeof(int16_t));
+  if (n>0) {
+     file.write(m_info.c_str(), sizeof(char)*n);
+  }
 
   int32_t nb_layers = (int) m_data.size();
   file.write((const char *) &nb_layers, sizeof(int32_t));

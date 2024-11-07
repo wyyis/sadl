@@ -66,6 +66,8 @@ private:
   std::vector<typename layers::Layer<T>::Id> m_ids_input, m_ids_output;
   bool                                       m_initDone = false;
   bool                                       m_sparsityComputed = false;
+  std::string                                m_info;
+
 public:
   bool             load(std::istream &in);
   bool             init(std::vector<Tensor<T>> &in);
@@ -78,8 +80,10 @@ public:
   size_t                                            nbOutputs() const { return m_ids_output.size(); }
   std::vector<typename layers::Layer<T>::Id>        getLayersId() const;
   const LayerData &                                 getLayer(const typename layers::Layer<T>::Id &id) const;
-  LayerData &                                getLayer(const typename layers::Layer<T>::Id &id);
+  LayerData &                                       getLayer(const typename layers::Layer<T>::Id &id);
   Version                                           version() const { return m_version; }
+  const std::string &                               info() const { return m_info; }
+
 #if SPARSE_SUPPORT
   bool             compute_sparsity(std::vector<Tensor<T>>& in);
   float sparsity_threshold      = kSparsifyThreshold;
@@ -219,6 +223,8 @@ template<typename T> bool Model<T>::load(std::istream &file)
     std::cerr << "[ERROR] Pb reading model" << std::endl;
     return false;
   }
+  // reset model
+  m_info.clear();
 
   SADL_DBG(std::cout << "[INFO] == start model loading ==" << std::endl);
   char magic[9];
@@ -248,6 +254,9 @@ template<typename T> bool Model<T>::load(std::istream &file)
   else if (magic_s == "SADL0004")
   {
     m_version = Version::sadl04;
+#if DEBUG_PRINT
+    std::cout << "[WARNING] SADL04 version model, please upgrade to SADL05" << std::endl;
+#endif
   }
   else if (magic_s == "SADL0005")
   {
@@ -276,6 +285,19 @@ template<typename T> bool Model<T>::load(std::istream &file)
     SADL_DBG(std::cout << "[INFO] Model type: " << (int) x << std::endl);
   }
 
+  if (m_version >= Version::sadl05 ) {
+    int16_t x = 0;
+    file.read((char *) &x, sizeof(int16_t));
+    if (x > 0)
+    {
+      std::vector<char> v;
+      v.resize(x + 1);
+      v[x] = 0;
+      file.read(v.data(), sizeof(char) * x);
+      m_info = std::string{ v.data() };
+    }
+    SADL_DBG(std::cout << "[INFO] Model info: '" << m_info << "'" << std::endl);
+  }
   int32_t nb_layers = 0;
   file.read((char *) &nb_layers, sizeof(int32_t));
   SADL_DBG(std::cout << "[INFO] Num layers: " << nb_layers << std::endl);
