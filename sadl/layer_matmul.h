@@ -514,7 +514,7 @@ template<typename T> bool MatMul<T>::apply_sparse_pack_matmul(std::vector<Tensor
         for (auto p = 0; p < packedSparsitySize; ++p)
         {
           x += (typename ComputationType<T>::type) aptr[j + p] * B.getDataSparse()[offset_data + p];
-          COUNTERS_MAC(B.getDataSparse()[offset_data]);
+          COUNTERS_MAC(B.getDataSparse()[offset_data+p]);
         }
       }
 
