@@ -63,7 +63,7 @@ protected:
 
   // should never be used
   void conv2d(const Tensor<T> &A, const Tensor<T> &kernel);
-  
+
   template<int s_h, int s_w> bool conv2d_core(const Tensor<T> &A, const Tensor<T> &kernel);
 
   template<int n> void multiply_add_n_points(const T* input, const T coeff, typename ComputationType<T>::type* sum);
@@ -211,15 +211,6 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
   assert(in_H > 1);
   assert(in_W > 1);
 
-  if ((half_size_h == 2 && top != 2) || (half_size_w == 2 && left != 2))
-  {
-    std::cerr << "[ERROR] pad=0 not implemented for conv size 5." << std::endl;
-  }
-  else if ((half_size_h == 3 && top != 3) || (half_size_w == 3 && left != 3))
-  {
-    std::cerr << "[ERROR] pad=0 not implemented for conv size 7." << std::endl;
-  }
-  
   if (m_groups == 1)
   {
     if (half_size_h == 0 && half_size_w == 0)   // 1x1
@@ -230,69 +221,26 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
     {
       conv2d_2x2_s<s_h, s_w>(A, kernel);
     }
+
     else if (half_size_h == 1 && half_size_w == 1)   // 3x3
     {
-      if (top == 0 && left == 0 && s_h == 1 && s_w == 1) // top=0 and left=0 means pad=(0,0)
+      if (!Tensor<T>::skip_border)
       {
-        // Do not use modified slow function -- too slow.
-        //conv2d(A, kernel);
-
-        // In order to use the fast functions, three things need to be done:
-        //   I) Resize the destination matrix so that it is as big as if no padding were used ('same').
-        //  II) Trick the fast function into thinking it is acutally using padding=(1,1)
-        // III) Copy data back from the larger destination matrix into the correct, smaller size.
-
-        // Create output tensor the same size as the current tensor
-        Tensor<T> T2(m_out.dims());
-        // Use same quantizer and dimensions
-        T2.quantizer = m_out.quantizer;
-        T2.border_skip = m_out.border_skip;
-
-        //   I) Resize the destination matrix so that it is as big as if no padding were used ('same').
-        Dimensions d;
-        d.resize(4);
-        d[0] = m_out.dims()[0];
-        d[1] = m_out.dims()[1]+2;
-        d[2] = m_out.dims()[2]+2;
-        d[3] = m_out.dims()[3];
-        m_out.resize(d);
-
-        //  II) Trick the fast function into thinking it is acutally using padding=(1,1).
-        m_pads[0] = 1;
-        m_pads[1] = 1;
-        conv2d_3x3_s_core_dispatch<s_h, s_w>(A, kernel);
-        // Restoring m_pads so they are correct henceforth.
-        m_pads[0] = top;
-        m_pads[1] = left;
-        
-        // III) Copy data back from the larger destination matrix into the correct, smaller size.
-        for(int batch = 0; batch < T2.dims()[0]; batch++)
-          for(int yy = 0; yy < T2.dims()[1]; yy++)
-            for(int xx = 0; xx < T2.dims()[2]; xx++)
-              for(int ch = 0; ch < T2.dims()[3]; ch++)
-                T2(batch,yy,xx,ch) = m_out(batch,yy+1,xx+1,ch);
-        swap(m_out, T2);
+        conv2d_3x3_s_peel<s_h, s_w>(A, kernel);
       }
       else
-      {
-        if (!Tensor<T>::skip_border)
+      {   // skip border
+        if (s_h == 1 && s_w == 1)
         {
-          conv2d_3x3_s_peel<s_h, s_w>(A, kernel);
+          start_h += m_out.border_skip.first;
+          start_w += m_out.border_skip.second;
+          in_H -= m_out.border_skip.first;
+          in_W -= m_out.border_skip.second;
+          m_out.border_skip.first++;
+          m_out.border_skip.second++;
         }
-        else
-        {   // skip border
-          if (s_h == 1 && s_w == 1)
-          {
-            start_h += m_out.border_skip.first;
-            start_w += m_out.border_skip.second;
-            in_H -= m_out.border_skip.first;
-            in_W -= m_out.border_skip.second;
-            m_out.border_skip.first++;
-            m_out.border_skip.second++;
-          }
-        }
-        conv2d_3x3_s_core_dispatch<s_h, s_w>(A, kernel);
       }
+      conv2d_3x3_s_core_dispatch<s_h, s_w>(A, kernel);
     }
     else if (half_size_h == 2 && half_size_w == 2)   // 5x5
     {
@@ -303,84 +251,6 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
         exit(-1);
       }
       conv2d_5x5_s<s_h, s_w>(A, kernel);
-    }
-    else if (half_size_h == 0 && half_size_w == 1 && top == 0 && left == 0 && s_h == 1 && s_w == 1)   // 1x3 pad (0,0)
-    {
-        // First make the output tensor larger to accommodate an output of size (n+2)x(n+2) so that
-        // we can use the fast version of conv2d that is built for that.
-
-        // Create output tensor the same size as the current tensor
-        Tensor<T> T2(m_out.dims());
-        // Use same quantizer and dimensions
-        T2.quantizer = m_out.quantizer;
-        T2.border_skip = m_out.border_skip;
-
-        // Now change the size of the current tensor to be a bit bigger
-        Dimensions d;
-        d.resize(4);
-        d[0] = m_out.dims()[0];
-        d[1] = m_out.dims()[1];
-        d[2] = m_out.dims()[2]+2;
-        d[3] = m_out.dims()[3];
-        m_out.resize(d);
-
-        // Use the fast version
-        m_pads[0] = 0;
-        m_pads[1] = 1;
-        //conv2d_ixj_s_peel<s_h, s_w>(A, kernel);
-        conv2d_ixj_s_core_dispatch<s_h, s_w>(A, kernel);
-        // Restoring m_pads so they are correct henceforth.
-        m_pads[0] = top;
-        m_pads[1] = left;
-
-        // Copy back the lower right part to the smaller tensor
-        for(int batch = 0; batch < T2.dims()[0]; batch++)
-          for(int yy = 0; yy < T2.dims()[1]; yy++)
-            for(int xx = 0; xx < T2.dims()[2]; xx++)
-              for(int ch = 0; ch < T2.dims()[3]; ch++)
-                T2(batch,yy,xx,ch) = m_out(batch,yy,xx+1,ch);
-        swap(m_out, T2);
-    }
-    else if (half_size_h == 1 && half_size_w == 0 && top == 0 && left == 0)   // 3x1 pad (0,0)
-    {
-        // assert 3x3, assert stride = 1, assert pad=0
-        assert(s_h == 1);
-        assert(s_w == 1);
-      
-        // First make the output tensor larger to accommodate an output of size (n+2)x(n+2) so that
-        // we can use the fast version of conv2d that is built for that.
-
-        // Create output tensor the same size as the current tensor
-        Tensor<T> T2(m_out.dims());
-        // Use same quantizer and dimensions
-        T2.quantizer = m_out.quantizer;
-        T2.border_skip = m_out.border_skip;
-
-        // Now change the size of the current tensor to be a bit bigger
-        Dimensions d;
-        d.resize(4);
-        d[0] = m_out.dims()[0];
-        d[1] = m_out.dims()[1]+2;
-        d[2] = m_out.dims()[2];
-        d[3] = m_out.dims()[3];
-        m_out.resize(d);
-        
-        // Use the fast version
-        m_pads[0] = 1;
-        m_pads[1] = 0;
-
-        //conv2d_ixj_s_peel<s_h, s_w>(A, kernel);
-        conv2d_ixj_s_core_dispatch<s_h, s_w>(A, kernel);
-        m_pads[0] = top;
-        m_pads[1] = left;
-
-        // Copy back the lower right part to the smaller tensor
-        for(int batch = 0; batch < T2.dims()[0]; batch++)
-          for(int yy = 0; yy < T2.dims()[1]; yy++)
-            for(int xx = 0; xx < T2.dims()[2]; xx++)
-              for(int ch = 0; ch < T2.dims()[3]; ch++)
-                T2(batch,yy,xx,ch) = m_out(batch,yy+1,xx,ch);
-        swap(m_out, T2);
     }
     else if (half_size_h != half_size_w)   // ixj
     {
@@ -405,87 +275,7 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
   }
   else   // groups
   {
-    if (half_size_h == 1 && half_size_w == 1 && top == 0 && left == 0)   // 3x3 padding = (0,0)
-    {
-      // assert 3x3, assert stride = 1, assert pad=0
-      assert(s_h == 1);
-      assert(s_w == 1);
-      // Use modified slow function
-      conv2d(A, kernel);
-    }
-    else if (half_size_h == 0 && half_size_w == 1 && top == 0 && left == 0)   // 1x3 padding = (0,0)
-    {
-      // assert stride = 1, assert pad=0
-      assert(s_h == 1);
-      assert(s_w == 1);
-    
-      // First make the output tensor larger to accommodate an output of size (n)x(n+2) so that
-      // we can use the fast version of conv2d that is built for that.
-
-      // Create output tensor the same size as the current tensor
-      Tensor<T> T2(m_out.dims());
-      // Use same quantizer and dimensions
-      T2.quantizer = m_out.quantizer;
-      T2.border_skip = m_out.border_skip;
-
-      // Now change the size of the current tensor to be a bit bigger
-      Dimensions d;
-      d.resize(4);
-      d[0] = m_out.dims()[0];
-      d[1] = m_out.dims()[1];
-      d[2] = m_out.dims()[2]+2;
-      d[3] = m_out.dims()[3];
-      m_out.resize(d);
-      
-      // Use the fast version
-      conv2d_ixj_s_peel<s_h, s_w>(A, kernel);
-      conv2d_ixj_s_core_dispatch<s_h, s_w>(A, kernel);
-
-      // Copy back the lower right part to the smaller tensor
-      for(int batch = 0; batch < T2.dims()[0]; batch++)
-        for(int yy = 0; yy < T2.dims()[1]; yy++)
-          for(int xx = 0; xx < T2.dims()[2]; xx++)
-            for(int ch = 0; ch < T2.dims()[3]; ch++)
-              T2(batch,yy,xx,ch) = m_out(batch,yy,xx+1,ch);
-      swap(m_out, T2);
-    }
-    else if (half_size_h == 1 && half_size_w == 0 && top == 0 && left == 0)   // 3x1 padding = (0,0)
-    {
-      // assert stride = 1, assert pad=0
-      assert(s_h == 1);
-      assert(s_w == 1);
-      
-      // First make the output tensor larger to accommodate an output of size (n+2)x(n) so that
-      // we can use the fast version of conv2d that is built for that.
-
-      // Create output tensor the same size as the current tensor
-      Tensor<T> T2(m_out.dims());
-      // Use same quantizer and dimensions
-      T2.quantizer = m_out.quantizer;
-      T2.border_skip = m_out.border_skip;
-
-      // Now change the size of the current tensor to be a bit bigger
-      Dimensions d;
-      d.resize(4);
-      d[0] = m_out.dims()[0];
-      d[1] = m_out.dims()[1]+2;
-      d[2] = m_out.dims()[2];
-      d[3] = m_out.dims()[3];
-      m_out.resize(d);
-      
-      // Use the fast version
-      conv2d_ixj_s_peel<s_h, s_w>(A, kernel);
-      conv2d_ixj_s_core_dispatch<s_h, s_w>(A, kernel);
-
-      // Copy back the lower right part to the smaller tensor
-      for(int batch = 0; batch < T2.dims()[0]; batch++)
-        for(int yy = 0; yy < T2.dims()[1]; yy++)
-          for(int xx = 0; xx < T2.dims()[2]; xx++)
-            for(int ch = 0; ch < T2.dims()[3]; ch++)
-              T2(batch,yy,xx,ch) = m_out(batch,yy+1,xx,ch);
-      swap(m_out, T2);
-    }
-    else if (half_size_h != half_size_w)   // ixj
+    if (half_size_h != half_size_w)   // ixj
     {
       if (!Tensor<T>::skip_border)
       {
@@ -540,10 +330,8 @@ template<typename T> bool Conv2D<T>::init(const std::vector<Tensor<T> *> &in)
   Dimensions dim;
   dim.resize(4);
   dim[0] = in[0]->dims()[0];
-  //dim[1] = (int) ceil(in[0]->dims()[1] / (float) m_strides[1]);
-  //dim[2] = (int) ceil(in[0]->dims()[2] / (float) m_strides[2]);
-  dim[1] = out_H;
-  dim[2] = out_W;
+  dim[1] = (int) ceil(in[0]->dims()[1] / (float) m_strides[1]);
+  dim[2] = (int) ceil(in[0]->dims()[2] / (float) m_strides[2]);
   dim[3] = in[1]->dims()[2];
   if (out_H != dim[1] || out_W != dim[2])   // warning, fail with tf2 3x3s2 pad=same i=(5,4)
     return false;
@@ -646,8 +434,6 @@ template<typename T> void Conv2D<T>::conv2d(const Tensor<T> &A, const Tensor<T> 
   const int left{ m_pads[1] };
   const int start_h{ half_size_i - top };
   const int start_w{ half_size_j - left };
-  const int stop_h{ in_H - start_h};
-  const int stop_w{ in_W - start_w};
   const int s_h = m_strides[1];
   const int s_w = m_strides[2];
 #if DEBUG_SIMD && __AVX2__
@@ -662,9 +448,9 @@ template<typename T> void Conv2D<T>::conv2d(const Tensor<T> &A, const Tensor<T> 
   for (int filter = 0; filter < nb_filters; ++filter)
   {
     int offset = (filter / cout_by_g) * cin_by_g;
-    for (int im_i = start_h; im_i < stop_h; im_i += s_h)
+    for (int im_i = start_h; im_i < in_H; im_i += s_h)
     {
-      for (int im_j = start_w; im_j < stop_w; im_j += s_w)
+      for (int im_j = start_w; im_j < in_W; im_j += s_w)
       {
         typename ComputationType<T>::type x = 0;
         for (int filter_i = -half_size_i; filter_i <= half_size_i; ++filter_i)
@@ -692,12 +478,11 @@ template<typename T> void Conv2D<T>::conv2d(const Tensor<T> &A, const Tensor<T> 
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        m_out(im_nb, (im_i-start_h) / s_h, (im_j-start_w) / s_w, filter) = static_cast<T>(x);
+        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(x);
       }
     }
   }
 }
-
 
 template<typename T> template<int n> void Conv2D<T>::multiply_add_n_points(const T* input, const T coeff, typename ComputationType<T>::type* sum)
 {
@@ -795,11 +580,9 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::conv2d_core(cons
     const bool startWithWH = ihalf_size > 0 || jhalf_size > 0;
     const int start_h2 = start_h + (startWithWH ? s_h : 0);
     const int start_w2 = start_w + (startWithWH ? s_w : 0);
-    int ioffset_if_1D = ihalf_size==0 ? -1 : 0;
-    int joffset_if_1D = jhalf_size==0 ? -1 : 0;
-    for (int im_i = start_h2 + ioffset_if_1D; im_i < in_H - ihalf_size; im_i += s_h)
+    for (int im_i = start_h2; im_i < in_H - ihalf_size; im_i += s_h)
     {
-      for (int im_jv = start_w2 + joffset_if_1D; im_jv < in_W - jhalf_size; im_jv += vectorSize)
+      for (int im_jv = start_w2; im_jv < in_W - jhalf_size; im_jv += vectorSize)
       {
         typename ComputationType<T>::type x[vectorSize] = {0};
         const int max_j = std::min(im_jv + vectorSize, in_W - jhalf_size);

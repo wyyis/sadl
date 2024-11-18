@@ -133,7 +133,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
       for (int im_i = start_h + s_h; im_i < in_H - ihalf_size; im_i += s_h)
       {
         int im_j = start_w;   // can be only 0 or 1
-        if (im_j < in_W && jhalf_size != 0)
+        if (im_j < in_W)
         {   // left side
           typename ComputationType<T>::type x = 0;
           for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
@@ -195,7 +195,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
       for (int im_j = s_w + start_w; im_j < in_W - jhalf_size; im_j += s_w)
       {
         int im_i = start_h;   // 0 or 1 -> adapt filter start
-        if (im_i < in_H && ihalf_size != 0)
+        if (im_i < in_H)
         {   // top line
           typename ComputationType<T>::type x = 0;
           for (int filter_i = -start_h; filter_i <= ihalf_size; ++filter_i)
@@ -281,11 +281,9 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_cor
             << "?? kMAC" << std::endl;
 #endif
 
-  int ioffset_if_1D = ihalf_size==0 ? -1 : 0;
-  int joffset_if_1D = jhalf_size==0 ? -1 : 0;
-  for (int im_i = start_h + s_h + ioffset_if_1D; im_i < in_H - ihalf_size; im_i += s_h)
+  for (int im_i = start_h + s_h; im_i < in_H - ihalf_size; im_i += s_h)
   {
-    for (int im_j = start_w + s_w + joffset_if_1D; im_j < in_W - jhalf_size; im_j += s_w)
+    for (int im_j = start_w + s_w; im_j < in_W - jhalf_size; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -339,11 +337,9 @@ template<typename T> template<int in_D, int ihalf_size, int jhalf_size> void Con
 #endif
   assert(start_h + s_h - ihalf_size >= 0);
   assert(start_w + s_w - jhalf_size >= 0);
-  int ioffset_if_1D = ihalf_size==0 ? -1 : 0;
-  int joffset_if_1D = jhalf_size==0 ? -1 : 0;
-  for (int im_i = start_h + s_h + ioffset_if_1D; im_i < in_H - ihalf_size; im_i += s_h)
+  for (int im_i = start_h + s_h; im_i < in_H - ihalf_size; im_i += s_h)
   {
-    for (int im_j = start_w + s_w + joffset_if_1D; im_j < in_W - jhalf_size; im_j += s_w)
+    for (int im_j = start_w + s_w; im_j < in_W - jhalf_size; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -389,11 +385,9 @@ template<> template<int in_D, int ihalf_size, int jhalf_size> void Conv2D<float>
   assert(start_h + s_h - ihalf_size >= 0);
   assert(start_w + s_w - jhalf_size >= 0);
 
-  int ioffset_if_1D = ihalf_size==0 ? -1 : 0;
-  int joffset_if_1D = jhalf_size==0 ? -1 : 0;
-  for (int im_i = start_h + s_h + ioffset_if_1D; im_i < in_H - ihalf_size; im_i += s_h)
+  for (int im_i = start_h + s_h; im_i < in_H - ihalf_size; im_i += s_h)
   {
-    for (int im_j = start_w + s_w + joffset_if_1D; im_j < in_W - jhalf_size; im_j += s_w)
+    for (int im_j = start_w + s_w; im_j < in_W - jhalf_size; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -446,11 +440,9 @@ template<> template<int in_D, int ihalf_size, int jhalf_size> void Conv2D<int16_
 
   assert(start_h + s_h - ihalf_size >= 0);
   assert(start_w + s_w - jhalf_size >= 0);
-  int ioffset_if_1D = ihalf_size==0 ? -1 : 0;
-  int joffset_if_1D = jhalf_size==0 ? -1 : 0;
-  for (int im_i = start_h + s_h + ioffset_if_1D; im_i < in_H - ihalf_size; im_i += s_h)
+  for (int im_i = start_h + s_h; im_i < in_H - ihalf_size; im_i += s_h)
   {
-    for (int im_j = start_w + s_w + joffset_if_1D; im_j < in_W - jhalf_size; im_j += s_w)
+    for (int im_j = start_w + s_w; im_j < in_W - jhalf_size; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -509,11 +501,9 @@ template<> template<int in_D, int ihalf_size, int jhalf_size> void Conv2D<int16_
 
   assert(start_h + s_h - ihalf_size >= 0);
   assert(start_w + s_w - jhalf_size >= 0);
-  int ioffset_if_1D = ihalf_size==0 ? -1 : 0;
-  int joffset_if_1D = jhalf_size==0 ? -1 : 0;
-  for (int im_i = start_h + s_h + ioffset_if_1D; im_i < in_H - ihalf_size; im_i += s_h)
+  for (int im_i = start_h + s_h; im_i < in_H - ihalf_size; im_i += s_h)
   {
-    for (int im_j = start_w + s_w + joffset_if_1D; im_j < in_W - jhalf_size; im_j += s_w)
+    for (int im_j = start_w + s_w; im_j < in_W - jhalf_size; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
