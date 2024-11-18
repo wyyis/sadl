@@ -154,7 +154,14 @@ template<typename T> bool Const<T>::loadInternal(std::istream &file, Version v)
     file.read((char*)&transposed, sizeof(transposed));
     m_out.setTransposed(transposed);
   }
-  m_out.resize(d, sizeSparse, packedSparsitySize);
+#if SPARSE_SUPPORT
+  if (sizeSparse > 0) {
+      m_out.resizeSparse(d, sizeSparse, packedSparsitySize);
+  } else
+#endif
+  {
+      m_out.resize(d);
+  }
   SADL_DBG(std::cout << "  - tensor: " << m_out.dims() << std::endl);
 
   file.read((char *) &x, sizeof(x));
