@@ -151,8 +151,10 @@ public:
   Tensor() = default;
   explicit Tensor(Dimensions d);
 
-  void resize(Dimensions d, int32_t sizeSparse = 0, int32_t packedSparsitySize = 1);
-
+  void resize(Dimensions d);
+#if SPARSE_SUPPORT
+  void resizeSparse(Dimensions d, int32_t sizeSparse, int32_t packedSparsitySize);
+#endif
   // linear access
   value_type &operator[](int i);
   value_type  operator[](int i) const;
@@ -207,7 +209,7 @@ public:
   void                           setTransposed(const bool val) { m_transposed = val; }
   bool                           getTransposed() const { return m_transposed; }
 #if SPARSE_SUPPORT
-  std::vector<value_type> &getDataSparse() { return m_data_sparse; }
+  std::vector<value_type>       &getDataSparse() { return m_data_sparse; }
   const std::vector<value_type> &getDataSparse() const { return m_data_sparse; }
   const std::vector<index> &     getIndices() const { return m_indices; }
   std::vector<index> &           getIndices() { return m_indices; }
@@ -223,7 +225,9 @@ public:
   void                           redensifySparseData();
 #else
   void                           redensifySparseData(const std::vector<T>& dataSparse,
-    const std::vector<uint16_t>& nbNonzerosCol, const int32_t packedSparsitySize, const std::vector<uint16_t>& indices);
+                                                     const std::vector<uint16_t>&   nbNonzerosCol,
+                                                     const int32_t packedSparsitySize,
+                                                     const std::vector<uint16_t>& indices);
 #endif
 private:
   Dimensions m_dims;
@@ -629,27 +633,36 @@ template<typename T> const Dimensions &Tensor<T>::dims() const { return m_dims; 
 
 template<typename T> int64_t Tensor<T>::size() const { return m_data.size(); }
 
-template<typename T> void Tensor<T>::resize(Dimensions d, int32_t sizeSparse, int32_t packedSparsitySize)
+template<typename T> void Tensor<T>::resize(Dimensions d)
 {
   m_dims     = d;
   int64_t m = m_dims.nbElements();
   assert(m < kMaxSize);
+  m_data.resize(m);
 #if SPARSE_SUPPORT
   m_data_sparse.clear();
-  if (sizeSparse > 0)
-  {
-    m_data.clear();
-    m_data_sparse.resize(sizeSparse);
-    m_indices.resize(sizeSparse / packedSparsitySize);
-    m_packed_sparsity_size = packedSparsitySize;
-    m_nb_nonzeros_col.resize(d[1]);
-  }
-  else
+  m_indices.clear();
+  m_nb_nonzeros_col.clear();
+  m_packed_sparsity_size = 1;
 #endif
-  {
-    m_data.resize(m);
-  }
 }
+
+#if SPARSE_SUPPORT
+template<typename T> void Tensor<T>::resizeSparse(Dimensions d, int32_t sizeSparse, int32_t packedSparsitySize)
+{
+  m_dims     = d;
+  int64_t m = m_dims.nbElements();
+  assert(m < kMaxSize);
+  assert(sizeSparse > 0);
+  assert(packedSparsitySize > 0);
+  m_data_sparse.clear();
+  m_data.clear();
+  m_data_sparse.resize(sizeSparse);
+  m_indices.resize(sizeSparse / packedSparsitySize);
+  m_packed_sparsity_size = packedSparsitySize;
+  m_nb_nonzeros_col.resize(d[1]);
+}
+#endif
 
 // TODO: variadic template to define all accesors
 template<typename T> T &Tensor<T>::operator[](int i)
