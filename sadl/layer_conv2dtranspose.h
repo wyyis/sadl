@@ -83,7 +83,6 @@ template<typename T> bool Conv2DTranspose<T>::apply(std::vector<Tensor<T> *> &in
   const Tensor<T> &A      = *in[0];
   const Tensor<T> &kernel = *in[1];
   m_out.quantizer         = A.quantizer - m_q;
-  m_out.border_skip       = A.border_skip;
 
   assert(m_out.quantizer >= 0);
   assert(kernel.quantizer + m_q >= 0);

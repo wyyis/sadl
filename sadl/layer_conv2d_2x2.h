@@ -58,6 +58,9 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_2x2_s(con
             << " groups=" << m_groups << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC"
             << std::endl;
 #endif
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   constexpr int im_nb     = 0;
   const int     shift     = kernel.quantizer + m_q;
   const int     cout_by_g = nb_filters / m_groups;

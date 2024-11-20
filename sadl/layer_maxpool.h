@@ -77,7 +77,6 @@ template<typename T> bool MaxPool<T>::apply(std::vector<Tensor<T> *> &in)
   int start = offset_start;
   
   m_out.quantizer   = in[0]->quantizer;     // adapt output width to bias
-  m_out.border_skip = in[0]->border_skip;   // to check
 
   for (int im_nb = 0; im_nb < N; ++im_nb)
   {

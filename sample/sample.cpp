@@ -41,7 +41,7 @@ using namespace std;
 
 namespace
 {
-template<typename T> void infer(const string &filename)
+template<typename T> void infer(const string &filename, int override)
 {
   sadl::Model<T> model;
   ifstream       file(filename, ios::binary);
@@ -52,7 +52,6 @@ template<typename T> void infer(const string &filename)
     exit(-1);
   }
 
-  //  sadl::Tensor<T>::skip_border = true;
   vector<sadl::Tensor<T>> inputs = model.getInputsTemplate();
   cout << "[INFO] Model initilization" << endl;
 
@@ -60,6 +59,14 @@ template<typename T> void infer(const string &filename)
   {
     cerr << "[ERROR] issue during initialization" << endl;
     exit(-1);
+  }
+  if (override>1) {
+       for (auto &t: inputs) {
+           auto d=t.dims();
+           d[1]=override;
+           d[2]=override;
+           t.resize(d);
+       }
   }
 
   // fill input with values from -1 to 1
@@ -81,34 +88,36 @@ template<typename T> void infer(const string &filename)
   chrono::duration<double>         dt = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
   cout << "[INFO] " << dt.count() * 1000. << " ms" << endl;
 
-  const int N = (int) model.getIdsOutput().size();
-  for (int i = 0; i < N; ++i)
-    cout << "[INFO] output " << i << '\n' << model.result(i) << endl;
+ // const int N = (int) model.getIdsOutput().size();
+//  for (int i = 0; i < N; ++i)
+//    cout << "[INFO] output " << i << '\n' << model.result(i) << endl;
 }
 
 }   // namespace
 
 int main(int argc, char **argv)
 {
-  if (argc != 2)
+  if (argc != 2 && argc !=3 )
   {
-    cout << "[ERROR] sample filename_model" << endl;
+    cout << "[ERROR] sample filename_model [override_size]" << endl;
     return 1;
   }
 
   const string filename_model = argv[1];
+  int override=-1;
+  if (argc==3) override=atoi(argv[2]);
 
   sadl::layers::TensorInternalType::Type type_model = getModelType(filename_model);
   switch (type_model)
   {
   case sadl::layers::TensorInternalType::Float:
-    infer<float>(filename_model);
+    infer<float>(filename_model,override);
     break;
   case sadl::layers::TensorInternalType::Int32:
-    infer<int32_t>(filename_model);
+    infer<int32_t>(filename_model,override);
     break;
   case sadl::layers::TensorInternalType::Int16:
-    infer<int16_t>(filename_model);
+    infer<int16_t>(filename_model,override);
     break;
   default:
     cerr << "[ERROR] unsupported type" << endl;

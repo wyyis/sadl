@@ -63,7 +63,6 @@ template<typename T> void infer(const string &filename)
     exit(-1);
   }
 
-  //  sadl::Tensor<T>::skip_border = true;
   vector<sadl::Tensor<T>> inputs = model.getInputsTemplate();
 
   cout << "[INFO] Model initilization" << endl;
@@ -80,8 +79,6 @@ template<typename T> void infer(const string &filename)
     exit(-1);
   }
 
-  if (sadl::Tensor<T>::skip_border)
-    cout << "[INFO] discard border size=" << model.result().border_skip.first << ' ' << model.result().border_skip.second << endl;
 
   const int N = (int) model.getIdsOutput().size();
   for (int i = 0; i < N; ++i)

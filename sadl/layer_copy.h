@@ -59,7 +59,6 @@ template<typename T> bool Copy<T>::apply(std::vector<Tensor<T> *> &in)
   assert(in[0]->dims() == m_out.dims());
   std::copy(in[0]->begin(), in[0]->end(), m_out.begin());
   m_out.quantizer   = in[0]->quantizer;     // adapt output width to bias
-  m_out.border_skip = in[0]->border_skip;   // adapt output width to bias
 
   return true;
 }

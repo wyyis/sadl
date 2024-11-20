@@ -72,7 +72,6 @@ template<typename T> bool Mul<T>::apply(std::vector<Tensor<T> *> &in)
     return false;
   }
   swap(*in[0], m_out);
-  m_out.border_skip = std::max(m_out.border_skip, in[1]->border_skip);
 
   m_out.quantizer -= m_q;   // q0-q
   assert(m_out.quantizer >= 0);
