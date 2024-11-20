@@ -59,6 +59,10 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_pee
   const int     start_h{ half_size_h - top };
   const int     start_w{ half_size_w - left };
   const int     in_D{ A.dims()[3] };
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
+
   for (int filter_nb = 0; filter_nb < nb_filters; ++filter_nb)
   {
     // corners
@@ -244,9 +248,10 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_pee
   }   // filter_nb
 }
 
-template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_core(const Tensor<T> &A, const Tensor<T> &kernel)
+template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::conv2d_3x3_s_core(const Tensor<T> &A, const Tensor<T> &kernel)
 {
-  if (conv2d_core<s_h, s_w>(A, kernel))
+
+  if (conv2d_core_alongJ<s_h, s_w,o_i,o_j>(A, kernel))
   {
     return;
   }
@@ -256,12 +261,8 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_cor
   const int     in_W{ A.dims()[2] };
   const int     in_D{ A.dims()[3] };
   constexpr int ihalf_size = 1;
-  constexpr int half_size_h{ ihalf_size };
-  constexpr int half_size_w{ ihalf_size };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
+  constexpr int           start_h{ ihalf_size };
+  constexpr int           start_w{ ihalf_size };
   constexpr int im_nb     = 0;
   constexpr int half_size = 1;
   const int     shift     = kernel.quantizer + m_q;
@@ -269,11 +270,14 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_cor
   std::cout << "\n[WARN] generic version conv 3x3 inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
 #endif
-  assert(start_h + s_h - half_size_h >= 0);
-  assert(start_w + s_w - half_size_w >= 0);
-  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
+  //assert(start_h + s_h - half_size_h >= 0);
+ // assert(start_w + s_w - half_size_w >= 0);
+  for (int im_i = start_h + s_h/2; im_i < in_H - start_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
+    for (int im_j = start_w + s_w/2; im_j < in_W - start_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -296,13 +300,13 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_cor
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(x);
+        m_out(im_nb, (im_i -o_i)/ s_h, (im_j - o_j )/ s_w , filter) = static_cast<T>(x);
       }
     }
   }
 }
 
-template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_core_dispatch(const Tensor<T> &A, const Tensor<T> &kernel)
+template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::conv2d_3x3_s_core_dispatch(const Tensor<T> &A, const Tensor<T> &kernel)
 {
 #if __AVX2__
 #define CONV_MOD8 simd8_conv2d_3x3_s_d
@@ -314,46 +318,47 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_cor
 #define CONV_MOD32 conv2d_3x3_s_d_core
 #endif
   const int in_D{ A.dims()[3] };
+
   switch (in_D)
   {
   case 1:
-    conv2d_3x3_s_d_core<1, s_h, s_w>(A, kernel);
+    conv2d_3x3_s_d_core<1, s_h, s_w, o_i, o_j>(A, kernel);
     break;
   case 2:
-    conv2d_3x3_s_d_core<2, s_h, s_w>(A, kernel);
+    conv2d_3x3_s_d_core<2, s_h, s_w, o_i, o_j>(A, kernel);
     break;
   case 4:
-    conv2d_3x3_s_d_core<4, s_h, s_w>(A, kernel);
+    conv2d_3x3_s_d_core<4, s_h, s_w, o_i, o_j>(A, kernel);
     break;
   case 8:
-    CONV_MOD8<8, s_h, s_w>(A, kernel);
+    CONV_MOD8<8, s_h, s_w, o_i, o_j>(A, kernel);
     break;
   case 16:
-    CONV_MOD16<16, s_h, s_w>(A, kernel);
+    CONV_MOD16<16, s_h, s_w, o_i, o_j>(A, kernel);
     break;
   case 24:
-    CONV_MOD8<24, s_h, s_w>(A, kernel);
+    CONV_MOD8<24, s_h, s_w, o_i, o_j>(A, kernel);
     break;
   case 32:
-    CONV_MOD32<32, s_h, s_w>(A, kernel);
+    CONV_MOD32<32, s_h, s_w, o_i, o_j>(A, kernel);
     break;
   case 48:
-    CONV_MOD16<48, s_h, s_w>(A, kernel);
+    CONV_MOD16<48, s_h, s_w, o_i, o_j>(A, kernel);
     break;
   case 64:
-    CONV_MOD32<64, s_h, s_w>(A, kernel);
+    CONV_MOD32<64, s_h, s_w, o_i, o_j>(A, kernel);
     break;
   case 72:
-    CONV_MOD8<72, s_h, s_w>(A, kernel);   // better do 64 and than 8
+    CONV_MOD8<72, s_h, s_w, o_i, o_j>(A, kernel);   // better do 64 and than 8
     break;
   case 96:
-    CONV_MOD32<96, s_h, s_w>(A, kernel);
+    CONV_MOD32<96, s_h, s_w, o_i, o_j>(A, kernel);
     break;
   case 128:
-    CONV_MOD32<128, s_h, s_w>(A, kernel);
+    CONV_MOD32<128, s_h, s_w, o_i, o_j>(A, kernel);
     break;
   default:
-    conv2d_3x3_s_core<s_h, s_w>(A, kernel);
+    conv2d_3x3_s_core<s_h, s_w, o_i, o_j>(A, kernel);
     break;
   }
 #undef CONV_MOD8
@@ -361,7 +366,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_cor
 #undef CONV_MOD32
 }
 
-template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d_3x3_s_d_core(const Tensor<T> &A, const Tensor<T> &kernel)
+template<typename T> template<int in_D, int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::conv2d_3x3_s_d_core(const Tensor<T> &A, const Tensor<T> &kernel)
 {
   constexpr int im_nb     = 0;
   constexpr int half_size = 1;
@@ -370,21 +375,20 @@ template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d
   const int     in_H{ A.dims()[1] };
   const int     in_W{ A.dims()[2] };
   constexpr int ihalf_size = 1;
-  constexpr int half_size_h{ ihalf_size };
-  constexpr int half_size_w{ ihalf_size };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
+  constexpr int           start_h{  ihalf_size };
+  constexpr int           start_w{ ihalf_size };
+
 #if DEBUG_SIMD && __AVX2__
   std::cout << "\n[WARN] generic version conv 3x3 inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
 #endif
-  // const int top{ m_pads[0] };
-  // const int left{ m_pads[1] };
-  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
+
+  for (int im_i = start_h + s_h/2; im_i < in_H - start_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
+    for (int im_j = start_w + s_w/2; im_j < in_W - start_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -407,7 +411,7 @@ template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d
         ComputationType<T>::quantize(x, shift);
         COUNTERS(x);
         SATURATE(x);
-        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<T>(x);
+        m_out(im_nb, (im_i -o_i)/ s_h, (im_j - o_j )/ s_w , filter) = static_cast<T>(x);
       }
     }
   }
@@ -418,7 +422,7 @@ template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d
 // ////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///
 #if __AVX2__
-template<> template<int in_D, int s_h, int s_w> void Conv2D<float>::simd8_conv2d_3x3_s_d(const Tensor<float> &A, const Tensor<float> &kernel)
+template<> template<int in_D, int s_h, int s_w,int o_i,int o_j> void Conv2D<float>::simd8_conv2d_3x3_s_d(const Tensor<float> &A, const Tensor<float> &kernel)
 {
   static_assert(in_D % 8 == 0, "Should be used with mod8 filters.");
   constexpr int im_nb     = 0;
@@ -427,12 +431,9 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<float>::simd8_conv2d
   const int     in_H{ A.dims()[1] };
   const int     in_W{ A.dims()[2] };
   constexpr int ihalf_size = 1;
-  constexpr int half_size_h{ ihalf_size };
-  constexpr int half_size_w{ ihalf_size };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
+  constexpr int           start_h{ ihalf_size };
+  constexpr int           start_w{ ihalf_size };
+
 #if DEBUG_SIMD && __AVX512F__
   if (in_D >= 16)
   {
@@ -440,9 +441,12 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<float>::simd8_conv2d
               << in_W << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
   }
 #endif
-  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
+  for (int im_i = start_h  + s_h/2 ; im_i < in_H - start_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
+    for (int im_j = start_w  + s_w/2 ; im_j < in_W - start_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -471,14 +475,14 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<float>::simd8_conv2d
             }
           }
         }
-        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = sum8_float(s);
+        m_out(im_nb, (im_i -o_i)/ s_h, (im_j - o_j )/ s_w , filter) = sum8_float(s);
       }
     }
   }
 }
 
 #if __AVX512F__
-template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd16_conv2d_3x3_s_d(const Tensor<float> &A, const Tensor<float> &kernel)
+template<> template<int in_D, int s_h, int s_w,int o_i,int o_j> inline void Conv2D<float>::simd16_conv2d_3x3_s_d(const Tensor<float> &A, const Tensor<float> &kernel)
 {
   static_assert(in_D % 16 == 0, "Should be used with mod16 filters.");
   constexpr int im_nb     = 0;
@@ -487,15 +491,14 @@ template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd1
   const int     in_H{ A.dims()[1] };
   const int     in_W{ A.dims()[2] };
   constexpr int ihalf_size = 1;
-  constexpr int half_size_h{ ihalf_size };
-  constexpr int half_size_w{ ihalf_size };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
-  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
+  constexpr int           start_h{ ihalf_size };
+  constexpr int           start_w{ ihalf_size };
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
+  for (int im_i = start_h  + s_h/2; im_i < in_H - start_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
+    for (int im_j = start_w  + s_w/2; im_j < in_W - start_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -523,14 +526,14 @@ template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd1
             }
           }
         }
-        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = sum16_float(s);
+        m_out(im_nb, (im_i -o_i)/ s_h, (im_j - o_j )/ s_w , filter) = sum16_float(s);
       }
     }
   }
 }
 #endif
 
-template<> template<int in_D, int s_h, int s_w> void Conv2D<int32_t>::simd8_conv2d_3x3_s_d(const Tensor<int32_t> &A, const Tensor<int32_t> &kernel)
+template<> template<int in_D, int s_h, int s_w,int o_i,int o_j> void Conv2D<int32_t>::simd8_conv2d_3x3_s_d(const Tensor<int32_t> &A, const Tensor<int32_t> &kernel)
 {
 #if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int32_t;
@@ -543,12 +546,13 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int32_t>::simd8_conv
   const int     in_H{ A.dims()[1] };
   const int     in_W{ A.dims()[2] };
   constexpr int ihalf_size = 1;
-  constexpr int half_size_h{ ihalf_size };
-  constexpr int half_size_w{ ihalf_size };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
+  //constexpr int half_size_h{ ihalf_size };
+  //constexpr int half_size_w{ ihalf_size };
+  //const int     top{ m_pads[0] };
+  //const int     left{ m_pads[1] };
+  constexpr int           start_h{ ihalf_size };
+  constexpr int           start_w{ ihalf_size };
+
 #if DEBUG_SIMD && __AVX512F__
   if (in_D >= 16)
   {
@@ -556,10 +560,12 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int32_t>::simd8_conv
               << in_W << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
   }
 #endif
-
-  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
+  for (int im_i = start_h  + s_h/2; im_i < in_H - start_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
+    for (int im_j = start_w  + s_w/2; im_j < in_W - start_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -592,14 +598,14 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int32_t>::simd8_conv
         }
         typename ComputationType<T>::type z = (sum64_int32(s) >> shift);
         SATURATE(z);
-        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<int32_t>(z);
+        m_out(im_nb, (im_i -o_i)/ s_h, (im_j - o_j )/ s_w , filter) = static_cast<int32_t>(z);
       }
     }
   }
 }
 
 // actually SSE42
-template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd8_conv2d_3x3_s_d(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
+template<> template<int in_D, int s_h, int s_w,int o_i,int o_j> void Conv2D<int16_t>::simd8_conv2d_3x3_s_d(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
 {
 #if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int16_t;
@@ -612,12 +618,13 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd8_conv
   const int     in_H{ A.dims()[1] };
   const int     in_W{ A.dims()[2] };
   constexpr int ihalf_size = 1;
-  constexpr int half_size_h{ ihalf_size };
-  constexpr int half_size_w{ ihalf_size };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
+ // constexpr int half_size_h{ ihalf_size };
+ // constexpr int half_size_w{ ihalf_size };
+ // const int     top{ m_pads[0] };
+ // const int     left{ m_pads[1] };
+  constexpr int           start_h{ ihalf_size };
+  constexpr int           start_w{ ihalf_size };
+
 #if DEBUG_SIMD
   if (in_D >= 8)
   {
@@ -625,9 +632,12 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd8_conv
               << in_W << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
   }
 #endif
-  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
+  for (int im_i = start_h + s_h/2 ; im_i < in_H - start_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
+    for (int im_j = start_w  + s_w/2; im_j < in_W - start_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -654,17 +664,18 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd8_conv
         }
         typename ComputationType<T>::type z = (sum32_int16(s) >> shift);
         SATURATE(z);
-        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<int16_t>(z);
+        m_out(im_nb, (im_i -o_i)/ s_h, (im_j - o_j )/ s_w , filter) = static_cast<int16_t>(z);
       }
     }
   }
 }
 
-template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd16_conv2d_3x3_s_d(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
+template<> template<int in_D, int s_h, int s_w,int o_i,int o_j> void Conv2D<int16_t>::simd16_conv2d_3x3_s_d(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
 {
 #if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int16_t;
 #endif
+
   static_assert(in_D % 16 == 0, "Should be used with mod16 filters.");
   constexpr int im_nb     = 0;
   constexpr int half_size = 1;
@@ -673,12 +684,9 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd16_con
   const int     in_H{ A.dims()[1] };
   const int     in_W{ A.dims()[2] };
   constexpr int ihalf_size = 1;
-  constexpr int half_size_h{ ihalf_size };
-  constexpr int half_size_w{ ihalf_size };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
+  constexpr int           start_h{ ihalf_size };
+  constexpr int           start_w{ ihalf_size };
+
 #if DEBUG_SIMD && __AVX512BW__
   if (in_D >= 32)
   {
@@ -686,9 +694,12 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd16_con
               << in_W << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
   }
 #endif
-  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
+  for (int im_i = start_h  + s_h/2; im_i < in_H - start_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
+    for (int im_j = start_w  + s_w/2; im_j < in_W - start_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -715,14 +726,14 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd16_con
         }
         typename ComputationType<T>::type z = (sum32_int16(s) >> shift);
         SATURATE(z);
-        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<int16_t>(z);
+        m_out(im_nb, (im_i -o_i)/ s_h, (im_j - o_j )/ s_w , filter) = static_cast<int16_t>(z);
       }
     }
   }
 }
 
 #if __AVX512BW__
-template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd32_conv2d_3x3_s_d(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
+template<> template<int in_D, int s_h, int s_w,int o_i,int o_j> void Conv2D<int16_t>::simd32_conv2d_3x3_s_d(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
 {
   static_assert(in_D % 32 == 0, "Should be used with mod32 filters.");
   using T                 = int16_t;
@@ -733,15 +744,14 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd32_con
   const int     in_H{ A.dims()[1] };
   const int     in_W{ A.dims()[2] };
   constexpr int ihalf_size = 1;
-  constexpr int half_size_h{ ihalf_size };
-  constexpr int half_size_w{ ihalf_size };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
-  for (int im_i = start_h + s_h; im_i < in_H - half_size_h; im_i += s_h)
+  constexpr int           start_h{ ihalf_size };
+  constexpr int           start_w{ ihalf_size };
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
+  for (int im_i = start_h  + s_h/2; im_i < in_H - start_h; im_i += s_h)
   {
-    for (int im_j = start_w + s_w; im_j < in_W - half_size_w; im_j += s_w)
+    for (int im_j = start_w  + s_w/2; im_j < in_W - start_w; im_j += s_w)
     {
       for (int filter = 0; filter < nb_filters; ++filter)
       {
@@ -769,7 +779,7 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd32_con
         typename ComputationType<T>::type z = (_mm512_reduce_add_epi32(s) >> shift);
         COUNTERS(z);
         SATURATE(z);
-        m_out(im_nb, im_i / s_h, im_j / s_w, filter) = z;
+        m_out(im_nb, (im_i -o_i)/ s_h, (im_j - o_j )/ s_w , filter) = z;
       }
     }
   }

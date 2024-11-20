@@ -2,6 +2,9 @@
 SPATH=$(dirname $(realpath ${BASH_SOURCE[0]}));
 BDIR=$(realpath $SPATH);
 
+BLACKHOLE=" /dev/null";
+# BLACKHOLE=" /dev/stdin";
+
 if [ $# != 1 -a $# != 2 ]; then
  echo "[ERROR] utest.sh model.onnx [--no_transpose]"
  exit -1;
@@ -22,20 +25,20 @@ NAME=$(basename $1);
 BNAME=${NAME/.onnx/};
 
 rm -f ${BNAME}.results;
-python3 ${BDIR}/onnx_inference.py --input_onnx $1 --output ${BNAME}.results $OPT $OPT2 > /dev/null
+python3 ${BDIR}/onnx_inference.py --input_onnx $1 --output ${BNAME}.results $OPT $OPT2 > $BLACKHOLE
 if [ ! -f ${BNAME}.results ]; then
  echo " [ERROR] onnx inference failed for ${BNAME}";
  exit -1;
 fi
 
 rm -f ${BNAME}.sadl;
-python3 ${BDIR}/../converter/main.py --input_onnx $1  --output ${BNAME}.sadl $OPT2 > /dev/null
+python3 ${BDIR}/../converter/main.py --input_onnx $1  --output ${BNAME}.sadl $OPT2 > $BLACKHOLE
 if [ ! -f ${BNAME}.sadl ]; then
  echo " [ERROR] onnx to SADL conversion failed for ${BNAME}";
  exit -1;
 fi
 
-${BDIR}/build/test_scalar ${BNAME}.sadl ${BNAME}.results 0.001 > /dev/null
+${BDIR}/build/test_scalar ${BNAME}.sadl ${BNAME}.results 0.001 > $BLACKHOLE
 E=$?;
 if (( E == 0 )); then
   echo -e "   \e[32m[PASS]\e[0m $BNAME scalar" 
@@ -44,7 +47,7 @@ else
   exit -1;  
 fi;
 
-${BDIR}/build/test_avx2 ${BNAME}.sadl ${BNAME}.results 0.001 > /dev/null
+${BDIR}/build/test_avx2 ${BNAME}.sadl ${BNAME}.results 0.001 > $BLACKHOLE
 E=$?;
 if (( E == 0 )); then
   echo -e "   \e[32m[PASS]\e[0m $BNAME avx2" 
@@ -53,7 +56,7 @@ else
   exit -1;  
 fi;
 
-${BDIR}/build/test_avx512 ${BNAME}.sadl ${BNAME}.results 0.001 > /dev/null
+${BDIR}/build/test_avx512 ${BNAME}.sadl ${BNAME}.results 0.001 > $BLACKHOLE
 E=$?;
 if (( E == 0 )); then
   echo -e "   \e[32m[PASS]\e[0m $BNAME avx512" 

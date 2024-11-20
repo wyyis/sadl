@@ -148,6 +148,9 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s(con
   std::cout << "\n[WARN] generic version conv1x1 inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "] " << in_H << 'x' << in_W << " "
             << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
 #endif
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   constexpr int im_nb = 0;
   const int     shift = kernel.quantizer + m_q;
   for (int im_i = start_h; im_i < in_H; im_i += s_h)
@@ -175,7 +178,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s(con
 
 template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s_d(const Tensor<T> &A, const Tensor<T> &kernel)
 { 
-  if (conv2d_core<s_h, s_w>(A, kernel))
+  if (conv2d_core_alongJ<s_h, s_w,0,0>(A, kernel))
   {
     return;
   }
@@ -194,7 +197,9 @@ template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d
   std::cout << "\n[WARN] generic version conv 1x1 inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
 #endif
-
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   constexpr int im_nb = 0;
   const int     shift = kernel.quantizer + m_q;
   for (int im_i = start_h; im_i < in_H; im_i += s_h)
@@ -241,6 +246,9 @@ template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd8
               << in_W << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
   }
 #endif
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   constexpr int im_nb = 0;
   for (int im_i = start_h; im_i < in_H; im_i += s_h)
   {
@@ -282,6 +290,9 @@ template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd1
   const int     left{ m_pads[1] };
   const int     start_h{ half_size_h - top };
   const int     start_w{ half_size_w - left };
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int im_i = start_h; im_i < in_H; im_i += s_h)
   {
     for (int im_j = start_w; im_j < in_W; im_j += s_w)
@@ -330,6 +341,9 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd8_conv
     std::cout << "\n[WARN] suboptimal SIMD8 version conv 3x3 inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x'
               << in_W << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
   }
+#endif
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
 #endif
   constexpr int im_nb = 0;
   const int     shift = kernel.quantizer + m_q;
@@ -380,6 +394,9 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd16_con
               << in_W << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
   }
 #endif
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   constexpr int im_nb = 0;
   const int     shift = kernel.quantizer + m_q;
   for (int im_i = start_h; im_i < in_H; im_i += s_h)
@@ -423,6 +440,9 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd32_con
   const int     start_w{ half_size_w - left };
   constexpr int im_nb = 0;
   const int     shift = kernel.quantizer + m_q;
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int im_i = start_h; im_i < in_H; im_i += s_h)
   {
     for (int im_j = start_w; im_j < in_W; im_j += s_w)

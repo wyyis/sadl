@@ -146,8 +146,6 @@ public:
   using index = uint16_t;
 #endif
 
-  static bool skip_border;   // to replace by inline global C++17
-
   Tensor() = default;
   explicit Tensor(Dimensions d);
 
@@ -202,7 +200,6 @@ public:
   const_iterator end() const { return m_data.end(); }
 
   int                      quantizer   = 0;   // for int
-  std::pair<int,int>       border_skip = {0,0};
   static constexpr int64_t kMaxSize    = 32LL * 1024 * 1024 * 1024;
 
   Data &getData() { return m_data; }
@@ -597,14 +594,12 @@ template<> struct ComputationType<int16_t>
 };
 
 // impl
-template<typename T> bool Tensor<T>::skip_border = false;
 
 template<typename T> void swap(Tensor<T> &t0, Tensor<T> &t1)
 {
   std::swap(t0.m_dims, t1.m_dims);
   std::swap(t0.m_data, t1.m_data);
   std::swap(t0.quantizer, t1.quantizer);
-  std::swap(t0.border_skip, t1.border_skip);
 #if SPARSE_SUPPORT
   std::swap(t0.m_data_sparse, t1.m_data_sparse);
 #endif
@@ -615,7 +610,6 @@ template<typename T> void swapData(Tensor<T> &t0, Tensor<T> &t1)
   assert(t0.size() == t1.size());
   std::swap(t0.m_data, t1.m_data);
   std::swap(t0.quantizer, t1.quantizer);
-  std::swap(t0.border_skip, t1.border_skip);
 #if SPARSE_SUPPORT
   std::swap(t0.m_data_sparse, t1.m_data_sparse);
 #endif
@@ -651,7 +645,7 @@ template<typename T> void Tensor<T>::resize(Dimensions d)
 template<typename T> void Tensor<T>::resizeSparse(Dimensions d, int32_t sizeSparse, int32_t packedSparsitySize)
 {
   m_dims     = d;
-  int64_t m = m_dims.nbElements();
+  [[ maybe_unused ]] int64_t m = m_dims.nbElements();
   assert(m < kMaxSize);
   assert(sizeSparse > 0);
   assert(packedSparsitySize > 0);

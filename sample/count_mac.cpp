@@ -53,7 +53,6 @@ template<typename T> void infer(const string &filename)
     exit(-1);
   }
 
-  //  sadl::Tensor<T>::skip_border = true;
   vector<sadl::Tensor<T>> inputs = model.getInputsTemplate();
   // fill with 1
   for (auto &t: inputs)

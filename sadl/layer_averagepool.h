@@ -81,7 +81,6 @@ template<typename T> bool AveragePool<T>::apply(std::vector<Tensor<T> *> &in)
   int start_w = offset_start_w;
   
   m_out.quantizer   = in[0]->quantizer;     // adapt output width to bias
-  m_out.border_skip = in[0]->border_skip;   // to check
   int cnt = m_kernel[1] * m_kernel[2];
   assert(cnt != 0);
   const int acc_bits = (int)ceil(log2(cnt));

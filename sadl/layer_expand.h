@@ -56,7 +56,6 @@ template<typename T> bool Expand<T>::apply(std::vector<Tensor<T> *> &in)
 {
   assert(in.size() == 2);
   // second layer is reshape prms, already process in init
-  m_out.border_skip = in[0]->border_skip;   // adapt output width to bias
   m_out.quantizer   = in[0]->quantizer;
   // border to skip??
   if (in[0]->size() == 1)
