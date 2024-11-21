@@ -171,6 +171,9 @@ template<> inline bool MatMul<float>::apply_dim2_simd8(std::vector<Tensor<float>
               << std::endl;
   }
 #endif
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   assert(H % 8 == 0);
   constexpr int idx_start{ 0 };
   const int     idx_end{ H };
@@ -212,6 +215,9 @@ template<> inline bool MatMul<float>::apply_dim2_simd16(std::vector<Tensor<float
   assert(H % 16 == 0);
   constexpr int idx_start{ 0 };
   const int     idx_end{ H };
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int b = 0; b < N; ++b)
   {
     float *optr = m_out.data() + R * b;
@@ -252,6 +258,9 @@ template<typename T> template<int NN> bool MatMul<T>::apply_dim2(std::vector<Ten
 #if __AVX2__ && DEBUG_SIMD
   std::cout << "\n[WARN] generic version matmul dim2 " << A.dims() << ' ' << B.dims() << "(H=" << H << ") " << (N * R * H) / 1000 << " kMAC" << std::endl;
 #endif   // SIMD
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   constexpr int idx_start{ 0 };
   const int     idx_end{ H };
   if (A.dims().size() == 2)
@@ -317,6 +326,9 @@ template<typename T> template<int NN> bool MatMul<T>::apply_dim3(std::vector<Ten
 #if __AVX2__ && DEBUG_SIMD
   std::cout << "\n[WARN] generic version matmul dim3 " << A.dims() << ' ' << B.dims() << "(H=" << H << ") " << (N * R * H * W) / 1000 << " kMAC" << std::endl;
 #endif   // SIMD
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   constexpr int idx_start{ 0 };
   const int     idx_end{ W };
   if (A.dims().size() == 3)
@@ -383,6 +395,9 @@ template<typename T> template<int NN> bool MatMul<T>::apply_dim4(std::vector<Ten
 #if __AVX2__ && DEBUG_SIMD
   std::cout << "\n[WARN] generic version matmul dim4 " << A.dims() << ' ' << B.dims() << "(H=" << H << ") " << (N * R * H * W) / 1000 << " kMAC" << std::endl;
 #endif   // SIMD
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   constexpr int idx_start{ 0 };
   const int     idx_end{ W };
 
@@ -425,7 +440,9 @@ template<typename T> bool MatMul<T>::apply_sparse_matmul(std::vector<Tensor<T> *
 
   uint32_t offset_data = 0;
   uint16_t i           = 0;
-
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   if (A.dims().size() == 2)
   {
     for (int b = 0; b < N; ++b)
@@ -498,7 +515,9 @@ template<typename T> bool MatMul<T>::apply_sparse_pack_matmul(std::vector<Tensor
   const int pad = 8;
   const int padShift = 3;
 #endif
-
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   int packedSparsitySize = B.getPackedSparsitySize();
   const auto* idx = B.getIndices().data();
   for (int b = 0; b < N; ++b)
@@ -552,7 +571,9 @@ template<> inline bool MatMul<int16_t>::apply_sparse_matmul_simd8(std::vector<Te
 
 
   int t = 0;
-
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int b = 0; b < N; ++b)
   {
     const int16_t *aptr = A.data() + H * b;   // A(b,i)   => A[H*b]
@@ -616,7 +637,9 @@ template<> inline bool MatMul<int16_t>::apply_sparse_matmul_simd16(std::vector<T
 
 
   int t = 0;
-
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int b = 0; b < N; ++b)
   {
     const int16_t *aptr = A.data() + H * b;   // A(b,i)   => A[H*b]
@@ -672,7 +695,9 @@ template<> inline bool MatMul<int16_t>::apply_sparse_pack8_matmul_simd16(std::ve
 
 
   int t = 0;
-
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int b = 0; b < N; ++b)
   {
     const int16_t *aptr = A.data() + H * b;   // A(b,i)   => A[H*b]
@@ -726,7 +751,9 @@ template<> inline bool MatMul<int16_t>::apply_sparse_pack16_matmul_simd16(std::v
 
 
   int t = 0;
-
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int b = 0; b < N; ++b)
   {
     const int16_t *aptr = A.data() + H * b;   // A(b,i)   => A[H*b]

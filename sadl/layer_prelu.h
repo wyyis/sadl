@@ -134,6 +134,9 @@ template<typename T> template<bool multialpha> bool PReLU<T>::apply_scalar(std::
   const Tensor<T> &A = *in[1];
   swap(*in[0], m_out);
   const int alpha_q = A.quantizer;
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   if (multialpha)
   {
     switch (in[0]->dims().size()) {
@@ -238,6 +241,9 @@ template<> template<bool multialpha> inline bool PReLU<float>::apply_simd256(std
   const float *const alpha_ptr = A.data();
   const __m256       m_zeros   = _mm256_setzero_ps();
   __m256             alpha     = _mm256_set1_ps(*A.data());
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int iter = 0; iter < m_out.size(); iter += 8)
   {
     if (multialpha)
@@ -269,6 +275,9 @@ template<> template<bool multialpha> inline bool PReLU<int16_t>::apply_simd256(s
   const __m256i min   = _mm256_set1_epi32(-32768);
   const __m256i zeros = _mm256_setzero_si256();
   const auto     N     = m_out.size();
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int64_t iter = 0; iter < N; iter += 16)
   {
     int16_t *aptr = data_ptr + iter;
@@ -332,6 +341,9 @@ template<> template<bool multialpha> inline bool PReLU<float>::apply_simd512(std
   const float *const alpha_ptr = A.data();
   const __m512       m_zeros   = _mm512_setzero_ps();
   __m512             alpha     = _mm512_set1_ps(*A.data());
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int64_t iter = 0; iter < m_out.size(); iter += 16)
   {
     if (multialpha)
@@ -368,7 +380,9 @@ template<> template<bool multialpha> inline bool PReLU<int16_t>::apply_simd512(s
   const auto shuffle=  _mm512_loadu_si512((void *)data);
 
   const auto N = m_out.size();
-
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int64_t iter = 0; iter < N; iter += 32)
   {
     int16_t *aptr = data_ptr + iter;
