@@ -51,7 +51,8 @@
 #include <vector>
 #include <list>
 
-#define DUMP_MODEL_EXT virtual bool dump(std::ostream &file)
+#define DUMP_MODEL_EXT      virtual bool dump(std::ostream &file) override
+#define DUMP_MODEL_EXT_BASE virtual bool dump(std::ostream &file)
 // trick to access inner data
 #define private public
 #define protected public

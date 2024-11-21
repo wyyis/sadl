@@ -89,6 +89,7 @@ template<typename T> T my_abs(T x) { return x < T{} ? -x : x; }
 
 #ifndef DUMP_MODEL_EXT
 #define DUMP_MODEL_EXT
+#define DUMP_MODEL_EXT_BASE
 #endif
 namespace sadl
 {
