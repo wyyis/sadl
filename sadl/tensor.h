@@ -522,7 +522,6 @@ template<typename T> void Tensor<T>::redensifySparseData(const std::vector<T> &d
   uint32_t offset_data = 0;
   const auto* idx = indices.data();
   const int        R{ dims()[0] };
-  int col = 0, elem = 0;
   int idxSparse = 0;
   for (const auto& nb_nonzero : nbNonzerosCol)
   {
@@ -547,8 +546,6 @@ template<typename T> void Tensor<T>::redensifySparseData(const std::vector<T> &d
     }
     offset_data += R;
     idx += nb_nonzero / packedSparsitySize;
-    col++;
-    elem += nb_nonzero / packedSparsitySize;
   }
 #if SPARSE_SUPPORT
   m_data_sparse.clear();

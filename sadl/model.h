@@ -101,7 +101,7 @@ public:
   Stat printOverflow(bool printinfo = false) const;
 #endif
 
-  DUMP_MODEL_EXT;
+  DUMP_MODEL_EXT_BASE;
 };
 
 template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, layers::OperationType::Type op)

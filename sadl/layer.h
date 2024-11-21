@@ -136,7 +136,7 @@ protected:
   std::vector<Id>           m_inputs_id;
   bool                      m_initDone = false;
   template<typename> friend class sadl::Model;
-  DUMP_MODEL_EXT;
+  DUMP_MODEL_EXT_BASE;
 };
 
 template<typename T> bool Layer<T>::load(std::istream &file, Version v) { return loadPrefix(file, v) && loadInternal(file, v); }
