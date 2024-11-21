@@ -432,7 +432,7 @@ template<typename T> void Conv2D<T>::conv2d(const Tensor<T> &A, const Tensor<T> 
   const int s_w = m_strides[2];
 
 #if DEBUG_SIMD && __AVX2__
-  std::cout << "\n[WARN] debug generic version conv inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "] " << in_H << 'x' << in_W
+  std::cout << "\n[WARN] debug generic version conv2d inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "] " << in_H << 'x' << in_W
             << " groups=" << m_groups << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC"
             << std::endl;
 #endif
@@ -536,7 +536,7 @@ template<typename T> template<int s_h, int s_w,int o_i, int o_j> bool Conv2D<T>:
   int           start_h{ ihalf_size  - top};
   int           start_w{ jhalf_size  - left };
 #if DEBUG_SIMD && __AVX2__
-  std::cout << "\n[WARN] generic version conv2d_core (stride known) " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D << " outD=" << nb_filters
+  std::cout << "\n[WARN] generic version conv2d_core_alongJ (stride known) " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D << " outD=" << nb_filters
             << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << "?? kMAC" << std::endl;
 #endif

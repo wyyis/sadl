@@ -306,7 +306,9 @@ template<typename T> void Conv2DTranspose<T>::conv2dtranspose(int nb_filters, in
   const int out_h = m_out.dims()[1];
   const int out_w = m_out.dims()[2];
   m_tempo.fill(T2{});
-
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int im_i = 0; im_i < out_h; im_i += sh)
   {
     for (int im_j = 0; im_j < out_w; im_j += sw)
@@ -375,7 +377,9 @@ template<typename T> void Conv2DTranspose<T>::conv2dtranspose_2x2(int nb_filters
   const int out_h = m_out.dims()[1];
   const int out_w = m_out.dims()[2];
   m_tempo.fill(T2{});
-
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   int i,j;
   for (int filter = 0; filter < nb_filters; ++filter)
   {i=0;
@@ -434,7 +438,9 @@ void Conv2DTranspose<float>::conv2dtranspose_simd256(int nb_filters, const Tenso
   const int out_h = m_out.dims()[1];
   const int out_w = m_out.dims()[2];
   m_tempo.fill(T2{});
-
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int im_i = 0; im_i < out_h; im_i += sh)
   {
     for (int im_j = 0; im_j < out_w; im_j += sw)
@@ -504,7 +510,9 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_simd256(int nb_filters, const Ten
   const int     out_w       = m_out.dims()[2];
   m_tempo.fill(T2{});
   const int shift = kernel.quantizer + m_q;
-
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int im_i = 0; im_i < out_h; im_i += sh)
   {
     for (int im_j = 0; im_j < out_w; im_j += sw)
@@ -579,7 +587,9 @@ void Conv2DTranspose<float>::conv2dtranspose_simd512(int nb_filters, const Tenso
   const int out_h = m_out.dims()[1];
   const int out_w = m_out.dims()[2];
   m_tempo.fill(T2{});
-
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int im_i = 0; im_i < out_h; im_i += sh)
   {
     for (int im_j = 0; im_j < out_w; im_j += sw)
@@ -651,7 +661,9 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_simd512(int nb_filters, const Ten
   const int     out_w       = m_out.dims()[2];
   m_tempo.fill(T2{});
   const int shift = kernel.quantizer + m_q;
-
+#if DEBUG_PATH
+  std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
   for (int im_i = 0; im_i < out_h; im_i += sh)
   {
     for (int im_j = 0; im_j < out_w; im_j += sw)
