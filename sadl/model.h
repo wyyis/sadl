@@ -885,7 +885,7 @@ template<typename T> void Model<T>::insertCopyLayers()
       for (int n = offset; n < (int) layer_with_current_as_mutable_input.size(); ++n)
       {
         auto &L = getLayer(layer_with_current_as_mutable_input[n]);
-        SADL_DBG(std::cout << "[INFO] replace id=" << current_layer.id() << " by id=" << id_copy_layers[n - 1] << " in layer " << L.layer->id() << std::endl);
+        SADL_DBG(std::cout << "[INFO] replace id=" << current_layer.id() << " by id=" << id_copy_layers[n - offset] << " in layer " << L.layer->id() << std::endl);
         L.layer->replaceInputId(current_layer.id(), id_copy_layers[n - offset]);
       }
     }
