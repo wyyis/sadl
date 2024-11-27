@@ -299,8 +299,16 @@ template<typename T> bool Conv2D<T>::init(const std::vector<Tensor<T> *> &in)
   const int k_w{ in[1]->dims()[1] };
   const int s_h   = m_strides[1];
   const int s_w   = m_strides[2];
-  const int out_H = (int)floor((float) (in_H + m_pads[0] + m_pads[2] - k_h) / s_h + 1);
-  const int out_W = (int)floor((float) (in_W + m_pads[1] + m_pads[3] - k_w) / s_w + 1);
+  // workaround heisenbug gcc 13
+  int out_H,out_W;
+  if (s_h == 1 )
+      out_H = (in_H + m_pads[0] + m_pads[2] - k_h) + 1;
+  else
+      out_H = (int)std::floor((float) (in_H + m_pads[0] + m_pads[2] - k_h) / s_h + 1);
+  if (s_w == 1 )
+      out_W = (in_W + m_pads[1] + m_pads[3] - k_w) / s_w + 1;
+  else
+      out_W = (int)std::floor((float) (in_W + m_pads[1] + m_pads[3] - k_w) / s_w + 1);
 
   // Hout=floor((H+2*p-k)/s+1)
   // assume p =k/2 (pad == same)
@@ -311,9 +319,9 @@ template<typename T> bool Conv2D<T>::init(const std::vector<Tensor<T> *> &in)
   dim[1] = out_H;
   dim[2] = out_W;
   dim[3] = in[1]->dims()[2];
-  if (out_H != dim[1] || out_W != dim[2]) {  // warning, fail with tf2 3x3s2 pad=same i=(5,4)
-    return false;
-  }
+//  if (out_H != dim[1] || out_W != dim[2]) {  // warning, fail with tf2 3x3s2 pad=same i=(5,4)
+//    return false;
+//  }
   if ((m_pads[0]!=m_pads[2])||(m_pads[1]!=m_pads[3])) {
        std::cerr << "[ERROR] assymetric padding note tested" << std::endl;
        return false;
@@ -323,7 +331,7 @@ template<typename T> bool Conv2D<T>::init(const std::vector<Tensor<T> *> &in)
        return false;
   }
   if ((k_h==k_w)&&(m_pads[0]!=m_pads[1])) {
-       std::cerr << "[ERROR] different padding for square kernel" << std::endl;
+       std::cerr << "[ERROR] different padding for square kernel not tested" << std::endl;
        return false;
   }
 
