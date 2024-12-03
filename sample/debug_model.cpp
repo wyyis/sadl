@@ -47,7 +47,7 @@ using namespace std;
 
 namespace
 {
-template<typename T> void infer(const string &filename)
+template<typename T> void infer(const string &filename, int override)
 {
   sadl::Model<T> model;
 #if SPARSE_SUPPORT
@@ -66,6 +66,14 @@ template<typename T> void infer(const string &filename)
   vector<sadl::Tensor<T>> inputs = model.getInputsTemplate();
 
   cout << "[INFO] Model initilization" << endl;
+  if (override>1) {
+       for (auto &t: inputs) {
+           auto d=t.dims();
+           d[1]=override;
+           d[2]=override;
+           t.resize(d);
+       }
+  }
 
   if (!model.init(inputs))
   {
@@ -89,25 +97,29 @@ template<typename T> void infer(const string &filename)
 
 int main(int argc, char **argv)
 {
-  if (argc != 2)
-  {
-    cout << "[ERROR] sample filename_model" << endl;
-    return 1;
-  }
+    if (argc != 2 && argc !=3 )
+    {
+        cout << "[ERROR] debug_model filename_model [override_size]" << endl;
+        return 1;
+    }
 
-  const string filename_model = argv[1];
+    const string filename_model = argv[1];
+    int override=-1;
+    if (argc==3) override=atoi(argv[2]);
+
+
 
   sadl::layers::TensorInternalType::Type type_model = getModelType(filename_model);
   switch (type_model)
   {
   case sadl::layers::TensorInternalType::Float:
-    infer<float>(filename_model);
+    infer<float>(filename_model,override);
     break;
   case sadl::layers::TensorInternalType::Int32:
-    infer<int32_t>(filename_model);
+    infer<int32_t>(filename_model,override);
     break;
   case sadl::layers::TensorInternalType::Int16:
-    infer<int16_t>(filename_model);
+    infer<int16_t>(filename_model,override);
     break;
   default:
     cerr << "[ERROR] unsupported type" << endl;

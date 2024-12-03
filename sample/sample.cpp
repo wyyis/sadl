@@ -54,12 +54,6 @@ template<typename T> void infer(const string &filename, int override)
 
   vector<sadl::Tensor<T>> inputs = model.getInputsTemplate();
   cout << "[INFO] Model initilization" << endl;
-
-  if (!model.init(inputs))
-  {
-    cerr << "[ERROR] issue during initialization" << endl;
-    exit(-1);
-  }
   if (override>1) {
        for (auto &t: inputs) {
            auto d=t.dims();
@@ -68,6 +62,12 @@ template<typename T> void infer(const string &filename, int override)
            t.resize(d);
        }
   }
+  if (!model.init(inputs))
+  {
+    cerr << "[ERROR] issue during initialization" << endl;
+    exit(-1);
+  }
+
 
   // fill input with values from -1 to 1
   double step = (1. + 1.) / (inputs[0].size() - 1);
