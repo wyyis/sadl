@@ -82,12 +82,11 @@ protected:
 
   // 3x3
   template<int s_h, int s_w> void conv2d_3x3_s_peel(const Tensor<T> &A, const Tensor<T> &kernel);
+  template<int s_h, int s_w,int o_i,int o_j> void conv2d_3x3_s_g1_core_dispatch(const Tensor<T> &A, const Tensor<T> &kernel);
 
-  template<int s_h, int s_w,int o_i,int o_j> void conv2d_3x3_s_core_dispatch(const Tensor<T> &A, const Tensor<T> &kernel);
+  template<int s_h, int s_w,int o_i,int o_j> void conv2d_3x3_s_g1_core(const Tensor<T> &A, const Tensor<T> &kernel);
 
-  template<int s_h, int s_w,int o_i,int o_j> void conv2d_3x3_s_core(const Tensor<T> &A, const Tensor<T> &kernel);
-
-  template<int in_D, int s_h, int s_w,int o_i,int o_j> void conv2d_3x3_s_d_core(const Tensor<T> &A, const Tensor<T> &kernel);
+  template<int in_D, int s_h, int s_w,int o_i,int o_j> void conv2d_3x3_s_g1_d_core(const Tensor<T> &A, const Tensor<T> &kernel);
 
   // i x j
   template<int s_h, int s_w> void conv2d_ixj_s_peel(const Tensor<T> &A, const Tensor<T> &kernel);
@@ -99,6 +98,8 @@ protected:
   template<int in_D, int s_h, int s_w,int o_i,int o_j> void conv2d_ixj_s11_gD_d_core(const Tensor<T> &A, const Tensor<T> &kernel);
 
   template<int in_D, int ihalf_size, int jhalf_size,int o_i,int o_j> void conv2d_ixj_s11_g1_d_core(const Tensor<T> &A, const Tensor<T> &kernel);
+
+  template<int in_D, int s_h, int s_w, int ihalf_size, int jhalf_size,int o_i,int o_j> void conv2d_ixj_s_gD_d_core(const Tensor<T> &A, const Tensor<T> &kernel);
 
 #if __AVX2__
   template<int in_D, int s_h, int s_w> void simd8_conv2d_1x1_s_d(const Tensor<T> & /*A*/, const Tensor<T> & /*kernel*/)
@@ -115,18 +116,18 @@ protected:
     simd16_conv2d_1x1_s_d<in_D, s_h, s_w>(A, kernel);
   }
 
-  template<int in_D, int s_h, int s_w,int o_i,int o_j> void simd8_conv2d_3x3_s_d(const Tensor<T> & /*A*/, const Tensor<T> & /*kernel*/)
+  template<int in_D, int s_h, int s_w,int o_i,int o_j> void simd8_conv2d_3x3_s_g1_d(const Tensor<T> & /*A*/, const Tensor<T> & /*kernel*/)
   {
     assert(false);
     exit(-1);
   }
-  template<int in_D, int s_h, int s_w,int o_i,int o_j> void simd16_conv2d_3x3_s_d(const Tensor<T> &A, const Tensor<T> &kernel)
+  template<int in_D, int s_h, int s_w,int o_i,int o_j> void simd16_conv2d_3x3_s_g1_d(const Tensor<T> &A, const Tensor<T> &kernel)
   {
-    simd8_conv2d_3x3_s_d<in_D, s_h, s_w, o_i, o_j>(A, kernel);
+    simd8_conv2d_3x3_s_g1_d<in_D, s_h, s_w, o_i, o_j>(A, kernel);
   }
-  template<int in_D, int s_h, int s_w,int o_i,int o_j> void simd32_conv2d_3x3_s_d(const Tensor<T> &A, const Tensor<T> &kernel)
+  template<int in_D, int s_h, int s_w,int o_i,int o_j> void simd32_conv2d_3x3_s_g1_d(const Tensor<T> &A, const Tensor<T> &kernel)
   {
-    simd16_conv2d_3x3_s_d<in_D, s_h, s_w, o_i, o_j>(A, kernel);
+    simd16_conv2d_3x3_s_g1_d<in_D, s_h, s_w, o_i, o_j>(A, kernel);
   }
   template<int in_D, int ihalf_size, int jhalf_size,int o_i,int o_j> void simd16_conv2d_ixj_s11_g1_d_core(const Tensor<T> &A, const Tensor<T> &kernel) {
     conv2d_ixj_s11_g1_d_core<in_D,ihalf_size,jhalf_size, o_i, o_j>(A,kernel);
@@ -222,16 +223,17 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
 
       else if (k_size_h == 3 && k_size_w == 3)   // 3x3
       {
-          if (m_pads[0] != 0 && m_pads[1] != 0)
+          if (m_pads[0] != 0 || m_pads[1] != 0)
           {
               conv2d_3x3_s_peel<s_h, s_w>(A, kernel);
-              conv2d_3x3_s_core_dispatch<s_h, s_w, 0, 0>(A, kernel);
+             // conv2d_ixj_s_peel<s_h,s_w>(A,kernel); //
+              conv2d_3x3_s_g1_core_dispatch<s_h, s_w, 0, 0>(A, kernel);
               return true;
           }
           else if (m_pads[0] == 1 && m_pads[1] == 1)
           {
               // skip border
-              conv2d_3x3_s_core_dispatch<s_h, s_w, 1, 1>(A, kernel);
+              conv2d_3x3_s_g1_core_dispatch<s_h, s_w, 1, 1>(A, kernel);
               return true;
           }
       }
@@ -336,14 +338,16 @@ template<typename T> bool Conv2D<T>::init(const std::vector<Tensor<T> *> &in)
   }
 
   m_out.resize(dim);
+#if DEBUG_SIMD
   if (m_groups != 1)
   {
     static bool once = true;
     if (once) {
-      std::cout << "[WARNING] generic support for groups !=1 only for debug, do not use" << std::endl;
+      std::cout << "[WARNING] generic support for groups !=1 not always optimized" << std::endl;
     }
     once = false;
   }
+#endif
   SADL_DBG(std::cout << "  - output Conv2D: " << m_out.dims() << std::endl);
   m_initDone = true;
   return true;
@@ -526,7 +530,6 @@ template<typename T> inline void Conv2D<T>::simd_multiply_add_16_points(const T*
 
 template<typename T> template<int s_h, int s_w,int o_i, int o_j> bool Conv2D<T>::conv2d_core_alongJ(const Tensor<T> &A, const Tensor<T> &kernel)
 {
-
   if constexpr (s_w != 1) // data is not continous for SIMD
     return false;
   constexpr int im_nb = 0;

@@ -130,10 +130,10 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_ixj_s_pee
 template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::conv2d_ixj_s_core(const Tensor<T> &A, const Tensor<T> &kernel)
 {
 
- // if (conv2d_core_alongJ<s_h, s_w, o_i, o_j>(A, kernel))
- // {
- //   return;
- // }
+//  if (conv2d_core_alongJ<s_h, s_w, o_i, o_j>(A, kernel))
+//  {
+//    return;
+//  }
   constexpr int im_nb = 0;
   const int     ihalf_size{ kernel.dims()[0] / 2 };
   const int     jhalf_size{ kernel.dims()[1] / 2 };
@@ -147,7 +147,7 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
   int           start_h{ ihalf_size }; // to be checked
   int           start_w{ jhalf_size };
 #if DEBUG_SIMD && __AVX2__
-  std::cout << "\n[WARN] generic version conv (stride known) " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D << " outD=" << nb_filters
+  std::cout << "\n[WARN] generic version conv2d_ixj_s_core (stride known) " << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D << " outD=" << nb_filters
             << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << "?? kMAC" << std::endl;
 #endif
@@ -190,6 +190,58 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
 }
 
 
+template<typename T> template<int in_D, int s_h, int s_w, int ihalf_size, int jhalf_size,int o_i,int o_j> void Conv2D<T>::conv2d_ixj_s_gD_d_core(const Tensor<T> &A, const Tensor<T> &kernel)
+{
+
+    constexpr int nb_filters = in_D;
+    constexpr int im_nb = 0;
+    const int     shift     = kernel.quantizer + m_q;
+    int           in_H{ A.dims()[1] };
+    int           in_W{ A.dims()[2] };
+    constexpr int           start_h{ ihalf_size  };
+    constexpr int           start_w{ jhalf_size  };
+#if DEBUG_SIMD && __AVX2__
+    std::cout << "\n[WARN] generic version conv2d_ixj_s_gD_d_core (s=T, g=in_D, k=T)" << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D << " outD=" << nb_filters
+              << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
+              << "?? kMAC" << std::endl;
+#endif
+#if DEBUG_PATH
+    std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
+    assert(start_h + s_h - ihalf_size >= 0);
+    assert(start_w + s_w - jhalf_size >= 0);
+    for (int im_i = start_h + s_h/2; im_i < in_H - start_h; im_i += s_h)
+    {
+        for (int im_j = start_w + s_w/2; im_j < in_W - start_w; im_j += s_w)
+        {
+            for (int filter = 0; filter < nb_filters; ++filter)
+            {
+                typename ComputationType<T>::type x      = 0;
+                constexpr int filter_d = 0;
+                { // fixed
+                    for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
+                    {   // fixed
+                        for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
+                        {   // fixed
+                            int ii = im_i + filter_i;
+                            int jj = im_j + filter_j;
+                            int ki = ihalf_size + filter_i;
+                            int kj = jhalf_size + filter_j;
+                            x += (typename ComputationType<T>::type) A(im_nb, ii, jj, filter) * kernel(ki, kj, filter, filter_d);
+                            COUNTERS_MAC(kernel(ki, kj, filter, filter_d));
+                        }
+                    }
+                }
+                ComputationType<T>::quantize(x, shift);
+                COUNTERS(x);
+                SATURATE(x);
+                m_out(im_nb, (im_i -o_i)/ s_h, (im_j - o_j )/ s_w , filter) = static_cast<T>(x);
+            }
+        }
+    }
+}
+
+
 template<typename T> template<int in_D, int ihalf_size, int jhalf_size,int o_i,int o_j> void Conv2D<T>::conv2d_ixj_s11_g1_d_core(const Tensor<T> &A, const Tensor<T> &kernel)
 {
 
@@ -200,8 +252,8 @@ template<typename T> template<int in_D, int ihalf_size, int jhalf_size,int o_i,i
   const int     shift     = kernel.quantizer + m_q;
   int           in_H{ A.dims()[1] };
   int           in_W{ A.dims()[2] };
-  int           start_h{ ihalf_size  };
-  int           start_w{ jhalf_size  };
+  constexpr int           start_h{ ihalf_size  };
+  constexpr int           start_w{ jhalf_size  };
 #if DEBUG_SIMD && __AVX2__
   std::cout << "\n[WARN] generic version conv2d_ixj_s11_g1_d_core (s=1, g=1, known kernel)" << kernel.dims()[0] << "x" << kernel.dims()[1] << "g" << m_groups << " inD=" << in_D << " outD=" << nb_filters
             << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
@@ -449,21 +501,11 @@ template<typename T> template<int in_D, int ihalf_size, int jhalf_size,int o_i,i
         {   // fixed
           int jj = im_j + filter_j;
           int kj = jhalf_size + filter_j;
-#if __AVX2__ // optimized code with inversed loop and unchecked access
-          const auto a = A.addr(im_nb, ii, jj, 0);
-          const auto k = kernel.addr(ki, kj, 0, 0);
-          for (int filter = 0; filter < nb_filters; ++filter)
-          { // fixed
-            x[filter] += a[filter] * k[filter];
-            COUNTERS_MAC(kernel(ki, kj, filter, 0));
-          }
-#else
           for (int filter = 0; filter < in_D; ++filter)
           { // fixed
             x[filter] += A(im_nb, ii, jj, filter) * kernel(ki, kj, filter, 0);
             COUNTERS_MAC(kernel(ki, kj, filter, 0));
           }
-#endif
         }
       }
 
@@ -492,68 +534,78 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
 #define CONV_MOD16 conv2d_ixj_s11_g1_d_core
 #endif
 
-  if (in_D == m_groups && in_D == nb_filters && s_h == 1 && s_w == 1)
-  {
-    if (kernel.dims()[0] / 2 == 0 && kernel.dims()[1] / 2 == 1)
-    {
-      constexpr int ki = 0;
-      constexpr int kj = 1;
-      switch (in_D)
+  if (in_D == m_groups && in_D == nb_filters ) {
+      if (s_h == 1 && s_w == 1)
       {
-      case 8:
-        conv2d_ixj_s11_gD_d_core<8, ki, kj,o_i,o_j>(A, kernel);
-        return;
-        break;
-      case 16:
-        conv2d_ixj_s11_gD_d_core<16, ki, kj,o_i,o_j>(A, kernel);
-        return;
-        break;
-      case 24:
-        conv2d_ixj_s11_gD_d_core<24, ki, kj,o_i,o_j>(A, kernel);
-        return;
-        break;
-      case 32:
-        conv2d_ixj_s11_gD_d_core<32, ki, kj,o_i,o_j>(A, kernel);
-        return;
-        break;
-      case 64:
-        conv2d_ixj_s11_gD_d_core<64, ki, kj,o_i,o_j>(A, kernel);
-        return;
-        break;
-      default:   // do default
-        break;
+          if (kernel.dims()[0] / 2 == 0 && kernel.dims()[1] / 2 == 1)
+          {
+              constexpr int ki = 0;
+              constexpr int kj = 1;
+              switch (in_D)
+              {
+              case 8:
+                  conv2d_ixj_s11_gD_d_core<8, ki, kj,o_i,o_j>(A, kernel);
+                  return;
+                  break;
+              case 16:
+                  conv2d_ixj_s11_gD_d_core<16, ki, kj,o_i,o_j>(A, kernel);
+                  return;
+                  break;
+              case 24:
+                  conv2d_ixj_s11_gD_d_core<24, ki, kj,o_i,o_j>(A, kernel);
+                  return;
+                  break;
+              case 32:
+                  conv2d_ixj_s11_gD_d_core<32, ki, kj,o_i,o_j>(A, kernel);
+                  return;
+                  break;
+              case 64:
+                  conv2d_ixj_s11_gD_d_core<64, ki, kj,o_i,o_j>(A, kernel);
+                  return;
+                  break;
+              default:   // do default
+                  break;
+              }
+          }
+          else if (kernel.dims()[0] / 2 == 1 && kernel.dims()[1] / 2 == 0)
+          {
+              constexpr int ki = 1;
+              constexpr int kj = 0;
+              switch (in_D)
+              {
+              case 8:
+                  conv2d_ixj_s11_gD_d_core<8, ki, kj,o_i,o_j>(A, kernel);
+                  return;
+                  break;
+              case 16:
+                  conv2d_ixj_s11_gD_d_core<16, ki, kj,o_i,o_j>(A, kernel);
+                  return;
+                  break;
+              case 24:
+                  conv2d_ixj_s11_gD_d_core<24, ki, kj,o_i,o_j>(A, kernel);
+                  return;
+                  break;
+              case 32:
+                  conv2d_ixj_s11_gD_d_core<32, ki, kj,o_i,o_j>(A, kernel);
+                  return;
+                  break;
+              case 64:
+                  conv2d_ixj_s11_gD_d_core<64, ki, kj,o_i,o_j>(A, kernel);
+                  return;
+                  break;
+              default:   // do default
+                  break;
+              }
+          }
+      } else {
+              if (kernel.dims()[0] == 1 && kernel.dims()[1] == 3 &&  in_D == 64) {
+                  conv2d_ixj_s_gD_d_core<64,s_h,s_w,0,1,o_i,o_j>(A,kernel);
+                  return;
+              } else if (kernel.dims()[0] == 3 && kernel.dims()[1] == 1 &&  in_D == 64) {
+                  conv2d_ixj_s_gD_d_core<64,s_h,s_w,1,0,o_i,o_j>(A,kernel);
+                  return;
+              }
       }
-    }
-    else if (kernel.dims()[0] / 2 == 1 && kernel.dims()[1] / 2 == 0)
-    {
-      constexpr int ki = 1;
-      constexpr int kj = 0;
-      switch (in_D)
-      {
-      case 8:
-        conv2d_ixj_s11_gD_d_core<8, ki, kj,o_i,o_j>(A, kernel);
-        return;
-        break;
-      case 16:
-        conv2d_ixj_s11_gD_d_core<16, ki, kj,o_i,o_j>(A, kernel);
-        return;
-        break;
-      case 24:
-        conv2d_ixj_s11_gD_d_core<24, ki, kj,o_i,o_j>(A, kernel);
-        return;
-        break;
-      case 32:
-        conv2d_ixj_s11_gD_d_core<32, ki, kj,o_i,o_j>(A, kernel);
-        return;
-        break;
-      case 64:
-        conv2d_ixj_s11_gD_d_core<64, ki, kj,o_i,o_j>(A, kernel);
-        return;
-        break;
-      default:   // do default
-        break;
-      }
-    }
   }
 
 

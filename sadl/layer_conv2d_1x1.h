@@ -55,6 +55,7 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s_dis
 #define CONV_MOD16 conv2d_1x1_s_d
 #define CONV_MOD32 conv2d_1x1_s_d
 #endif
+
   const int in_D{ A.dims()[3] };
   switch (in_D)
   {
@@ -66,6 +67,12 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s_dis
     break;
   case 4:
     conv2d_1x1_s_d<4, s_h, s_w>(A, kernel);
+    break;
+  case 6:
+    conv2d_1x1_s_d<6, s_h, s_w>(A, kernel);
+    break;
+  case 34:
+    conv2d_1x1_s_d<34, s_h, s_w>(A, kernel);
     break;
   case 8:
     CONV_MOD8<8, s_h, s_w>(A, kernel);
@@ -139,13 +146,15 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s(con
   const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_h{ 0 };
   constexpr int half_size_w{ 0 };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
+  assert(m_pads[0]==0);
+  assert(m_pads[1]==0);
+  constexpr int     top{ 0 };
+  constexpr int     left{ 0 };
+  constexpr int     start_h{ half_size_h - top };
+  constexpr int     start_w{ half_size_w - left };
 
 #if DEBUG_SIMD && __AVX2__
-  std::cout << "\n[WARN] generic version conv1x1 inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "] " << in_H << 'x' << in_W << " "
+  std::cout << "\n[WARN] generic version conv2d_1x1_s inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "] " << in_H << 'x' << in_W << " "
             << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
 #endif
 #if DEBUG_PATH
@@ -178,23 +187,25 @@ template<typename T> template<int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s(con
 
 template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d_1x1_s_d(const Tensor<T> &A, const Tensor<T> &kernel)
 { 
-  if (conv2d_core_alongJ<s_h, s_w,0,0>(A, kernel))
-  {
-    return;
-  }
+//  if (conv2d_core_alongJ<s_h, s_w,0,0>(A, kernel))
+//  {
+//    return;
+//  }
   
   const int     in_H{ A.dims()[1] };
   const int     in_W{ A.dims()[2] };
   const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_h{ 0 };
   constexpr int half_size_w{ 0 };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
+  assert(m_pads[0]==0);
+  assert(m_pads[1]==0);
+  constexpr int     top{ 0 };
+  constexpr int     left{ 0 };
+  constexpr int     start_h{ half_size_h - top };
+  constexpr int     start_w{ half_size_w - left };
 
 #if DEBUG_SIMD && __AVX2__
-  std::cout << "\n[WARN] generic version conv 1x1 inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
+  std::cout << "\n[WARN] generic version conv2d_1x1_s_d inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x' << in_W << " "
             << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
 #endif
 #if DEBUG_PATH
@@ -223,6 +234,7 @@ template<typename T> template<int in_D, int s_h, int s_w> void Conv2D<T>::conv2d
   }
 }
 
+
 #if __AVX2__
 // ////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 1x1
@@ -235,10 +247,12 @@ template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd8
   const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_h{ 0 };
   constexpr int half_size_w{ 0 };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
+  assert(m_pads[0]==0);
+  assert(m_pads[1]==0);
+  constexpr int     top{ 0 };
+  constexpr int     left{ 0 };
+  constexpr int     start_h{ half_size_h - top };
+  constexpr int     start_w{ half_size_w - left };
 #if DEBUG_SIMD && __AVX512F__
   if (in_D >= 16)
   {
@@ -286,10 +300,12 @@ template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd1
   const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_h{ 0 };
   constexpr int half_size_w{ 0 };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
+  assert(m_pads[0]==0);
+  assert(m_pads[1]==0);
+  constexpr int     top{ 0 };
+  constexpr int     left{ 0 };
+  constexpr int     start_h{ half_size_h - top };
+  constexpr int     start_w{ half_size_w - left };
 #if DEBUG_PATH
   std::cout<<__PRETTY_FUNCTION__<<std::endl;
 #endif
@@ -330,15 +346,17 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd8_conv
   const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_h{ 0 };
   constexpr int half_size_w{ 0 };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
+  assert(m_pads[0]==0);
+  assert(m_pads[1]==0);
+  constexpr int     top{ 0 };
+  constexpr int     left{ 0 };
+  constexpr int     start_h{ half_size_h - top };
+  constexpr int     start_w{ half_size_w - left };
   static_assert(in_D % 8 == 0, "Should be used with mod16 filters.");
 #if DEBUG_SIMD && __AVX2__
   if (in_D >= 8)
   {
-    std::cout << "\n[WARN] suboptimal SIMD8 version conv 3x3 inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x'
+    std::cout << "\n[WARN] suboptimal SIMD8 version simd8_conv2d_1x1_s_d inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x'
               << in_W << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
   }
 #endif
@@ -382,15 +400,17 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd16_con
   const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_h{ 0 };
   constexpr int half_size_w{ 0 };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
+  assert(m_pads[0]==0);
+  assert(m_pads[1]==0);
+  constexpr int     top{ 0 };
+  constexpr int     left{ 0 };
+  constexpr int     start_h{ half_size_h - top };
+  constexpr int     start_w{ half_size_w - left };
   static_assert(in_D % 16 == 0, "Should be used with mod16 filters.");
 #if DEBUG_SIMD && __AVX512BW__
   if (in_D >= 32)
   {
-    std::cout << "\n[WARN] suboptimal SIMD16 version conv 3x3 inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x'
+    std::cout << "\n[WARN] suboptimal SIMD16 version simd16_conv2d_1x1_s_d inD=" << in_D << " outD=" << nb_filters << " s=[" << s_w << ' ' << s_h << "]  " << in_H << 'x'
               << in_W << " " << in_D * kernel.dims()[0] * kernel.dims()[1] * nb_filters * (in_H / s_h) * (in_W / s_w) / 1000 << " kMAC" << std::endl;
   }
 #endif
@@ -399,6 +419,7 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd16_con
 #endif
   constexpr int im_nb = 0;
   const int     shift = kernel.quantizer + m_q;
+
   for (int im_i = start_h; im_i < in_H; im_i += s_h)
   {
     for (int im_j = start_w; im_j < in_W; im_j += s_w)
@@ -421,8 +442,10 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd16_con
         m_out(im_nb, im_i / s_h, im_j / s_w, filter) = static_cast<int16_t>(z);
       }
     }
-  }
+  }  
 }
+
+
 
 #if __AVX512BW__
 template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd32_conv2d_1x1_s_d(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
@@ -434,10 +457,12 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd32_con
   const int     nb_filters{ kernel.dims()[2] };
   constexpr int half_size_h{ 0 };
   constexpr int half_size_w{ 0 };
-  const int     top{ m_pads[0] };
-  const int     left{ m_pads[1] };
-  const int     start_h{ half_size_h - top };
-  const int     start_w{ half_size_w - left };
+  assert(m_pads[0]==0);
+  assert(m_pads[1]==0);
+  constexpr int     top{ 0 };
+  constexpr int     left{ 0 };
+  constexpr int     start_h{ half_size_h - top };
+  constexpr int     start_w{ half_size_w - left };
   constexpr int im_nb = 0;
   const int     shift = kernel.quantizer + m_q;
 #if DEBUG_PATH

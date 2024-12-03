@@ -10,7 +10,6 @@ include_directories(..)
 add_executable(test_scalar  test.cpp ${HEADER_FILES})
 add_executable(test_avx2    test.cpp ${HEADER_FILES})
 add_executable(test_avx512  test.cpp ${HEADER_FILES})
-
 if( UNIX OR MINGW )
  set(CMAKE_CXX_FLAGS_RELEASE "-O3")
  set(CMAKE_CXX_FLAGS "-ffast-math -Wall -fstrict-aliasing") 
