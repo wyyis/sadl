@@ -101,39 +101,13 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
       }
       else if (in[0]->dims().size() == 2)
       {
+        const Tensor<T> &B = *in[1];
+        assert(B.dims().size() == 1 || (B.dims().size() == 2 && B.dims()[0] == 1));
         const int N = in[0]->dims()[0];
         const int H = in[0]->dims()[1];
 #if DEBUG_MODEL_ANALYZE
         std::cout << "\n[ANALYZE] add (in):\t" << H << std::endl;
 #endif
-#if __AVX2__
-        if constexpr(std::is_same_v<T, int16_t>)
-        {
-          if (H % 16 == 0) 
-          {
-            const __m256i     max   = _mm256_set1_epi16(32767);
-            const __m256i     min   = _mm256_set1_epi16(-32768);
-            for (int n = 0; n < N; ++n) {
-              T *a_ptr = &m_out[n];
-              T *b_ptr = in[1]->data();
-              for (int i = 0; i < H; i += 16, a_ptr+=16, b_ptr+=16)
-              {
-                __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(a_ptr));
-                __m256i b = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(b_ptr));
-                __m256i result = _mm256_adds_epi16(a, b);
-                result = _mm256_slli_epi16(result, shift);
-#if SATURATE_RESULT
-                result = _mm256_min_epi16(_mm256_max_epi16(result, min), max);
-#endif
-                _mm256_store_si256((__m256i *) a_ptr, result);
-              }
-            }
-            return true;
-          }
-        }
-#else
-        const Tensor<T> &B = *in[1];
-        assert(B.dims().size() == 1 || (B.dims().size() == 2 && B.dims()[0] == 1));
         for (int n = 0; n < N; ++n)
           for (int i = 0; i < H; ++i)
           {
@@ -144,7 +118,6 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
             SATURATE(z);
             m_out(n, i) = static_cast<T>(z);
           }
-#endif
       }
       else if (in[0]->dims().size() == 3)
       {
@@ -232,39 +205,13 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
       }
       else if (in[0]->dims().size() == 2)
       {
+        const Tensor<T> &B = *in[1];
+        assert(B.dims().size() == 1 || (B.dims().size() == 2 && B.dims()[0] == 1));
         const int N = in[0]->dims()[0];
         const int H = in[0]->dims()[1];
 #if DEBUG_MODEL_ANALYZE
         std::cout << "\n[ANALYZE] add (in):\t" << H << std::endl;
 #endif
-#if __AVX2__
-        if constexpr(std::is_same_v<T, int16_t>)
-        {
-          if (H % 16 == 0) 
-          {
-            const __m256i     max   = _mm256_set1_epi16(32767);
-            const __m256i     min   = _mm256_set1_epi16(-32768);
-            for (int n = 0; n < N; ++n) {
-              T *a_ptr = &m_out[n];
-              T *b_ptr = in[1]->data();
-              for (int i = 0; i < H; i += 16, a_ptr+=16, b_ptr+=16)
-              {
-                __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(a_ptr));
-                __m256i b = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(b_ptr));
-                __m256i result = _mm256_adds_epi16(a, b);
-                result = _mm256_srai_epi16(result, shift);
-#if SATURATE_RESULT
-                result = _mm256_min_epi16(_mm256_max_epi16(result, min), max);
-#endif
-                _mm256_store_si256((__m256i *) a_ptr, result);
-              }
-            }
-            return true;
-          }
-        }
-#else
-        const Tensor<T> &B = *in[1];
-        assert(B.dims().size() == 1 || (B.dims().size() == 2 && B.dims()[0] == 1));
         for (int n = 0; n < N; ++n)
           for (int i = 0; i < H; ++i)
           {
@@ -275,7 +222,6 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
             SATURATE(z);
             m_out(n, i) = static_cast<T>(z);
           }
-#endif
       }
       else if (in[0]->dims().size() == 3)
       {
