@@ -1283,7 +1283,7 @@ def parse_graph_node(
         mode = getAttribute(node, "mode").s.decode("utf-8")
         padding_mode = getAttribute(node, "padding_mode").s.decode("utf-8")
 
-        mode_list = ["nearest", "bilinear"]
+        mode_list = ["nearest", "bilinear", "bicubic"]
         if not mode in mode_list:
             quit("[ERROR] Currently, the mode of GridSample must in", mode_list, node)
         else:

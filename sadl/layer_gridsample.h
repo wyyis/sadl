@@ -53,21 +53,26 @@ protected:
   virtual bool loadInternal(std::istream &file, Version) override;
   bool         gridsample_nearest(std::vector<Tensor<T> *> &in);
   bool         gridsample_bilinear(std::vector<Tensor<T> *> &in);
+  bool         gridsample_bicubic(std::vector<Tensor<T> *> &in);
   void         get_bilinear_coeffs(T2 y, T2 x, int pos[], T2 coeffs[]);
+  void         get_bicubic_coeffs(T2 y, T2 x, T2 coeffs[]) const;
+  void         calc_bicubic_positions(T2 y, T2 x, int H, int W, int pos[][2]) const;
+  T2           cubic_coeffs(T2 x, int i) const;
   void         gs_denormalize(T2 &x, int length);
   void         pixel_addr_at_grid(int H, int W, int &i, int &j);
 
   enum gridsample_mode
   {
     gridsample_mode_nearest  = 0,
-    gridsample_mode_bilinear = 1
+    gridsample_mode_bilinear = 1,
+    gridsample_mode_bicubic  = 2
   };
   enum gridsample_paddingmode
   {
     gridsample_paddingmode_border = 0
   };
   int m_align_corners;   // 0: False, 1: True
-  int m_mode;            // 0: "nearest", 1: "bilinear"
+  int m_mode;            // 0: "nearest", 1: "bilinear", 2: "bicubic"
   int m_padding_mode;    // 0: "border"
   int m_grid_quantizer;
   DUMP_MODEL_EXT;
@@ -85,12 +90,7 @@ template<typename T> bool GridSample<T>::loadInternal(std::istream &file, Versio
   file.read((char *) &x, sizeof(x));
   m_padding_mode = x;
   SADL_DBG(std::cout << "  - padding_mode: " << m_padding_mode << std::endl);
-  if (m_align_corners != 1)
-  {
-    std::cerr << "[ERROR] invalid align corners: " << m_align_corners << std::endl;
-    return false;
-  }
-  if (m_mode != 0 && m_mode != 1)
+  if (m_mode != 0 && m_mode != 1 && m_mode != 2)
   {
     std::cerr << "[ERROR] invalid mode: " << m_mode << std::endl;
     return false;
@@ -124,6 +124,8 @@ template<typename T> bool GridSample<T>::apply(std::vector<Tensor<T> *> &in)
     return gridsample_nearest(in);
   else if (m_mode == gridsample_mode_bilinear)
     return gridsample_bilinear(in);
+  else if (m_mode == gridsample_mode_bicubic)
+    return gridsample_bicubic(in);
 
   return false;
 }
@@ -210,16 +212,66 @@ template<typename T> bool GridSample<T>::gridsample_bilinear(std::vector<Tensor<
   return true;
 }
 
+template<typename T> bool GridSample<T>::gridsample_bicubic(std::vector<Tensor<T> *> &in)
+{
+  // Given an input data and a flow-field grid, computes the output Y using data
+  // values and pixel locations from the grid.
+  const Tensor<T> &data = *in[0];   // (1,H_in,W_in,C)
+  const Tensor<T> &grid = *in[1];   // (1,W_out,2,H_out)
+  m_out.quantizer       = data.quantizer;
+  m_grid_quantizer      = grid.quantizer;
+  assert(data.dims()[0] == 1 && grid.dims()[0] == 1 && grid.dims()[2] == 2);
+
+  constexpr int im_nb = 0;
+  int           shift = m_grid_quantizer + 1;
+  int           H_in  = data.dims()[1];
+  int           W_in  = data.dims()[2];
+  int           H_out = grid.dims()[3];
+  int           W_out = grid.dims()[1];
+
+  for (int im_j = 0; im_j < W_out; im_j++)
+  {
+    for (int im_i = 0; im_i < H_out; im_i++)
+    {
+      // compute pixel locations from the grid
+      T2 x = grid(im_nb, im_j, 0, im_i);
+      T2 y = grid(im_nb, im_j, 1, im_i);
+      gs_denormalize(x, W_in);
+      gs_denormalize(y, H_in);
+
+      // compute the output Y using data values and pixel locations
+      T2   coeffs[16];
+      int  pos[16][2];
+
+      // calculate original pixel position (x, y) and adjacent pixel positions.
+      calc_bicubic_positions(y, x, H_in, W_in, pos);
+
+      // coeffs
+      get_bicubic_coeffs(y, x, coeffs);
+
+      BICUBIC_COUNTERS(data, coeffs);
+      bicubic_in_channels(data, coeffs, pos, shift, im_i, im_j, m_out);
+    }
+  }
+  return true;
+}
+
 template<> inline void GridSample<float>::gs_denormalize(float &x, int length)
 {
   if (m_mode == gridsample_mode_nearest)
   {
-    x = (x + 1) * (length - 1) / 2.0f;
+    if (m_align_corners)
+      x = (x + 1) * (length - 1) / 2.0f;
+    else
+      x = ((x + 1) * length - 1) / 2.0f;
     x = round(x);
   }
-  else if (m_mode == gridsample_mode_bilinear)
+  else if (m_mode == gridsample_mode_bilinear || m_mode == gridsample_mode_bicubic)
   {
-    x = (x + 1) * (length - 1) / 2.0f;
+    if (m_align_corners)
+      x = (x + 1) * (length - 1) / 2.0f;
+    else
+      x = ((x + 1) * length - 1) / 2.0f;
   }
 }
 
@@ -229,13 +281,19 @@ template<typename T> void GridSample<T>::gs_denormalize(T2 &x, int length)
   if (m_mode == gridsample_mode_nearest)
   {
     T2 normalize_bias = (T)(1 << shift);
-    x                 = (x + normalize_bias) * (length - 1);
+    if (m_align_corners)
+      x               = (x + normalize_bias) * (length - 1);
+    else
+      x               = (x + normalize_bias) * length - (T)(1 << shift);
     x                 = (x + normalize_bias) >> (shift + 1);   // round
   }
-  else if (m_mode == gridsample_mode_bilinear)
+  else if (m_mode == gridsample_mode_bilinear || m_mode == gridsample_mode_bicubic)
   {
     T2 normalize_bias = (T)(1 << shift);
-    x                 = (x + normalize_bias) * (length - 1);   // shift later to to maintain precision in higher-order bits during computation
+    if (m_align_corners)
+      x               = (x + normalize_bias) * (length - 1);
+    else
+      x               = (x + normalize_bias) * length - (T)(1 << shift);  // shift later to to maintain precision in higher-order bits during computation
   }
 }
 
@@ -284,6 +342,124 @@ template<typename T> void GridSample<T>::pixel_addr_at_grid(int H, int W, int &i
   {
     i = (i < 0) ? 0 : ((i > H - 1) ? H - 1 : i);
     j = (j < 0) ? 0 : ((j > W - 1) ? W - 1 : j);
+  }
+}
+
+template<> void GridSample<float>::calc_bicubic_positions(float y, float x, int H, int W, int pos[][2]) const
+{
+  float x_int = std::floor(x);
+  float y_int = std::floor(y);
+
+  // acquire the positions of 16 adjacent pixels
+  int idx = 0;
+  for (int dy = -1; dy <= 2; dy++)
+  {
+    for (int dx = -1; dx <= 2; dx++)
+    {
+      pos[idx][0] = std::min(std::max((int)(y_int + dy), 0), H - 1);
+      pos[idx][1] = std::min(std::max((int)(x_int + dx), 0), W - 1);
+      idx++;
+    }
+  }
+}
+
+template<typename T> void GridSample<T>::calc_bicubic_positions(T2 y, T2 x, int H, int W, int pos[][2]) const
+{
+  int  shift = m_grid_quantizer + 1;
+  T2 x_int = x >> shift;   // floor
+  T2 y_int = y >> shift;
+
+  // acquire the positions of 16 adjacent pixels
+  int idx = 0;
+  for (int dy = -1; dy <= 2; dy++)
+  {
+    for (int dx = -1; dx <= 2; dx++)
+    {
+      pos[idx][0] = std::min(std::max((int)(y_int + dy), 0), H - 1);
+      pos[idx][1] = std::min(std::max((int)(x_int + dx), 0), W - 1);
+      idx++;
+    }
+  }
+}
+
+template<> inline float GridSample<float>::cubic_coeffs(float x, int i) const
+{
+  if (i == -1)
+    return (-3 * x * x * x + 6 * x * x - 3 * x) / 4;
+  else if (i == 0)
+    return (5 * x * x * x - 9 * x * x + 4) / 4;
+  else if (i == 1)
+    return (-5 * x * x * x + 6 * x * x + 3 * x) / 4;
+  else
+    return (3 * x * x * x - 3 * x * x) / 4;
+}
+
+template<typename T> inline typename GridSample<T>::T2 GridSample<T>::cubic_coeffs(T2 x, int i) const
+{
+  int shift = m_grid_quantizer + 1;
+  T2 x2 = x * x;
+  ComputationType<T>::quantize(x2, shift);
+  T2 x3 = x2 * x;
+  ComputationType<T>::quantize(x3, shift);
+  if (i == -1)
+    return (-3 * x3 + 6 * x2 - 3 * x) >> 2;
+  else if (i == 0)
+    return (5 * x3 - 9 * x2 + (4 << shift)) >> 2;
+  else if (i == 1)
+    return (-5 * x3 + 6 * x2 + 3 * x) >> 2;
+  else
+    return (3 * x3 - 3 * x2) >> 2;
+}
+
+template<> inline void GridSample<float>::get_bicubic_coeffs(float y_ori, float x_ori, float coeffs[]) const
+{
+  float x_ori_int = std::floor(x_ori);
+  float y_ori_int = std::floor(y_ori);
+  float x_ratio   = (x_ori == x_ori_int) ? 1 : x_ori - x_ori_int;
+  float y_ratio   = (y_ori == y_ori_int) ? 1 : y_ori - y_ori_int;
+
+  float wx[4], wy[4];
+  for (int i = -1; i <= 2; i++)
+  {
+    wx[i + 1] = cubic_coeffs(x_ratio, i);
+    wy[i + 1] = cubic_coeffs(y_ratio, i);
+  }
+
+  int idx = 0;
+  for (int j = 0; j < 4; j++)
+  {
+    for (int i = 0; i < 4; i++)
+    {
+      coeffs[idx++] = wx[i] * wy[j];
+    }
+  }
+}
+
+template<typename T> void GridSample<T>::get_bicubic_coeffs(T2 y_ori, T2 x_ori, T2 coeffs[]) const
+{
+  int shift = m_grid_quantizer + 1;
+
+  T2 x_ori_int = (x_ori >> shift) << shift;
+  T2 y_ori_int = (y_ori >> shift) << shift;
+  T2 x_ratio   = (x_ori == x_ori_int) ? (T)(1 << shift) : x_ori - x_ori_int;
+  T2 y_ratio   = (y_ori == y_ori_int) ? (T)(1 << shift) : y_ori - y_ori_int;
+
+  T2 wx[4], wy[4];
+  for (int i = -1; i <= 2; i++)
+  {
+    wx[i + 1] = cubic_coeffs(x_ratio, i);
+    wy[i + 1] = cubic_coeffs(y_ratio, i);
+  }
+
+  int idx = 0;
+  for (int j = 0; j < 4; j++)
+  {
+    for (int i = 0; i < 4; i++)
+    {
+      coeffs[idx] = wx[i] * wy[j] + (T)(1 << (shift - 1));
+      ComputationType<T>::quantize(coeffs[idx], shift);
+      idx++;
+    }
   }
 }
 
