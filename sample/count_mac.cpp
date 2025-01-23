@@ -66,9 +66,12 @@ template<typename T> void infer(const string &filename,int override)
   if (override > 1) {
       for(auto &t: inputs) {
           auto d=t.dims();
-          d[1]=override;
-          d[2]=override;
-          t.resize(d);
+          if (d.size() >= 3)
+          {
+            d[1] = override;
+            d[2] = override;
+            t.resize(d);
+          }
       }
   }
   if (!model.init(inputs))
