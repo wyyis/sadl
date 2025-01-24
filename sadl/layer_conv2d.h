@@ -102,6 +102,18 @@ protected:
   template<int in_D, int s_h, int s_w, int ihalf_size, int jhalf_size,int o_i,int o_j> void conv2d_ixj_s_gD_d_core(const Tensor<T> &A, const Tensor<T> &kernel);
 
 #if __AVX2__
+  template<int in_D, int ihalf_size, int jhalf_size,int o_i,int o_j> void simd16_conv2d_ixj_s11_gD_d_core(const Tensor<T> &A, const Tensor<T> &kernel)
+  {
+    assert(false);
+    exit(-1);
+  }
+
+  template<int s_h, int s_w,int o_i,int o_j> void simd16_conv2d_ixj_s_core(const Tensor<T> &A, const Tensor<T> &kernel)
+  {
+    assert(false);
+    exit(-1);
+  }
+
   template<int in_D, int s_h, int s_w> void simd8_conv2d_1x1_s_d(const Tensor<T> & /*A*/, const Tensor<T> & /*kernel*/)
   {
     assert(false);
