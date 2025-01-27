@@ -345,7 +345,7 @@ template<typename T> void GridSample<T>::pixel_addr_at_grid(int H, int W, int &i
   }
 }
 
-template<> void GridSample<float>::calc_bicubic_positions(float y, float x, int H, int W, int pos[][2]) const
+template<> inline void GridSample<float>::calc_bicubic_positions(float y, float x, int H, int W, int pos[][2]) const
 {
   float x_int = std::floor(x);
   float y_int = std::floor(y);
