@@ -202,6 +202,7 @@ template<> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<int16_t>::simd
   int           in_W{ A.dims()[2] };
   int           start_h{ ihalf_size }; // to be checked
   int           start_w{ jhalf_size };
+  assert(nb_filters%16==0);
 #if DEBUG_PATH
   std::cout<<__PRETTY_FUNCTION__<<std::endl;
 #endif
@@ -652,19 +653,19 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
   const int in_D{ A.dims()[3] };
   const int nb_filters{ kernel.dims()[2] };
 
-  // grouped conv with stride 1 and inD==outD
 #if __AVX2__
-#define CONV_MOD32 simd32_conv2d_ixj_s11_g1_d_core
-#define CONV_MOD16 simd16_conv2d_ixj_s11_g1_d_core
-#define CONV_MOD16_DW3x3 simd16_conv2d_ixj_s_core
-#define CONV_MOD16_IJ simd16_conv2d_ixj_s11_gD_d_core
+#define CONV_IJ_G1_MOD32  simd32_conv2d_ixj_s11_g1_d_core
+#define CONV_IJ_G1_MOD16  simd16_conv2d_ixj_s11_g1_d_core
+#define CONV_3x3_DW_MOD16 simd16_conv2d_ixj_s_core
+#define CONV_IJ_GD_MOD16  simd16_conv2d_ixj_s11_gD_d_core
 #else
-#define CONV_MOD32 conv2d_ixj_s11_g1_d_core
-#define CONV_MOD16 conv2d_ixj_s11_g1_d_core
-#define CONV_MOD16_DW3x3 conv2d_ixj_s_core
-#define CONV_MOD16_IJ conv2d_ixj_s11_gD_d_core
+#define CONV_IJ_G1_MOD32  conv2d_ixj_s11_g1_d_core
+#define CONV_IJ_G1_MOD16  conv2d_ixj_s11_g1_d_core
+#define CONV_3x3_DW_MOD16 conv2d_ixj_s_core
+#define CONV_IJ_GD_MOD16  conv2d_ixj_s11_gD_d_core
 #endif
 
+  // grouped conv with stride 1 and inD==outD
   if (in_D == m_groups && in_D == nb_filters ) {
       if (s_h == 1 && s_w == 1)
       {
@@ -679,7 +680,7 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
                   return;
                   break;
               case 16:
-                  CONV_MOD16_IJ<16, ki, kj, o_i, o_j>(A, kernel);
+                  CONV_IJ_GD_MOD16<16, ki, kj, o_i, o_j>(A, kernel);
                   return;
                   break;
               case 24:
@@ -687,11 +688,11 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
                   return;
                   break;
               case 32:
-                  CONV_MOD16_IJ<32, ki, kj, o_i, o_j>(A, kernel);
+                  CONV_IJ_GD_MOD16<32, ki, kj, o_i, o_j>(A, kernel);
                   return;
                   break;
               case 64:
-                  CONV_MOD16_IJ<64, ki, kj, o_i, o_j>(A, kernel);
+                  CONV_IJ_GD_MOD16<64, ki, kj, o_i, o_j>(A, kernel);
                   return;
                   break;
               default:   // do default
@@ -709,7 +710,7 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
                   return;
                   break;
               case 16:
-                  CONV_MOD16_IJ<16, ki, kj, o_i, o_j>(A, kernel);
+                  CONV_IJ_GD_MOD16<16, ki, kj, o_i, o_j>(A, kernel);
                   return;
                   break;
               case 24:
@@ -717,11 +718,11 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
                   return;
                   break;
               case 32:
-                  CONV_MOD16_IJ<32, ki, kj, o_i, o_j>(A, kernel);
+                  CONV_IJ_GD_MOD16<32, ki, kj, o_i, o_j>(A, kernel);
                   return;
                   break;
               case 64:
-                  CONV_MOD16_IJ<64, ki, kj, o_i, o_j>(A, kernel);
+                  CONV_IJ_GD_MOD16<64, ki, kj, o_i, o_j>(A, kernel);
                   return;
                   break;
               default:   // do default
@@ -739,7 +740,7 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
               case 64:
               case 80:
               case 96:
-                  CONV_MOD16_DW3x3<s_h, s_w, o_i, o_j>(A, kernel);
+                  CONV_3x3_DW_MOD16<s_h, s_w, o_i, o_j>(A, kernel);
                   return;
                   break;
               default:   // do default
@@ -770,19 +771,19 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
       switch (in_D)
       {
       case 16:
-        CONV_MOD16<16, ki, kj,o_i,o_j>(A, kernel);
+        CONV_IJ_G1_MOD16<16, ki, kj,o_i,o_j>(A, kernel);
         return;
         break;
       case 32:
-        CONV_MOD32<32, ki, kj,o_i,o_j>(A, kernel);
+        CONV_IJ_G1_MOD32<32, ki, kj,o_i,o_j>(A, kernel);
         return;
         break;
       case 48:
-        CONV_MOD16<48, ki, kj,o_i,o_j>(A, kernel);
+        CONV_IJ_G1_MOD16<48, ki, kj,o_i,o_j>(A, kernel);
         return;
         break;
       case 64:
-        CONV_MOD32<64, ki, kj,o_i,o_j>(A, kernel);
+        CONV_IJ_G1_MOD32<64, ki, kj,o_i,o_j>(A, kernel);
         return;
         break;
       default:   // do default
@@ -796,19 +797,19 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
       switch (in_D)
       {
       case 16:
-        CONV_MOD16<16, ki, kj,o_i,o_j>(A, kernel);
+        CONV_IJ_G1_MOD16<16, ki, kj,o_i,o_j>(A, kernel);
         return;
         break;
       case 32:
-        CONV_MOD32<32, ki, kj,o_i,o_j>(A, kernel);
+        CONV_IJ_G1_MOD32<32, ki, kj,o_i,o_j>(A, kernel);
         return;
         break;
       case 48:
-        CONV_MOD16<48, ki, kj,o_i,o_j>(A, kernel);
+        CONV_IJ_G1_MOD16<48, ki, kj,o_i,o_j>(A, kernel);
         return;
         break;
       case 64:
-        CONV_MOD32<64, ki, kj,o_i,o_j>(A, kernel);
+        CONV_IJ_G1_MOD32<64, ki, kj,o_i,o_j>(A, kernel);
         return;
         break;
       default:   // do default
@@ -816,7 +817,10 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
       }
     }
   }
-#undef CONV_MOD16
+#undef CONV_IJ_G1_MOD16
+#undef CONV_IJ_GD_MOD16
+#undef CONV_IJ_G1_MOD32
+#undef CONV_3x3_DW_MOD16
   conv2d_ixj_s_core<s_h, s_w,o_i,o_j>(A, kernel);
 }
 
