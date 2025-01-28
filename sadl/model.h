@@ -67,11 +67,12 @@ private:
   bool                                       m_initDone = false;
   bool                                       m_sparsityComputed = false;
   std::string                                m_info;
-
+  void                                       activateLayer(typename layers::Layer<T>::Id id);
 public:
   bool             load(std::istream &in);
   bool             init(std::vector<Tensor<T>> &in);
   bool             apply(std::vector<Tensor<T>> &in);   // change input for optiz
+  void             activateOutput(const std::vector<char> &output_activated);
   const Tensor<T> &result(int idx_out = 0) const { return getLayer(m_ids_output[idx_out]).layer->output(); }
 
   // aditionnal info
@@ -431,6 +432,7 @@ template<typename T> bool Model<T>::init(std::vector<Tensor<T>> &in)
     for (auto &L: m_data)
     {
       L.layer->m_initDone = false;
+      L.layer->m_torun = true;
     }
   }
   else
@@ -634,7 +636,7 @@ template<typename T> bool Model<T>::apply(std::vector<Tensor<T>> &in)
   int  placeholders_cnt = 0;
   for (int layer_cnt = 0; layer_cnt < (int) m_data.size() && ok; ++layer_cnt)
   {
-    if (m_data[layer_cnt].layer->op() == layers::OperationType::Placeholder)
+    if (m_data[layer_cnt].layer->op() == layers::OperationType::Placeholder && m_data[layer_cnt].layer->m_torun )
     {
       std::vector<Tensor<T> *> v = { &in[placeholders_cnt] };
       ++placeholders_cnt;
@@ -673,7 +675,7 @@ template<typename T> bool Model<T>::apply(std::vector<Tensor<T>> &in)
 
   for (int layer_cnt = 0; layer_cnt < (int) m_data.size() && ok; ++layer_cnt)
   {
-    if (m_data[layer_cnt].layer->op() == layers::OperationType::Placeholder)
+    if (m_data[layer_cnt].layer->op() == layers::OperationType::Placeholder || !m_data[layer_cnt].layer->m_torun)
       continue;
 #if DEBUG_MODEL
     for (int kk = 0; kk < (int) m_data[layer_cnt].inputs.size(); ++kk)
@@ -844,6 +846,48 @@ template<typename T> std::vector<typename layers::Layer<T>::Id> Model<T>::getLay
   for (const auto &L: m_data)
     ids.push_back(L.layer->id());
   return ids;
+}
+
+template<typename T>
+void Model<T>::activateLayer(typename layers::Layer<T>::Id id) {
+    auto it = std::find_if(m_data.begin(), m_data.end(), [&, id](const LayerData &d) { return d.layer->id() == id; });
+    if (it == m_data.end())
+    {
+      std::cerr << "[ERROR] cannot find input " << id << std::endl;
+      assert(false);
+      exit(-1);
+    }
+    it->layer->m_torun=true;
+    for (auto idin: it->layer->m_inputs_id)
+    {
+        activateLayer(idin);
+    }
+}
+
+template<typename T>
+void Model<T>::activateOutput(const std::vector<char> &output_activated) {
+    assert(!m_ids_output.empty());
+    if (output_activated.size()!=m_ids_output.size()) {
+        std::cerr << "[ERROR] output_activated not compatible with current outputs" << std::endl;
+        assert(false);
+        exit(-1);
+    }
+    for (auto &L: m_data) {
+        L.layer->m_torun=false;
+    }
+    for(int idx=0;idx<(int)output_activated.size();++idx) {
+        if (output_activated[idx]) {
+         activateLayer(m_ids_output[idx])   ;
+        }
+    }
+#if DEBUG_PRINT
+    // debug
+    int n=0;
+    for(const auto &L: m_data) {
+        if (L.layer->m_torun) ++n;
+    }
+    std::cout<<"[INFO] nb activated layers: "<<n<<"/"<<m_data.size()<<std::endl;
+#endif
 }
 
 // insert copy layer before some layers inputs to deal with mutability of inputs

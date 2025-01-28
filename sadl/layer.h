@@ -135,6 +135,7 @@ protected:
   std::string               m_name;
   std::vector<Id>           m_inputs_id;
   bool                      m_initDone = false;
+  bool                      m_torun = true;
   template<typename> friend class sadl::Model;
   DUMP_MODEL_EXT_BASE;
 };
