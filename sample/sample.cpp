@@ -67,7 +67,8 @@ template<typename T> void infer(const string &filename, int override)
     cerr << "[ERROR] issue during initialization" << endl;
     exit(-1);
   }
-
+  // example for output deactivation:
+  // model.activateOutput({true,false});
 
   // fill input with values from -1 to 1
   double step = (1. + 1.) / (inputs[0].size() - 1);
