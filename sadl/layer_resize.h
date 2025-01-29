@@ -299,7 +299,7 @@ template<typename T> bool Resize<T>::interpolate_nearest(std::vector<Tensor<T> *
   return true;
 }
 
-template<> void Resize<float>::calc_bicubic_positions(int y, int x, int H, int W, int pos[][2], float ori[]) const
+template<> inline void Resize<float>::calc_bicubic_positions(int y, int x, int H, int W, int pos[][2], float ori[]) const
 {
   float &x_ori = ori[0], &y_ori = ori[1], &x_ori_int = ori[2], &y_ori_int = ori[3];
 
