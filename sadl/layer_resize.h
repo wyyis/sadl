@@ -52,9 +52,13 @@ protected:
   virtual bool loadInternal(std::istream &file, Version v) override;
   bool         interpolate_bilinear(std::vector<Tensor<T> *> &in);
   bool         interpolate_nearest(std::vector<Tensor<T> *> &in);
+  bool         interpolate_bicubic(std::vector<Tensor<T> *> &in);
+  void         calc_bicubic_positions(int y, int x, int H, int W, int pos[][2], T2 ori[]) const;
   void         calc_positions(int y, int x, int H, int W, int pos[], T2 ori[]);
   void         get_bilinear_coeffs(T2 y_ori, T2 x_ori, T2 coeffs[]);
   void         get_nearest_coeffs(T2 ratio, T2 &coeff_1, T2 &coeff_2);
+  void         get_bicubic_coeffs(T2 y_ori, T2 x_ori, T2 coeffs[]) const;
+  T2           cubic_coeffs(T2 x, int i) const;
 
   enum resize_coordinate_transformation_mode
   {
@@ -64,7 +68,8 @@ protected:
   enum resize_mode
   {
     resize_mode_linear  = 0,
-    resize_mode_nearest = 1
+    resize_mode_nearest = 1,
+    resize_mode_cubic = 2
   };
   enum resize_nearest_mode
   {
@@ -72,7 +77,7 @@ protected:
     resize_nearest_mode_round_prefer_ceil = 1
   };
   int        m_coordinate_transformation_mode;   // 0: "half_pixel", 1: "asymmetric"
-  int        m_mode;                             // 0: "linear", 1: "nearest"
+  int        m_mode;                             // 0: "linear", 1: "nearest", 2: "bicubic"
   int        m_nearest_mode;                     // 0: "floor", 1: "round_prefer_ceil"
   int        m_input_label;                      // 1: "X and sizes", 2: "X and scales"
   int        m_quantizer;
@@ -105,7 +110,7 @@ template<typename T> bool Resize<T>::loadInternal(std::istream &file, Version v)
     std::cerr << "[ERROR] invalid coordinate transformation mode: " << m_coordinate_transformation_mode << std::endl;
     return false;
   }
-  if (m_mode != 0 && m_mode != 1)
+  if (m_mode != 0 && m_mode != 1 && m_mode != 2)
   {
     std::cerr << "[ERROR] invalid mode: " << m_mode << std::endl;
     return false;
@@ -179,8 +184,44 @@ template<typename T> bool Resize<T>::apply(std::vector<Tensor<T> *> &in)
     return interpolate_bilinear(in);
   else if (m_mode == resize_mode_nearest)
     return interpolate_nearest(in);
+  else if (m_mode == resize_mode_cubic)
+    return interpolate_bicubic(in);
 
   return false;
+}
+
+template<typename T> bool Resize<T>::interpolate_bicubic(std::vector<Tensor<T> *> &in)
+{
+  assert(in.size() == 2);
+  assert(in[0]->dims().size() == 4 && in[0]->dims()[0] == 1);
+  const Tensor<T> &data = *in[0];
+  m_out.quantizer       = data.quantizer;
+  m_quantizer           = data.quantizer;
+
+  int shift = m_quantizer;
+  int H_out = m_out.dims()[1];
+  int W_out = m_out.dims()[2];
+
+  for (int im_i = 0; im_i < H_out; im_i++)
+  {
+    for (int im_j = 0; im_j < W_out; im_j++)
+    {
+      T2   ori[4]    = { 0, 0, 0, 0 };
+      int  pos[16][2];
+      T2   coeffs[16];
+      T2  &x_ori = ori[0], &y_ori = ori[1];
+
+      // calculate original pixel position (x_ori, y_ori) and adjacent pixel positions.
+      calc_bicubic_positions(im_i, im_j, data.dims()[1], data.dims()[2], pos, ori);
+
+      // coeffs
+      get_bicubic_coeffs(y_ori, x_ori, coeffs);
+
+      BICUBIC_COUNTERS(data, coeffs);
+      bicubic_in_channels(data, coeffs, pos, shift, im_i, im_j, m_out);
+    }
+  }
+  return true;
 }
 
 template<typename T> bool Resize<T>::interpolate_bilinear(std::vector<Tensor<T> *> &in)
@@ -258,6 +299,74 @@ template<typename T> bool Resize<T>::interpolate_nearest(std::vector<Tensor<T> *
   return true;
 }
 
+template<> void Resize<float>::calc_bicubic_positions(int y, int x, int H, int W, int pos[][2], float ori[]) const
+{
+  float &x_ori = ori[0], &y_ori = ori[1], &x_ori_int = ori[2], &y_ori_int = ori[3];
+
+  if (m_coordinate_transformation_mode == resize_coordinate_transformation_mode_half_pixel)
+  {
+    x_ori = (x + 0.5f) / scale_factors[2] - 0.5f;
+    y_ori = (y + 0.5f) / scale_factors[1] - 0.5f;
+  }
+  else if (m_coordinate_transformation_mode == resize_coordinate_transformation_mode_asymmetric)
+  {
+    x_ori = x / scale_factors[2];
+    y_ori = y / scale_factors[1];
+  }
+  x_ori_int = std::floor(x_ori);
+  y_ori_int = std::floor(y_ori);
+
+  // acquire the positions of 16 adjacent pixels
+  int idx = 0;
+  for (int dy = -1; dy <= 2; dy++)
+  {
+    for (int dx = -1; dx <= 2; dx++)
+    {
+      pos[idx][0] = std::min(std::max((int)(y_ori_int + dy), 0), H - 1);
+      pos[idx][1] = std::min(std::max((int)(x_ori_int + dx), 0), W - 1);
+      idx++;
+    }
+  }
+}
+
+template<typename T> void Resize<T>::calc_bicubic_positions(int y, int x, int H, int W, int pos[][2], T2 ori[]) const
+{
+  static_assert(std::is_same<T, int16_t>::value || std::is_same<T, int32_t>::value, "T must be int16_t or int32_t");
+  assert(scale_factors[1] == 2 && scale_factors[2] == 2);
+  int  shift = m_quantizer;
+  T2  &x_ori = ori[0], &y_ori = ori[1], &x_ori_int = ori[2], &y_ori_int = ori[3];
+  
+  if (m_coordinate_transformation_mode == resize_coordinate_transformation_mode_half_pixel)
+  {
+    T2 normalize_bias = (T)(1 << (shift - 2));
+    x                 = x << shift;
+    y                 = y << shift;
+    x_ori             = ((x + 1) >> 1) - normalize_bias;
+    y_ori             = ((y + 1) >> 1) - normalize_bias;
+  }
+  else if (m_coordinate_transformation_mode == resize_coordinate_transformation_mode_asymmetric)
+  {
+    x     = x << shift;
+    y     = y << shift;
+    x_ori = (x + 1) >> 1;
+    y_ori = (y + 1) >> 1;
+  }
+  x_ori_int = x_ori >> shift;   // floor
+  y_ori_int = y_ori >> shift;
+
+  // acquire the positions of 16 adjacent pixels
+  int idx = 0;
+  for (int dy = -1; dy <= 2; dy++)
+  {
+    for (int dx = -1; dx <= 2; dx++)
+    {
+      pos[idx][0] = std::min(std::max((int)(y_ori_int + dy), 0), H - 1);
+      pos[idx][1] = std::min(std::max((int)(x_ori_int + dx), 0), W - 1);
+      idx++;
+    }
+  }
+}
+
 template<> inline void Resize<float>::calc_positions(int y, int x, int H, int W, int pos[], float ori[])
 {
   float &x_ori = ori[0], &y_ori = ori[1], &x_ori_int = ori[2], &y_ori_int = ori[3];
@@ -321,6 +430,87 @@ template<typename T> void Resize<T>::calc_positions(int y, int x, int H, int W, 
   y_ori_top    = std::max(0, y_ori_top);
   x_ori_right  = std::min(W - 1, x_ori_right);
   y_ori_bottom = std::min(H - 1, y_ori_bottom);
+}
+
+template<> inline float Resize<float>::cubic_coeffs(float x, int i) const
+{
+  if (i == -1)
+    return (-3 * x * x * x + 6 * x * x - 3 * x) / 4;
+  else if (i == 0)
+    return (5 * x * x * x - 9 * x * x + 4) / 4;
+  else if (i == 1)
+    return (-5 * x * x * x + 6 * x * x + 3 * x) / 4;
+  else
+    return (3 * x * x * x - 3 * x * x) / 4;
+}
+
+template<typename T> inline typename Resize<T>::T2 Resize<T>::cubic_coeffs(T2 x, int i) const
+{
+  int shift = m_quantizer;
+  T2 x2 = x * x;
+  ComputationType<T>::quantize(x2, shift);
+  T2 x3 = x2 * x;
+  ComputationType<T>::quantize(x3, shift);
+  if (i == -1)
+    return (-3 * x3 + 6 * x2 - 3 * x) >> 2;
+  else if (i == 0)
+    return (5 * x3 - 9 * x2 + (4 << shift)) >> 2;
+  else if (i == 1)
+    return (-5 * x3 + 6 * x2 + 3 * x) >> 2;
+  else
+    return (3 * x3 - 3 * x2) >> 2;
+}
+
+template<> inline void Resize<float>::get_bicubic_coeffs(float y_ori, float x_ori, float coeffs[]) const
+{
+  float x_ori_int = std::floor(x_ori);
+  float y_ori_int = std::floor(y_ori);
+  float x_ratio   = (x_ori == x_ori_int) ? 1 : x_ori - x_ori_int;
+  float y_ratio   = (y_ori == y_ori_int) ? 1 : y_ori - y_ori_int;
+
+  float wx[4], wy[4];
+  for (int i = -1; i <= 2; i++)
+  {
+    wx[i + 1] = cubic_coeffs(x_ratio, i);
+    wy[i + 1] = cubic_coeffs(y_ratio, i);
+  }
+
+  int idx = 0;
+  for (int j = 0; j < 4; j++)
+  {
+    for (int i = 0; i < 4; i++)
+    {
+      coeffs[idx++] = wx[i] * wy[j];
+    }
+  }
+}
+
+template<typename T> void Resize<T>::get_bicubic_coeffs(T2 y_ori, T2 x_ori, T2 coeffs[]) const
+{
+  int shift = m_quantizer;
+
+  T2 x_ori_int = (x_ori >> shift) << shift;
+  T2 y_ori_int = (y_ori >> shift) << shift;
+  T2 x_ratio   = (x_ori == x_ori_int) ? (T)(1 << shift) : x_ori - x_ori_int;
+  T2 y_ratio   = (y_ori == y_ori_int) ? (T)(1 << shift) : y_ori - y_ori_int;
+
+  T2 wx[4], wy[4];
+  for (int i = -1; i <= 2; i++)
+  {
+    wx[i + 1] = cubic_coeffs(x_ratio, i);
+    wy[i + 1] = cubic_coeffs(y_ratio, i);
+  }
+
+  int idx = 0;
+  for (int j = 0; j < 4; j++)
+  {
+    for (int i = 0; i < 4; i++)
+    {
+      coeffs[idx] = wx[i] * wy[j] + (T)(1 << (shift - 1));
+      ComputationType<T>::quantize(coeffs[idx], shift);
+      idx++;
+    }
+  }
 }
 
 template<> inline void Resize<float>::get_bilinear_coeffs(float y_ori, float x_ori, float coeffs[])

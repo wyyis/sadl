@@ -1381,7 +1381,7 @@ def parse_graph_node(
                 "[ERROR] Currently, the exclude_outside of Resize must be default 0.",
                 node,
             )
-        mode_list = ["linear", "nearest"]
+        mode_list = ["linear", "nearest", "cubic"]
         if not mode in mode_list:
             quit("[ERROR] Currently, the mode of Resize must in", mode_list, node)
         else:
