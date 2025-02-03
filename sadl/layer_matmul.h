@@ -155,6 +155,49 @@ template<typename T> bool MatMul<T>::apply(std::vector<Tensor<T> *> &in)
 }
 
 #if __AVX2__
+
+template<> inline bool MatMul<int16_t>::apply_dim2_simd16(std::vector<Tensor<int16_t> *> &in) {
+  using T = int16_t;
+
+  const Tensor<int16_t>& A = *in[0]; // bs x m
+  const Tensor<int16_t>& B = *in[1]; //  m x n
+  const int M = A.dims()[0];
+  const int K = A.dims()[1];
+  const int N = B.dims()[1];
+
+  assert(K == B.dims()[0]);
+  assert(K % 16 == 0);
+
+  const int16_t* a_ptr = A.data();
+  const int16_t* b_ptr = B.data();
+  int16_t* c_ptr = m_out.data();
+
+  const int shift = B.quantizer + m_q;
+
+  for (int i = 0; i < M; ++i) {
+    for (int j = 0; j < N; ++j) {
+      __m256i sum = _mm256_setzero_si256();
+      
+      for (int k = 0; k < K; k += 16) {
+        __m256i a1 = _mm256_load_si256(reinterpret_cast<const __m256i*>(a_ptr + i * K + k));
+        __m256i b1 = _mm256_load_si256(reinterpret_cast<const __m256i*>(b_ptr + j * K + k));
+        
+        sum = _mm256_add_epi32(sum, _mm256_madd_epi16(a1, b1));
+      }
+
+      sum = _mm256_hadd_epi32(sum, sum);
+      sum = _mm256_hadd_epi32(sum, sum);
+      typename ComputationType<T>::type result = _mm256_extract_epi32(sum, 0) + _mm256_extract_epi32(sum, 4);
+      ComputationType<T>::quantize(result, shift);
+      COUNTERS(result);
+      SATURATE(result);
+      c_ptr[i * N + j] = static_cast<T>(result);
+    }
+  }
+  return true;
+}
+
+
 template<> inline bool MatMul<float>::apply_dim2_simd8(std::vector<Tensor<float> *> &in)
 {
   using T = float;

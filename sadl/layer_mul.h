@@ -59,6 +59,9 @@ protected:
 #if __AVX2__
   bool apply_singleton_simd8(std::vector<Tensor<T> *> &in);
   bool apply_singleton_simd16(std::vector<Tensor<T> *> &in);
+
+  bool apply_same_dim_simd8(std::vector<Tensor<T> *> &in);
+  bool apply_same_dim_simd16(std::vector<Tensor<T> *> &in);
 #endif
   DUMP_MODEL_EXT;
 };
@@ -86,6 +89,9 @@ template<typename T> bool Mul<T>::apply(std::vector<Tensor<T> *> &in)
     constexpr int NN = 16;
     if (in[0]->dims() == in[1]->dims())
     {   // product wise
+#if __AVX2__
+      return apply_same_dim_simd16(in);
+#endif
       return apply_same_dim<NN>(in);
     }
     else if (in[1]->size() == 1)
@@ -113,6 +119,9 @@ template<typename T> bool Mul<T>::apply(std::vector<Tensor<T> *> &in)
     constexpr int NN = 8;
     if (in[0]->dims() == in[1]->dims())
     {   // product wise
+#if __AVX2__
+      return apply_same_dim_simd8(in);
+#endif
       return apply_same_dim<NN>(in);
     }
     else if (in[1]->size() == 1)
@@ -305,6 +314,97 @@ template<> inline bool Mul<float>::apply_singleton_simd8(std::vector<Tensor<floa
   }
   return true;
 }
+
+template<> inline bool Mul<int16_t>::apply_singleton_simd16(std::vector<Tensor<int16_t> *> &in)
+{
+  using T                 = int16_t;
+  const Tensor<T> &B      = *in[1];
+  const int         shift =  in[1]->quantizer + m_q;
+  const __m256i     value = _mm256_set1_epi16(B[0]);
+  const __m256i     max   = _mm256_set1_epi32(32767);
+  const __m256i     min   = _mm256_set1_epi32(-32768);
+  const __m256i     mask  = _mm256_set1_epi32(65535);
+  for (int64_t k = 0; k < m_out.size(); k += 16)
+  {
+    __m256i *aptr = (__m256i *) (m_out.data() + k);
+    __m256i a    = _mm256_load_si256(aptr);
+    // mul
+    auto lo = _mm256_mullo_epi16(a, value);
+    auto hi = _mm256_mulhi_epi16(a, value);
+    auto lo32 = _mm256_unpacklo_epi16(lo, hi);
+    auto hi32 = _mm256_unpackhi_epi16(lo, hi);
+    auto y0   = _mm256_permute2x128_si256(lo32, hi32, _MM_SHUFFLE(0, 2, 0, 0));
+    auto y1   = _mm256_permute2x128_si256(lo32, hi32, _MM_SHUFFLE(0, 3, 0, 1));
+    // shift
+    auto y0s = _mm256_srai_epi32(y0, shift);
+    auto y1s = _mm256_srai_epi32(y1, shift);
+#if SATURATE_RESULT
+    // clip
+    auto y0c  = _mm256_max_epi32(y0s, min);
+    auto y1c  = _mm256_max_epi32(y1s, min);
+    auto y0c2 = _mm256_min_epi32(y0c, max);
+    auto y1c2 = _mm256_min_epi32(y1c, max);
+#else
+    auto y0c2 = y0s;
+    auto y1c2 = y1s;
+#endif
+    // mask 16bits
+    auto y0p = _mm256_and_si256(y0c2, mask);
+    auto y1p = _mm256_and_si256(y1c2, mask);
+    // repack
+    auto z  = _mm256_packus_epi32(y0p, y1p);
+    auto z2 = _mm256_permute4x64_epi64(z, _MM_SHUFFLE(3, 1, 2, 0));
+    _mm256_store_si256(aptr, z2);
+  }
+  return true;
+}
+
+template<typename T> inline bool Mul<T>::apply_same_dim_simd8(std::vector<Tensor<T> *> &in) { return apply_same_dim<8>(in);}
+template<typename T> inline bool Mul<T>::apply_same_dim_simd16(std::vector<Tensor<T> *> &in) { return apply_same_dim<16>(in);}
+
+template<> inline bool Mul<int16_t>::apply_same_dim_simd16(std::vector<Tensor<int16_t> *> &in)
+{
+  const int         shift =  in[1]->quantizer + m_q;
+  const __m256i     max   = _mm256_set1_epi32(32767);
+  const __m256i     min   = _mm256_set1_epi32(-32768);
+  const __m256i     mask  = _mm256_set1_epi32(65535);
+  for (int64_t k = 0; k < m_out.size(); k += 16)
+  {
+    const __m256i *aptr = (const __m256i *) (m_out.data() + k);
+    const __m256i *bptr = (const __m256i *) (in[1]->data() + k);
+    __m256i a    = _mm256_load_si256(aptr);
+    __m256i b    = _mm256_load_si256(bptr);
+    // mul
+    auto lo = _mm256_mullo_epi16(a, b);
+    auto hi = _mm256_mulhi_epi16(a, b);
+    auto lo32 = _mm256_unpacklo_epi16(lo, hi);
+    auto hi32 = _mm256_unpackhi_epi16(lo, hi);
+    auto y0   = _mm256_permute2x128_si256(lo32, hi32, _MM_SHUFFLE(0, 2, 0, 0));
+    auto y1   = _mm256_permute2x128_si256(lo32, hi32, _MM_SHUFFLE(0, 3, 0, 1));
+    // shift
+    auto y0s = _mm256_srai_epi32(y0, shift);
+    auto y1s = _mm256_srai_epi32(y1, shift);
+#if SATURATE_RESULT
+    // clip
+    auto y0c  = _mm256_max_epi32(y0s, min);
+    auto y1c  = _mm256_max_epi32(y1s, min);
+    auto y0c2 = _mm256_min_epi32(y0c, max);
+    auto y1c2 = _mm256_min_epi32(y1c, max);
+#else
+    auto y0c2 = y0s;
+    auto y1c2 = y1s;
+#endif
+    // mask 16bits
+    auto y0p = _mm256_and_si256(y0c2, mask);
+    auto y1p = _mm256_and_si256(y1c2, mask);
+    // repack
+    auto z  = _mm256_packus_epi32(y0p, y1p);
+    auto z2 = _mm256_permute4x64_epi64(z, _MM_SHUFFLE(3, 1, 2, 0));
+    _mm256_store_si256((__m256i *) aptr, z2);
+  }
+  return true;
+}
+
 template<> inline bool Mul<float>::apply_singleton_simd16(std::vector<Tensor<float> *> &in) { return apply_singleton_simd8(in); }
 
 template<typename T> bool Mul<T>::apply_singleton_simd8(std::vector<Tensor<T> *> &in) { return apply_singleton<8>(in); }
