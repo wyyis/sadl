@@ -26,7 +26,7 @@ L="conv2d_4_8x8x4_k1x1s1,1_g1_p0,0 conv2d_4_8x8x4_k1x1s1,1_g4_p0,0 conv2d_4_8x8x
   conv2d_4_8x9x4_k3x3s2,2_g1_p1,1 conv2d_4_9x8x4_k1x1s1,1_g1_p0,0 conv2d_4_9x8x4_k1x1s2,1_g1_p0,0 conv2d_4_9x8x4_k1x3s1,2_g1_p0,1 \
   conv2d_4_9x8x4_k3x1s1,1_g1_p1,0 conv2d_4_9x8x4_k3x3s1,1_g1_p1,1 conv2d_4_9x8x4_k3x3s2,1_g1_p1,1 conv2d_4_9x8x4_k3x3s2,2_g1_p1,1 \
   conv2d_4_9x8x4_k5x5s1,1_g1_p2,2 conv2d_4_9x8x4_k5x5s2,1_g1_p2,2 conv2d_4_9x9x4_k1x3s1,2_g1_p0,1 repeated_conv slice_pytorch \
-  linear slice_inf_pytorch slice_chw_pytorch prelu_multiple_alpha prelu_single_alpha scatternd_c_pytorch scatternd_hwc_with_conv_pytorch \
+  linear slice_inf_pytorch slice_chw_pytorch relu prelu_multiple_alpha prelu_single_alpha scatternd_c_pytorch scatternd_hwc_with_conv_pytorch \
   gridsample_bilinear gridsample_nearest gridsample_bilinear_conv gridsample_nearest_conv conv2dt_32_8x8x32_k3,3_s2,2_p1,1_op1,1 \
   conv2dt_32_8x8x32_k4,4_s2,2_p1,1_op0,0 conv2dt_32_8x8x32_k5,5_s2,2_p2,2_op1,1 resize_bilinear_up2_pytorch\
   resize_nearest_up2_pytorch resize_bilinear_up2_16x16x64_pytorch prelu_single_alpha_c32 prelu_multiple_alpha_c32 \
