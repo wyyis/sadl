@@ -37,7 +37,7 @@ L="conv2d_4_8x8x4_k1x1s1,1_g1_p0,0 conv2d_4_8x8x4_k1x1s1,1_g4_p0,0 conv2d_4_8x8x
   conv2d_5x1_1x5_s1_g16 conv2d_7x1_1x7_s1_g16 \
   conv2d_16_4x4x1_k1x3s1,1_g1_p0,0 conv2d_16_4x4x1_k3x1s1,1_g1_p0,0 conv2d_16_4x4x1_k3x3s1,1_g1_p0,0 \
   conv2d_16_4x4x16_k3x3s1,1_g16_p0,0 conv2d_16_4x4x16_k1x3s1,1_g16_p0,0 conv2d_16_4x4x16_k3x1s1,1_g16_p0,0 \
-  conv2d_1_4x4x16_k3x3s1,1_g1_p0,0 gridsample_bicubic resize_bicubic_up2"
+  conv2d_1_4x4x16_k3x3s1,1_g1_p0,0 gridsample_bicubic resize_bicubic_up2 conv2d_transpose_32_2x2x3_k2x2s2,2_p0,0"
 
 
 # mini_model_bb_mult 
