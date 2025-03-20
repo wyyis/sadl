@@ -191,7 +191,7 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
 #if DEBUG_MODEL_ANALYZE
         std::cout << "\n[ANALYZE] add (in):\t" << K << std::endl;
 #endif
-        assert(B.dims().size() == 1 || (B.dims().size() == 2 && B.dims()[0] == 1));
+        assert(B.dims().size() == 1 || (B.dims().size() == 2 && B.dims()[0] == 1) || (B.dims().size() == 3 && B.dims()[1] == 1 && B.dims()[2] == 1));
         for (int n = 0; n < N; ++n)
           for (int i = 0; i < H; ++i)
             for (int j = 0; j < W; ++j)
@@ -312,7 +312,7 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
       else if (in[0]->dims().size() == 4)
       {
         const Tensor<T> &B = *in[1];
-        assert(B.dims().size() == 1 || (B.dims().size() == 2 && B.dims()[0] == 1));
+        assert(B.dims().size() == 1 || (B.dims().size() == 2 && B.dims()[0] == 1) || (B.dims().size() == 3 && B.dims()[1] == 1 && B.dims()[2] == 1));
         const int N = in[0]->dims()[0];
         const int H = in[0]->dims()[1];
         const int W = in[0]->dims()[2];
@@ -358,6 +358,11 @@ template<typename T> bool Add<T>::init(const std::vector<Tensor<T> *> &in)
   else if (in[1]->dims().size() == 2 && in[1]->dims()[0] == 1)
   {
     if (in[1]->dims()[1] != 1 && in[1]->dims()[1] != in[0]->dims().back())
+      return false;
+  }
+  else if (in[1]->dims().size() == 3 && in[1]->dims()[1] == 1 && in[1]->dims()[2] == 1)
+  {
+    if (in[1]->dims()[0] != in[0]->dims().back())
       return false;
   }
   else
