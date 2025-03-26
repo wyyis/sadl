@@ -851,12 +851,8 @@ template<typename T> std::vector<typename layers::Layer<T>::Id> Model<T>::getLay
 template<typename T>
 void Model<T>::activateLayer(typename layers::Layer<T>::Id id) {
     auto it = std::find_if(m_data.begin(), m_data.end(), [&, id](const LayerData &d) { return d.layer->id() == id; });
-    if (it == m_data.end())
-    {
-      std::cerr << "[ERROR] cannot find input " << id << std::endl;
-      assert(false);
-      exit(-1);
-    }
+    assert(it != m_data.end());
+    if (it->layer->m_torun) return; 
     it->layer->m_torun=true;
     for (auto idin: it->layer->m_inputs_id)
     {
