@@ -130,6 +130,7 @@ class OPTYPE(IntEnum):
     Minimum = (27,)
     AveragePool = (28,)
     ReduceMean = (29,)
+    Tile = (30,)
 
     # "BatchMatMulV2" did not exist in Tensorflow 1.9. It exists in
     # Tensorflow 1.15.
@@ -1566,6 +1567,33 @@ def parse_graph_node(
         a = getAttribute(node, "axes")
         myGraph[node.output[0]]["additional"]["axes"] = a.ints
         myGraph[node.output[0]]["additional"]["data"] = node
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
+    
+    elif node.op_type == "Tile":
+        n2 = getNodesWithOutput(n1name, model_onnx)
+        if n2 is not None and (not hasattr(n2, "op_type") or n2.op_type == "Constant"):
+            myGraph[n1name] = {}
+            myGraph[n1name]["op_type"] = OPTYPE.Const
+            myGraph[n1name]["inputs"] = []
+            additional = {}
+            (
+                additional["dims"],
+                additional["raw_data"],
+                additional["dtype"],
+            ) = extract_additional_data(
+                n1name, True, model_onnx.graph, verbose
+            )
+            additional["data"] = node
+            myGraph[n1name]["additional"] = additional
+        map_onnx_to_myGraph[n1name] = n1name
+
+        inputs, additional = [], {}
+        inputs = [map_onnx_to_myGraph[n0name], map_onnx_to_myGraph[n1name]]
+        additional["data"] = node
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["inputs"] = inputs
+        myGraph[node.output[0]]["additional"] = additional
+        myGraph[node.output[0]]["op_type"] = OPTYPE.Tile
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
     else:

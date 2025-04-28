@@ -199,6 +199,9 @@ template<typename T> std::unique_ptr<layers::Layer<T>> createLayer(int32_t id, l
   case layers::OperationType::ReduceMean:
     return std::unique_ptr<layers::Layer<T>>(new layers::ReduceMean<T>{ id, op });
     break;    
+  case layers::OperationType::Tile:
+    return std::unique_ptr<layers::Layer<T>>(new layers::Tile<T>{ id, op });
+    break; 
   case layers::OperationType::OperationTypeCount:
     std::cerr << "[ERROR] unknown layer " << op << std::endl;
     exit(-1);
