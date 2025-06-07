@@ -71,6 +71,12 @@ protected:
 
 
   template<int s_h, int s_w> void conv2d_5x5_s(const Tensor<T> &A, const Tensor<T> &kernel);
+
+  // 2x2
+  template<int s_h, int s_w> void conv2d_2x2_s_dispatch(const Tensor<T> &A, const Tensor<T> &kernel);
+
+  template<int in_D, int s_h, int s_w> void conv2d_2x2_s_d(const Tensor<T> &A, const Tensor<T> &kernel);
+
   template<int s_h, int s_w> void conv2d_2x2_s(const Tensor<T> &A, const Tensor<T> &kernel);
 
   // 1x1
@@ -148,6 +154,20 @@ protected:
 
   template<int in_D, int ihalf_size, int jhalf_size,int o_i,int o_j> void simd32_conv2d_ixj_s11_g1_d_core(const Tensor<T> &A, const Tensor<T> &kernel) {
     simd16_conv2d_ixj_s11_g1_d_core<in_D,ihalf_size,jhalf_size, o_i, o_j>(A,kernel);
+  }
+
+  template<int in_D, int s_h, int s_w> void simd8_conv2d_2x2_s_d(const Tensor<T> & /*A*/, const Tensor<T> & /*kernel*/)
+  {
+    assert(false);
+    exit(-1);
+  }
+  template<int in_D, int s_h, int s_w> void simd16_conv2d_2x2_s_d(const Tensor<T> &A, const Tensor<T> &kernel)
+  {
+    simd8_conv2d_2x2_s_d<in_D, s_h, s_w>(A, kernel);
+  }
+  template<int in_D, int s_h, int s_w> void simd32_conv2d_2x2_s_d(const Tensor<T> &A, const Tensor<T> &kernel)
+  {
+    simd16_conv2d_2x2_s_d<in_D, s_h, s_w>(A, kernel);
   }
 #endif
   static constexpr int bufSize = 256 + 8 * 2;
@@ -251,9 +271,9 @@ template<typename T> template<int s_h, int s_w> bool Conv2D<T>::apply_s(const Te
       }
   }
   //
-  if (k_size_h == 2 && k_size_w == 2)   // 1x1
+  if (k_size_h == 2 && k_size_w == 2)   // 2x2
   {
-      conv2d_2x2_s<s_h, s_w>(A, kernel);
+      conv2d_2x2_s_dispatch<s_h, s_w>(A, kernel);
       return true;
   }
   if (k_size_h == 5 && k_size_w == 5)   // 5x5
