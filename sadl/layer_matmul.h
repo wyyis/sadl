@@ -779,7 +779,7 @@ template<> inline bool MatMul<int16_t>::apply_sparse_pack8_matmul_simd16(std::ve
   return true;
 }
 
-template<typename T> bool MatMul<T>::apply_sparse_pack8_matmul_simd16(std::vector<Tensor<T> *> &in) { return apply_sparse_matmul(in); }
+template<typename T> bool MatMul<T>::apply_sparse_pack8_matmul_simd16(std::vector<Tensor<T> *> &in) { return apply_sparse_pack_matmul(in); }
 
 template<> inline bool MatMul<int16_t>::apply_sparse_pack16_matmul_simd16(std::vector<Tensor<int16_t> *> &in)
 {
@@ -830,7 +830,8 @@ template<> inline bool MatMul<int16_t>::apply_sparse_pack16_matmul_simd16(std::v
 
   return true;
 }
-template<typename T> bool MatMul<T>::apply_sparse_pack16_matmul_simd16(std::vector<Tensor<T> *> &in) { return apply_sparse_matmul(in); }
+
+template<typename T> bool MatMul<T>::apply_sparse_pack16_matmul_simd16(std::vector<Tensor<T> *> &in) { return apply_sparse_pack_matmul(in); }
 
 #endif
 #endif
