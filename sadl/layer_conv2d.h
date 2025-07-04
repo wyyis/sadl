@@ -102,6 +102,13 @@ protected:
   template<int in_D, int s_h, int s_w, int ihalf_size, int jhalf_size,int o_i,int o_j> void conv2d_ixj_s_gD_d_core(const Tensor<T> &A, const Tensor<T> &kernel);
 
 #if __AVX2__
+
+  template<int in_D, int s_h, int s_w, int ihalf_size, int jhalf_size,int o_i,int o_j> void simd16_conv2d_ixj_s_gD_d_core(const Tensor<T> &A, const Tensor<T> &kernel)
+  {
+    assert(false);
+    exit(-1);
+
+  }
   template<int in_D, int ihalf_size, int jhalf_size,int o_i,int o_j> void simd16_conv2d_ixj_s11_gD_d_core(const Tensor<T> &A, const Tensor<T> &kernel)
   {
     assert(false);
@@ -164,6 +171,7 @@ template<typename T> T Conv2D<T>::input_tempo[dSize][bufSize][bufSize + vectorSi
 // kernel [filter_height, filter_width, in_channels, out_channels]
 template<typename T> bool Conv2D<T>::apply(std::vector<Tensor<T> *> &in)
 {
+
   assert(in.size() == 2);
   assert(in[0]->dims().size() == 4);
   assert(in[1]->dims().size() == 4);

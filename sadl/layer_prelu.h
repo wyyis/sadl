@@ -66,6 +66,7 @@ template<typename T> bool PReLU<T>::apply(std::vector<Tensor<T> *> &in)
 #if DEBUG_MODEL_ANALYZE
   std::cout << "\n[ANALYZE] prelu (in):\t" << m_out.size() << std::endl;
 #endif
+
 #if __AVX512F__
   if (std::is_same<T, float>::value && in[0]->size() % 16 == 0)
   {
@@ -119,6 +120,7 @@ template<typename T> bool PReLU<T>::apply(std::vector<Tensor<T> *> &in)
     }
   }
 #endif
+
   if (in[1]->size() == 1)
   {
     return apply_scalar<false>(in);
@@ -263,65 +265,62 @@ template<> template<bool multialpha> inline bool PReLU<float>::apply_simd256(std
 
 template<> template<bool multialpha> inline bool PReLU<int16_t>::apply_simd256(std::vector<Tensor<int16_t> *> &in)
 {
+
   Tensor<int16_t> &A = *in[1];
   swap(*in[0], m_out);
   int16_t *const                        data_ptr  = m_out.data();
   [[maybe_unused]] const int16_t *const alpha_ptr = A.data();
   const int                             alpha_q   = A.quantizer;
 
-  __m256i       alpha = _mm256_set1_epi16(A[0]);
-  const __m256i mask  = _mm256_set1_epi32(65535);
-  const __m256i max   = _mm256_set1_epi32(32767);
-  const __m256i min   = _mm256_set1_epi32(-32768);
+  __m256i  alpha = _mm256_set1_epi16(A[0]);
   const __m256i zeros = _mm256_setzero_si256();
   const auto     N     = m_out.size();
+
+#if !SATURATE_RESULT
+  const __m256i mask  = _mm256_set1_epi32(65535);
+#endif
+
 #if DEBUG_PATH
   std::cout<<__PRETTY_FUNCTION__<<std::endl;
 #endif
   for (int64_t iter = 0; iter < N; iter += 16)
   {
     int16_t *aptr = data_ptr + iter;
-    auto     a    = _mm256_load_si256((__m256i *) aptr);   // load
+    const __m256i     a    = _mm256_load_si256((__m256i *) aptr);   // load
     if (multialpha)
     {
       alpha = _mm256_load_si256((__m256i *) (alpha_ptr + (iter % A.size())));
     }
 
     // prepare branches
-    auto max0 = _mm256_max_epi16(a, zeros);
-    auto min0 = _mm256_min_epi16(a, zeros);
+    const __m256i max0 = _mm256_max_epi16(a, zeros);
+    const __m256i min0 = _mm256_min_epi16(a, zeros);
+
     // branch neg
     // mul
-    auto lo = _mm256_mullo_epi16(min0, alpha);   // min(a,0)*alpha lo part
-    auto hi = _mm256_mulhi_epi16(min0, alpha);   // min(a,0)*alpha hi part
+    const __m256i lo = _mm256_mullo_epi16(min0, alpha);   // min(a,0)*alpha lo part
+    const __m256i hi = _mm256_mulhi_epi16(min0, alpha);   // min(a,0)*alpha hi part
     // repack32
-    auto lo32 = _mm256_unpacklo_epi16(lo, hi);
-    auto hi32 = _mm256_unpackhi_epi16(lo, hi);
-    auto y0   = _mm256_permute2x128_si256(lo32, hi32, _MM_SHUFFLE(0, 2, 0, 0));
-    auto y1   = _mm256_permute2x128_si256(lo32, hi32, _MM_SHUFFLE(0, 3, 0, 1));
-    // shift
-    auto y0s = _mm256_srai_epi32(y0, alpha_q);
-    auto y1s = _mm256_srai_epi32(y1, alpha_q);
+    const __m256i lo32 = _mm256_unpacklo_epi16(lo, hi);
+    const __m256i hi32 = _mm256_unpackhi_epi16(lo, hi);
+
+     // shift
+    const __m256i y0s = _mm256_srai_epi32(lo32, alpha_q);
+    const __m256i y1s = _mm256_srai_epi32(hi32, alpha_q);
+
 #if SATURATE_RESULT
-    // clip
-    auto y0c  = _mm256_max_epi32(y0s, min);
-    auto y1c  = _mm256_max_epi32(y1s, min);
-    auto y0c2 = _mm256_min_epi32(y0c, max);
-    auto y1c2 = _mm256_min_epi32(y1c, max);
+    const __m256i z  = _mm256_packs_epi32(y0s , y1s );
 #else
-    auto y0c2 = y0s;
-    auto y1c2 = y1s;
+    const __m256i y0p = _mm256_and_si256(y0s, mask);
+    const __m256i y1p = _mm256_and_si256(y1s, mask);
+    const __m256i z  = _mm256_packus_epi32(y0p , y1p );
 #endif
-    // mask 16bits
-    auto y0p = _mm256_and_si256(y0c2, mask);
-    auto y1p = _mm256_and_si256(y1c2, mask);
-    // repack
-    auto z  = _mm256_packus_epi32(y0p, y1p);
-    auto z2 = _mm256_permute4x64_epi64(z, _MM_SHUFFLE(3, 1, 2, 0));
+  
     // merge 2 branches
-    auto r = _mm256_add_epi16(max0, z2);
+    const __m256i r = _mm256_add_epi16(max0, z);
     _mm256_store_si256((__m256i *) aptr, r);
   }
+
   return true;
 }
 

@@ -192,7 +192,6 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
 #if __AVX2__
 template<> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<int16_t>::simd16_conv2d_ixj_s_core(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
 {
-
   constexpr int im_nb = 0;
   const int     ihalf_size{ kernel.dims()[0] / 2 };
   const int     jhalf_size{ kernel.dims()[1] / 2 };
@@ -246,6 +245,7 @@ template<> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<int16_t>::simd
       }
     }
   }
+
 }
 #endif
 
@@ -299,7 +299,66 @@ template<typename T> template<int in_D, int s_h, int s_w, int ihalf_size, int jh
         }
     }
 }
+#if __AVX2__
+template<> template<int in_D, int s_h, int s_w, int ihalf_size, int jhalf_size,int o_i,int o_j> void Conv2D<int16_t>::simd16_conv2d_ixj_s_gD_d_core(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
+{
 
+    constexpr int nb_filters = in_D;
+    constexpr int im_nb = 0;
+    const int     shift     = kernel.quantizer + m_q;
+    int           in_H{ A.dims()[1] };
+    int           in_W{ A.dims()[2] };
+    constexpr int           start_h{ ihalf_size  };
+    constexpr int           start_w{ jhalf_size  };
+
+#if DEBUG_PATH
+    std::cout<<__PRETTY_FUNCTION__<<std::endl;
+#endif
+    assert(start_h + s_h - ihalf_size >= 0);
+    assert(start_w + s_w - jhalf_size >= 0);
+    const int sft = shift;
+    for (int im_i = start_h + s_h/2; im_i < in_H - start_h; im_i += s_h)
+    {
+        for (int im_j = start_w + s_w/2; im_j < in_W - start_w; im_j += s_w)
+        {
+            for (int filter = 0; filter < nb_filters; filter+=16)
+          {
+           __m256i s_lo = _mm256_setzero_si256();
+           __m256i s_hi = _mm256_setzero_si256();
+
+           for (int filter_i = -ihalf_size; filter_i <= ihalf_size; ++filter_i)
+           {
+             for (int filter_j = -jhalf_size; filter_j <= jhalf_size; ++filter_j)
+             {
+              int ii = im_i + filter_i;
+              int jj = im_j + filter_j;
+              int ki = ihalf_size + filter_i;
+              int kj = jhalf_size + filter_j;
+              const __m256i *kptr = (const __m256i *) kernel.addr(ki, kj, filter, 0);
+              const __m256i  k0   = _mm256_load_si256(kptr); 
+              const __m256i *aptr = (const __m256i *) A.addr(im_nb, ii, jj, filter);
+              const __m256i  v0   = _mm256_load_si256(aptr);
+
+              const __m256i mul0_hi = _mm256_mulhi_epi16(k0, v0); 
+              const __m256i mul0_lo = _mm256_mullo_epi16(k0, v0); 
+            
+              const __m256i mul0_up_lo = _mm256_unpacklo_epi16(mul0_lo, mul0_hi);
+              const __m256i mul0_up_hi = _mm256_unpackhi_epi16(mul0_lo, mul0_hi);
+              s_lo                = _mm256_add_epi32(s_lo, mul0_up_lo);
+              s_hi                = _mm256_add_epi32(s_hi, mul0_up_hi);
+             }
+           }
+             const __m256i sf_lo= _mm256_srai_epi32(s_lo, sft);
+             const __m256i sf_hi= _mm256_srai_epi32(s_hi, sft);
+
+             const  __m256i sf16= _mm256_packs_epi32(sf_lo, sf_hi); 
+            _mm256_storeu_si256((__m256i *) m_out.addr(im_nb, (im_i -o_i)/ s_h, (im_j - o_j )/ s_w , filter), sf16 );
+          }
+        }
+    }
+}
+
+#endif
 
 template<typename T> template<int in_D, int ihalf_size, int jhalf_size,int o_i,int o_j> void Conv2D<T>::conv2d_ixj_s11_g1_d_core(const Tensor<T> &A, const Tensor<T> &kernel)
 {
@@ -646,6 +705,11 @@ template<> template<int s_h, int s_w,int o_i, int o_j> void Conv2D<float>::simd1
 {
   conv2d_ixj_s_core<s_h, s_w, o_i, o_j>(A, kernel);
 }
+template<> template<int in_D, int s_h, int s_w, int ihalf_size, int jhalf_size, int o_i, int o_j> void Conv2D<float>::simd16_conv2d_ixj_s_gD_d_core(const Tensor<float> &A, const Tensor<float> &kernel)
+{
+   conv2d_ixj_s_gD_d_core<in_D, s_h, s_w, ihalf_size, jhalf_size, o_i, o_j>(A, kernel);
+}
+
 #endif
 
 template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::conv2d_ixj_s_core_dispatch(const Tensor<T> &A, const Tensor<T> &kernel)
@@ -658,11 +722,13 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
 #define CONV_IJ_G1_MOD16  simd16_conv2d_ixj_s11_g1_d_core
 #define CONV_3x3_DW_MOD16 simd16_conv2d_ixj_s_core
 #define CONV_IJ_GD_MOD16  simd16_conv2d_ixj_s11_gD_d_core
+#define CONV_IJ_GD_S_MOD16  simd16_conv2d_ixj_s_gD_d_core
 #else
 #define CONV_IJ_G1_MOD32  conv2d_ixj_s11_g1_d_core
 #define CONV_IJ_G1_MOD16  conv2d_ixj_s11_g1_d_core
 #define CONV_3x3_DW_MOD16 conv2d_ixj_s_core
 #define CONV_IJ_GD_MOD16  conv2d_ixj_s11_gD_d_core
+#define CONV_IJ_GD_S_MOD16  conv2d_ixj_s_gD_d_core
 #endif
 
   // grouped conv with stride 1 and inD==outD
@@ -751,10 +817,10 @@ template<typename T> template<int s_h, int s_w,int o_i,int o_j> void Conv2D<T>::
 
       } else {
               if (kernel.dims()[0] == 1 && kernel.dims()[1] == 3 &&  in_D == 64) {
-                  conv2d_ixj_s_gD_d_core<64,s_h,s_w,0,1,o_i,o_j>(A,kernel);
+                  CONV_IJ_GD_S_MOD16<64,s_h,s_w,0,1,o_i,o_j>(A,kernel);
                   return;
               } else if (kernel.dims()[0] == 3 && kernel.dims()[1] == 1 &&  in_D == 64) {
-                  conv2d_ixj_s_gD_d_core<64,s_h,s_w,1,0,o_i,o_j>(A,kernel);
+                  CONV_IJ_GD_S_MOD16<64,s_h,s_w,1,0,o_i,o_j>(A,kernel);
                   return;
               }
       }
