@@ -191,36 +191,44 @@ inline void bilinear_in_channels_simd256(const Tensor<int16_t> &data, const int3
   constexpr int im_nb = 0;
   int           in_D  = data.dims()[3];
   assert(in_D % 8 == 0);   // Should be used with mod8 data.
-#if DEBUG_COUNTERS || SATURATE_RESULT
-  using T = int16_t;
-#endif
+//#if DEBUG_COUNTERS || SATURATE_RESULT
+//  using T = int16_t;
+//#endif
   const int &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
   const int  pos_table[4][2] = { {y_ori_top, x_ori_left}, {y_ori_top, x_ori_right}, {y_ori_bottom, x_ori_left}, {y_ori_bottom, x_ori_right} };
+ 
 
-  static std::vector<int32_t> temp_buffer;
-  temp_buffer.resize(in_D);
-  std::fill(temp_buffer.begin(),temp_buffer.end(),0);
-
-  for (int coeff_i = 0; coeff_i < 4; coeff_i++)
-  {
-    const __m256i  c0   = _mm256_set1_epi32(coeffs[coeff_i]);
-    const int16_t *dptr = data.addr(im_nb, pos_table[coeff_i][0], pos_table[coeff_i][1], 0);
-    const int32_t *bptr = &temp_buffer[0];
-    for (int im_c = 0; im_c < in_D; im_c += 8)
+    for (int im_c = 0; im_c < in_D; im_c += 16)
     {
-      const __m256i d0 = _mm256_cvtepi16_epi32(_mm_loadu_si128((__m128i *) (dptr + im_c)));
-      const __m256i b0 = _mm256_loadu_si256((__m256i *) (bptr + im_c));
-      const __m256i s  = _mm256_add_epi32(_mm256_mullo_epi32(c0, d0), b0);   // res in int32
-      _mm256_storeu_si256((__m256i *) (bptr + im_c), s);
+      __m256i s_l = _mm256_setzero_si256();
+      __m256i s_h = _mm256_setzero_si256();
+
+      for (int coeff_i = 0; coeff_i < 4; coeff_i++)
+      {
+        int16_t coeff16= (int16_t) coeffs[coeff_i];
+        const __m256i  c0   = _mm256_set1_epi16(coeff16);
+        const __m256i *dptr = (const __m256i *) data.addr(im_nb, pos_table[coeff_i][0], pos_table[coeff_i][1], im_c);
+
+   
+        const __m256i  d0   = _mm256_load_si256(dptr);
+
+        const __m256i mul0_hi = _mm256_mulhi_epi16(c0, d0); 
+        const __m256i mul0_lo = _mm256_mullo_epi16(c0, d0); 
+            
+        const __m256i mul0_up_lo = _mm256_unpacklo_epi16(mul0_lo, mul0_hi);
+        const __m256i mul0_up_hi = _mm256_unpackhi_epi16(mul0_lo, mul0_hi);
+        s_l                  = _mm256_add_epi32(s_l, mul0_up_lo);
+        s_h                 = _mm256_add_epi32(s_h, mul0_up_hi);
+
+      }
+        const __m256i sf_l= _mm256_srai_epi32(s_l, shift);
+        const __m256i sf_h= _mm256_srai_epi32(s_h, shift);
+
+        const  __m256i sf16= _mm256_packs_epi32(sf_l, sf_h); 
+
+        _mm256_storeu_si256((__m256i *)(out.addr(im_nb, im_i, im_j, im_c)), sf16);
     }
-  }
-  for (int im_c = 0; im_c < in_D; im_c++)
-  {
-    int32_t num = temp_buffer[im_c];
-    ComputationType<int16_t>::quantize(num, shift);
-    SATURATE(num);
-    out(im_nb, im_i, im_j, im_c) = num;
-  }
+ 
 }
 
 template<typename T, typename T2>

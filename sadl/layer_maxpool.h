@@ -48,6 +48,12 @@ public:
   virtual bool init(const std::vector<Tensor<T> *> &in) override;
 
 protected:
+  bool pool(std::vector<Tensor<T> *> &in);
+#if __AVX2__
+  bool simd16_pool(std::vector<Tensor<T> *> &in);
+#endif
+
+protected:
   virtual bool loadInternal(std::istream &file, Version v) override;
   Dimensions   m_kernel;
   Dimensions   m_strides;
@@ -55,11 +61,26 @@ protected:
   DUMP_MODEL_EXT;
 };
 
+template<typename T> bool MaxPool<T>::apply(std::vector<Tensor<T> *> &in)
+{
+
+#if __AVX2__
+  const int        D            = m_out.dims()[3];
+  if (D % 16 ==0)
+     simd16_pool(in);
+  else
+     pool(in);
+#else
+  pool(in);
+#endif
+return true;
+}
+
 // assume data in in[0]
 // data [batch, in_height, in_width, in_channels]
 // kernel [1, kernel_height, kernel_width, 1]
 // stride [1, stride_height, stride_width, 1]
-template<typename T> bool MaxPool<T>::apply(std::vector<Tensor<T> *> &in)
+template<typename T> bool MaxPool<T>::pool(std::vector<Tensor<T> *> &in)
 {
   assert(in.size() == 1);
   assert(in[0]->dims().size() == 4);
@@ -110,6 +131,77 @@ template<typename T> bool MaxPool<T>::apply(std::vector<Tensor<T> *> &in)
 
   return true;
 }
+
+
+
+// assume data in in[0]
+// data [batch, in_height, in_width, in_channels]
+// kernel [1, kernel_height, kernel_width, 1]
+// stride [1, stride_height, stride_width, 1]
+#if __AVX2__
+template<typename T> bool MaxPool<T>::simd16_pool(std::vector<Tensor<T> *> &in)
+{
+  assert(in.size() == 1);
+  assert(in[0]->dims().size() == 4);
+
+  const Tensor<T> &A            = *in[0];
+  const int        N            = m_out.dims()[0];
+  const int        H            = m_out.dims()[1];
+  const int        W            = m_out.dims()[2];
+  const int        D            = m_out.dims()[3];
+  const int        offset_end   = m_kernel[1] / 2;
+  const int        offset_start = m_kernel[1] - 1 - offset_end;
+  const int        step         = m_strides[1];
+
+  // currently adhoc start
+  int start = offset_start;
+  __m256i xx;
+  m_out.quantizer   = in[0]->quantizer;     // adapt output width to bias
+
+  for (int im_nb = 0; im_nb < N; ++im_nb)
+  {
+    // loop on out
+    for (int im_i = 0; im_i < H; ++im_i)
+    {
+      for (int im_j = 0; im_j < W; ++im_j)
+      {
+        for (int im_d = 0; im_d < D; im_d+=16)
+        {
+          bool firstElement = true;          
+          for (int filter_i = -offset_start; filter_i <= offset_end; ++filter_i)
+          {
+            for (int filter_j = -offset_start; filter_j <= offset_end; ++filter_j)
+            {
+              int ii = im_i * step + filter_i + start;
+              int jj = im_j * step + filter_j + start;
+              if (A.in(im_nb, ii, jj, im_d))
+              {
+
+                const __m256i *aptr = (const __m256i *) A.addr(im_nb, ii, jj, im_d);
+                const __m256i  v   = _mm256_load_si256(aptr);
+                if (firstElement)
+                {
+                  firstElement=false;
+                  xx=v;
+                }
+                else 
+                {
+                  xx = _mm256_max_epi16(xx, v);
+                }
+              }
+            }
+          }
+          _mm256_storeu_si256((__m256i *) m_out.addr(im_nb, im_i, im_j , im_d), xx );
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+#endif
+
 
 // data [batch, in_height, in_width, in_channels]
 // kernel [filter_height, filter_width, in_channels, out_channels]
