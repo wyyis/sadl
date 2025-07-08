@@ -131,6 +131,7 @@ class OPTYPE(IntEnum):
     AveragePool = (28,)
     ReduceMean = (29,)
     Tile = (30,)
+    Pad = (31,)
 
     # "BatchMatMulV2" did not exist in Tensorflow 1.9. It exists in
     # Tensorflow 1.15.
@@ -1595,6 +1596,63 @@ def parse_graph_node(
         myGraph[node.output[0]]["additional"] = additional
         myGraph[node.output[0]]["op_type"] = OPTYPE.Tile
         map_onnx_to_myGraph[node.output[0]] = node.output[0]
+        
+    elif node.op_type == "Pad":
+        def nchw_to_hw_pads(pads_nchw):
+            """
+                pads_nchw: List of 8 integers in NCHW order: 
+                    [N_before, C_before, H_before, W_before, N_after, C_after, H_after, W_after]
+            """
+            # Check for invalid padding on N/C dimensions
+            if pads_nchw[0] != 0 or pads_nchw[4] != 0:  # N_before or N_after
+                raise ValueError("Padding on the batch dimension (N) is not allowed.")
+            if pads_nchw[1] != 0 or pads_nchw[5] != 0:  # C_before or C_after
+                raise ValueError("Padding on the channel dimension (C) is not allowed.")
+
+            # Directly extract H/W padding values from NCHW format
+            return [
+                pads_nchw[2],  # H_before (original NCHW index 2)
+                pads_nchw[3],  # W_before (original NCHW index 3)
+                pads_nchw[6],  # H_after (original NCHW index 6)
+                pads_nchw[7]   # W_after (original NCHW index 7)
+            ]
+        
+        mode = getAttribute(node, "mode").s.decode("utf-8")
+        mode_list = ["constant", "reflect", "edge"]
+        if not mode in mode_list:
+            quit("[ERROR] Currently, the mode of Pad must in", mode_list, node)
+        else:
+            mode = mode_list.index(mode)
+
+        n2 = getNodesWithOutput(n1name, model_onnx)
+        pads_nchw = np.frombuffer(n2.raw_data, dtype=np.int64).tolist()
+        pads_hw = nchw_to_hw_pads(pads_nchw)
+            
+        if len(node.input) > 2 and is_constant(node.input[2], model_onnx.graph.initializer):
+            additional = {}
+            additional["data"] = node
+            (
+                additional["dims"],
+                additional["raw_data"],
+                additional["dtype"],
+            ) = extract_additional_data(node.input[2], False, model_onnx.graph, verbose)
+            myGraph[node.input[2]] = {}
+            myGraph[node.input[2]]["op_type"] = OPTYPE.Const
+            myGraph[node.input[2]]["inputs"] = []
+            myGraph[node.input[2]]["additional"] = additional
+            map_onnx_to_myGraph[node.input[2]] = node.input[2]
+            
+        myGraph[node.output[0]] = {}
+        myGraph[node.output[0]]["op_type"] = OPTYPE.Pad
+        if len(node.input) > 2 and is_constant(node.input[2], model_onnx.graph.initializer):
+            myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name], map_onnx_to_myGraph[node.input[2]]]
+        else:
+            myGraph[node.output[0]]["inputs"] = [map_onnx_to_myGraph[n0name]]
+        myGraph[node.output[0]]["additional"] = {}
+        myGraph[node.output[0]]["additional"]["mode"] = mode
+        myGraph[node.output[0]]["additional"]["pads"] = pads_hw
+        myGraph[node.output[0]]["additional"]["data"] = node
+        map_onnx_to_myGraph[node.output[0]] = node.output[0]
 
     else:
         raise Exception("[ERROR] node not supported:\n{})".format(node))
@@ -1950,6 +2008,19 @@ def dump_onnx(graph, my_inputs, my_outputs, output_filename, verbose=False):
                 if verbose:
                     print("#\t keepdims", node["additional"]["keepdims"])
                 f.write(struct.pack("?", bool(node["additional"]["keepdims"])))
+                
+            elif node["op_type"] == OPTYPE.Pad:
+                if verbose:
+                    print("#\t mode", node["additional"]["mode"])
+                f.write(struct.pack("i", int(node["additional"]["mode"])))
+                
+                if verbose:
+                    print("#\t  nb_pads", len(node["additional"]["pads"]))
+
+                for pad_value in node["additional"]["pads"]:
+                    if verbose:
+                        print(f"#\t\t {pad_value}")
+                    f.write(struct.pack("i", int(pad_value)))
 
             if (
                 node["op_type"] == OPTYPE.Conv2D
