@@ -114,8 +114,10 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
       {
         if (H % 16 == 0) 
         {
+#if SATURATE_RESULT          
           const __m256i     max   = _mm256_set1_epi16(32767);
           const __m256i     min   = _mm256_set1_epi16(-32768);
+#endif
           for (int n = 0; n < N; ++n) {
             T *a_ptr = &m_out[n];
             const T *b_ptr = B.data();
@@ -244,8 +246,10 @@ template<typename T> bool BiasAdd<T>::apply(std::vector<Tensor<T> *> &in)
         {
           if (H % 16 == 0) 
           {
+#if SATURATE_RESULT            
             const __m256i     max   = _mm256_set1_epi16(32767);
             const __m256i     min   = _mm256_set1_epi16(-32768);
+#endif
             for (int n = 0; n < N; ++n) {
               T *a_ptr = &m_out[n];
               const T *b_ptr = B.data();

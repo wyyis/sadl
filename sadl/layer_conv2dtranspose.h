@@ -535,9 +535,7 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_2x2_simd256(int nb_filters, const
   assert(m_strides[1] == 2);
   assert(m_strides[2] == 2);
   assert(in_D % 16 == 0);   // Should be used with mod16 filters.
-#if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int16_t;
-#endif
   constexpr int sw = 2;
   constexpr int sh = 2;
 
@@ -557,8 +555,8 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_2x2_simd256(int nb_filters, const
       j = 0;
       for (int im_j = 0; im_j < out_w; im_j += 1)
       {
-        const int i1 = im_i / sh;
-        const int j1 = im_j / sw;
+         [[maybe_unused]] const int i1 = im_i / sh;
+         [[maybe_unused]] const int j1 = im_j / sw;
         assert(A.in(im_nb, i1, j1, 0));
         __m256i s            = _mm256_setzero_si256();
         const T *kptr        = kernel.addr(i, j, filter, 0);
@@ -677,9 +675,7 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_simd256(int nb_filters, const Ten
   assert(m_strides[1] == 2);
   assert(m_strides[2] == 2);
   assert(in_D % 16 == 0);   // Should be used with mod16 filters.
-#if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int16_t;
-#endif
   assert(kernel.dims()[0] == kernel.dims()[1]);
   const int     kernel_size = kernel.dims()[0];
   const int     half_size   = (kernel.dims()[0] - 1) / 2;
@@ -696,8 +692,8 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_simd256(int nb_filters, const Ten
   {
     for (int im_j = 0; im_j < out_w; im_j += sw)
     {
-      const int i1 = im_i / sh;
-      const int j1 = im_j / sw;
+       [[maybe_unused]] const int i1 = im_i / sh;
+       [[maybe_unused]] const int j1 = im_j / sw;
       assert(A.in(im_nb, i1, j1, 0));
       for (int ki = 0; ki < kernel_size; ++ki)
       {
@@ -820,9 +816,7 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_2x2_simd512(int nb_filters, const
   assert(m_strides[1] == 2);
   assert(m_strides[2] == 2);
   assert(in_D % 32 == 0);   // Should be used with mod32 filters.
-#if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int16_t;
-#endif
   constexpr int sw = 2;
   constexpr int sh = 2;
 
@@ -842,8 +836,8 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_2x2_simd512(int nb_filters, const
       j = 0;
       for (int im_j = 0; im_j < out_w; im_j += 1)
       {
-        const int i1 = im_i / sh;
-        const int j1 = im_j / sw;
+         [[maybe_unused]] const int i1 = im_i / sh;
+         [[maybe_unused]] const int j1 = im_j / sw;
         assert(A.in(im_nb, i1, j1, 0));
         __m512i s            = _mm512_setzero_si512();
         const T *kptr        = kernel.addr(i, j, filter, 0);
@@ -966,9 +960,7 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_simd512(int nb_filters, const Ten
   assert(m_strides[1] == 2);
   assert(m_strides[2] == 2);
   assert(in_D % 32 == 0);   // Should be used with mod32 filters.
-#if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int16_t;
-#endif
   assert(kernel.dims()[0] == kernel.dims()[1]);
   const int     kernel_size = kernel.dims()[0];
   const int     half_size   = (kernel.dims()[0] - 1) / 2;
@@ -985,8 +977,8 @@ void Conv2DTranspose<int16_t>::conv2dtranspose_simd512(int nb_filters, const Ten
   {
     for (int im_j = 0; im_j < out_w; im_j += sw)
     {
-      const int i1 = im_i / sh;
-      const int j1 = im_j / sw;
+       [[maybe_unused]] const int i1 = im_i / sh;
+       [[maybe_unused]] const int j1 = im_j / sw;
       assert(A.in(im_nb, i1, j1, 0));
       for (int ki = 0; ki < kernel_size; ++ki)
       {

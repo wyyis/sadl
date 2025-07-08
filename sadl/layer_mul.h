@@ -321,8 +321,10 @@ template<> inline bool Mul<int16_t>::apply_singleton_simd16(std::vector<Tensor<i
   const Tensor<T> &B      = *in[1];
   const int         shift =  in[1]->quantizer + m_q;
   const __m256i     value = _mm256_set1_epi16(B[0]);
+#if SATURATE_RESULT
   const __m256i     max   = _mm256_set1_epi32(32767);
   const __m256i     min   = _mm256_set1_epi32(-32768);
+#endif
   const __m256i     mask  = _mm256_set1_epi32(65535);
   for (int64_t k = 0; k < m_out.size(); k += 16)
   {

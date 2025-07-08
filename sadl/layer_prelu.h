@@ -372,8 +372,10 @@ template<> template<bool multialpha> inline bool PReLU<int16_t>::apply_simd512(s
   const int                             alpha_q   = A.quantizer;
   auto                                  alpha0    = _mm512_set1_epi32(A[0]);
   auto                                  alpha1    = alpha0;
+#if SATURATE_RESULT
   const auto                            max       = _mm512_set1_epi32(32767);
   const auto                            min       = _mm512_set1_epi32(-32768);
+#endif
   const auto                            zeros     = _mm512_setzero_si512();
   static constexpr int16_t data[]={0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62};
   const auto shuffle=  _mm512_loadu_si512((void *)data);

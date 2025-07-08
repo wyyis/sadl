@@ -538,9 +538,7 @@ template<> template<int in_D, int s_h, int s_w,int o_i,int o_j> inline void Conv
 
 template<> template<int in_D, int s_h, int s_w,int o_i,int o_j> void Conv2D<int32_t>::simd8_conv2d_3x3_s_g1_d(const Tensor<int32_t> &A, const Tensor<int32_t> &kernel)
 {
-#if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int32_t;
-#endif
   static_assert(in_D % 8 == 0, "Should be used with mod8 filters.");
   constexpr int im_nb     = 0;
   constexpr int half_size = 1;
@@ -610,9 +608,8 @@ template<> template<int in_D, int s_h, int s_w,int o_i,int o_j> void Conv2D<int3
 // actually SSE42
 template<> template<int in_D, int s_h, int s_w,int o_i,int o_j> void Conv2D<int16_t>::simd8_conv2d_3x3_s_g1_d(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
 {
-#if DEBUG_COUNTERS || SATURATE_RESULT
+
   using T = int16_t;
-#endif
   static_assert(in_D % 8 == 0, "Should be used with mod8 filters.");
   constexpr int im_nb     = 0;
   constexpr int half_size = 1;
@@ -675,10 +672,7 @@ template<> template<int in_D, int s_h, int s_w,int o_i,int o_j> void Conv2D<int1
 
 template<> template<int in_D, int s_h, int s_w,int o_i,int o_j> void Conv2D<int16_t>::simd16_conv2d_3x3_s_g1_d(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
 {
-#if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int16_t;
-#endif
-
   static_assert(in_D % 16 == 0, "Should be used with mod16 filters.");
   constexpr int im_nb     = 0;
   constexpr int half_size = 1;
