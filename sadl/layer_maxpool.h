@@ -155,7 +155,7 @@ template<typename T> bool MaxPool<T>::simd16_pool(std::vector<Tensor<T> *> &in)
 
   // currently adhoc start
   int start = offset_start;
-  __m256i xx;
+  __m256i xx{};
   m_out.quantizer   = in[0]->quantizer;     // adapt output width to bias
 
   for (int im_nb = 0; im_nb < N; ++im_nb)

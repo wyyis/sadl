@@ -111,8 +111,10 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
           if (m_out.size() % 16 == 0) 
           {
             const __m256i     value = _mm256_set1_epi16(B[0]);
+#if SATURATE_RESULT
             const __m256i     max   = _mm256_set1_epi16(32767);
             const __m256i     min   = _mm256_set1_epi16(-32768);
+#endif
             T *a_ptr = m_out.data();
             for (int64_t i = 0; i < m_out.size(); i += 16, a_ptr+=16)
             {
@@ -239,8 +241,10 @@ template<typename T> bool Add<T>::apply(std::vector<Tensor<T> *> &in)
           if (m_out.size() % 16 == 0) 
           {
             const __m256i     value = _mm256_srai_epi16(_mm256_set1_epi16(B[0]), shift);
+#if SATURATE_RESULT
             const __m256i     max   = _mm256_set1_epi16(32767);
             const __m256i     min   = _mm256_set1_epi16(-32768);
+#endif
             T *a_ptr = m_out.data();
             for (int64_t i = 0; i < m_out.size(); i += 16, a_ptr+=16)
             {

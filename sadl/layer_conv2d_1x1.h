@@ -338,9 +338,7 @@ template<> template<int in_D, int s_h, int s_w> inline void Conv2D<float>::simd1
 // int16
 template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd8_conv2d_1x1_s_d(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
 {   // should be sse42
-#if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int16_t;
-#endif
   const int     in_H{ A.dims()[1] };
   const int     in_W{ A.dims()[2] };
   const int     nb_filters{ kernel.dims()[2] };
@@ -392,9 +390,7 @@ template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd8_conv
 
 template<> template<int in_D, int s_h, int s_w> void Conv2D<int16_t>::simd16_conv2d_1x1_s_d(const Tensor<int16_t> &A, const Tensor<int16_t> &kernel)
 {
-#if DEBUG_COUNTERS || SATURATE_RESULT
   using T = int16_t;
-#endif
   const int     in_H{ A.dims()[1] };
   const int     in_W{ A.dims()[2] };
   const int     nb_filters{ kernel.dims()[2] };
