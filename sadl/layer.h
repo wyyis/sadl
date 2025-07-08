@@ -78,7 +78,8 @@ struct OperationType
     AveragePool        = 28,
     ReduceMean         = 29,
     Tile               = 30,
-    OperationTypeCount = 31,
+    Pad                = 31,
+    OperationTypeCount = 32,
     OperationExperimentalStart = 65535,
     OperationExperimentalEnd = 65536 // 
   };

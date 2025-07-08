@@ -176,6 +176,13 @@ template<typename T> bool sadl::layers::Resize<T>::dump(std::ostream &file)
   return true;
 }
 
+template<typename T> bool sadl::layers::Pad<T>::dump(std::ostream &file)
+{
+  file.write((const char *) &m_mode, sizeof(m_mode));
+  file.write(reinterpret_cast<const char *>(m_pads.data()), m_pads.size() * sizeof(int32_t));
+  return true;
+}
+
 template<typename T> bool sadl::layers::Compare<T>::dump(std::ostream &file)
 {
   file.write((const char *) &m_mode, sizeof(m_mode));

@@ -118,6 +118,10 @@ template<typename T> bool copy(const sadl::layers::Layer<float> &layer, sadl::la
     break;
   case sadl::layers::OperationType::Tile:
     break;
+  case sadl::layers::OperationType::Pad:
+    dynamic_cast<sadl::layers::Pad<T> &>(layerQ).m_mode = dynamic_cast<const sadl::layers::Pad<float> &>(layer).m_mode;
+    dynamic_cast<sadl::layers::Pad<T> &>(layerQ).m_pads = dynamic_cast<const sadl::layers::Pad<float> &>(layer).m_pads;
+    break;
   case sadl::layers::OperationType::OperationExperimentalStart:
     break;
   case sadl::layers::OperationType::OperationExperimentalEnd:
