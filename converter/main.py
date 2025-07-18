@@ -199,6 +199,18 @@ def getAttribute(node, attr):
     return None
 
 
+def transpose_constant_tensor_dim4(raw_data, dims, perm):
+    """
+        Transpose a 4D constant tensor
+    """
+    assert len(dims) == len(perm), f"[ERROR] Mismatched lengths: dims({len(dims)}) vs perm({len(perm)})"
+    x = np.frombuffer(raw_data, dtype=np.float32)
+    x = np.reshape(x, dims)
+    x = np.transpose(x, perm)
+    newShape = [dims[i] for i in perm]
+    return x.tobytes(), newShape
+
+
 def transpose_tensor(raw_data, dims):
     """
     When convert TF2 to ONNX, ONNX weight's  are not represent in the same way as TF2 weight's
@@ -534,7 +546,7 @@ def add_transpose_to_output(node, myGraph, map_onnx_to_myGraph):
 
 
 def parse_graph_node(
-    node, model_onnx, myGraph, node_annotation, map_onnx_to_myGraph, verbose
+    node, model_onnx, myGraph, node_annotation, map_onnx_to_myGraph, verbose, force_transpose_constant_tensor_dim4
 ):
     if node.name not in node_annotation:
         print(f"[WARN] node {node.name} never reached: removed")
@@ -692,6 +704,11 @@ def parse_graph_node(
                 additional["raw_data"],
                 additional["dtype"],
             ) = extract_additional_data(n0name, False, model_onnx.graph, verbose)
+            
+            if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                additional["raw_data"], additional["dims"] = \
+                    transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                    
             map_onnx_to_myGraph[n0name] = n0name
             myGraph[n0name] = {}
             myGraph[n0name]["inputs"] = []
@@ -706,6 +723,11 @@ def parse_graph_node(
                 additional["raw_data"],
                 additional["dtype"],
             ) = extract_additional_data(n1name, False, model_onnx.graph, verbose)
+                        
+            if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                additional["raw_data"], additional["dims"] = \
+                    transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                    
             map_onnx_to_myGraph[n1name] = n1name
             myGraph[n1name] = {}
             myGraph[n1name]["inputs"] = []
@@ -775,6 +797,11 @@ def parse_graph_node(
             ) = extract_additional_data(
                 n0name, node_annotation[n2.name].to_transpose, model_onnx.graph, verbose
             )
+                        
+            if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                additional["raw_data"], additional["dims"] = \
+                    transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                    
             map_onnx_to_myGraph[n0name] = n0name
             myGraph[n0name] = {}
             myGraph[n0name]["inputs"] = []
@@ -792,6 +819,11 @@ def parse_graph_node(
             ) = extract_additional_data(
                 n1name, node_annotation[n2.name].to_transpose, model_onnx.graph, verbose
             )
+                        
+            if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                additional["raw_data"], additional["dims"] = \
+                    transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                    
             map_onnx_to_myGraph[n1name] = n1name
             myGraph[n1name] = {}
             myGraph[n1name]["inputs"] = []
@@ -952,6 +984,11 @@ def parse_graph_node(
             ) = extract_additional_data(
                 n0name, node_annotation[n2.name].to_transpose, model_onnx.graph, verbose
             )
+                        
+            if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                additional["raw_data"], additional["dims"] = \
+                    transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                    
             map_onnx_to_myGraph[n0name] = n0name
             myGraph[n0name] = {}
             myGraph[n0name]["inputs"] = []
@@ -969,6 +1006,11 @@ def parse_graph_node(
             ) = extract_additional_data(
                 n1name, node_annotation[n2.name].to_transpose, model_onnx.graph, verbose
             )
+                        
+            if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                additional["raw_data"], additional["dims"] = \
+                    transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                    
             map_onnx_to_myGraph[n1name] = n1name
             myGraph[n1name] = {}
             myGraph[n1name]["inputs"] = []
@@ -1031,6 +1073,11 @@ def parse_graph_node(
                     model_onnx.graph,
                     verbose,
                 )
+                            
+                if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                    additional["raw_data"], additional["dims"] = \
+                        transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                        
                 map_onnx_to_myGraph[node_input] = node_input
                 myGraph[node_input] = {}
                 myGraph[node_input]["inputs"] = []
@@ -1062,6 +1109,11 @@ def parse_graph_node(
                     model_onnx.graph,
                     verbose,
                 )
+                            
+                if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                    additional["raw_data"], additional["dims"] = \
+                        transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                        
                 map_onnx_to_myGraph[node_input] = node_input
                 myGraph[node_input] = {}
                 myGraph[node_input]["inputs"] = []
@@ -1233,6 +1285,11 @@ def parse_graph_node(
             additional["raw_data"],
             additional["dtype"],
         ) = extract_additional_data(n1name, False, model_onnx.graph, verbose)
+                    
+        if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+            additional["raw_data"], additional["dims"] = \
+                transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                
         if len(additional["dims"]) == 5:
             # When the tensor format is specified as NCHW4 (or NHWC4) and the value of N is 1, the format is transformed
             # to CHW4 (or HWC4). Here, the "4" indicates the position index within a 4-dimensional tensor.
@@ -1328,6 +1385,11 @@ def parse_graph_node(
                 ) = extract_additional_data(
                     input_name, False, model_onnx.graph, verbose
                 )
+                                        
+                if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                    additional["raw_data"], additional["dims"] = \
+                        transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                        
                 if (
                     additional["raw_data"] == b""
                 ):  # When tensor data is empty, just ignore it.
@@ -1421,6 +1483,11 @@ def parse_graph_node(
                 additional["raw_data"],
                 additional["dtype"],
             ) = extract_additional_data(n1name, False, model_onnx.graph, verbose)
+                                                
+            if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                additional["raw_data"], additional["dims"] = \
+                    transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                    
             myGraph[n1name] = {}
             myGraph[n1name]["op_type"] = OPTYPE.Const
             myGraph[n1name]["inputs"] = []
@@ -1447,6 +1514,11 @@ def parse_graph_node(
                 additional["raw_data"],
                 additional["dtype"],
             ) = extract_additional_data(n1name, False, model_onnx.graph, verbose)
+                                                
+            if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                additional["raw_data"], additional["dims"] = \
+                    transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                    
             myGraph[n1name] = {}
             myGraph[n1name]["op_type"] = OPTYPE.Const
             myGraph[n1name]["inputs"] = []
@@ -1473,6 +1545,11 @@ def parse_graph_node(
                 additional["raw_data"],
                 additional["dtype"],
             ) = extract_additional_data(n1name, False, model_onnx.graph, verbose)
+                                                
+            if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                additional["raw_data"], additional["dims"] = \
+                    transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                    
             myGraph[n1name] = {}
             myGraph[n1name]["op_type"] = OPTYPE.Const
             myGraph[n1name]["inputs"] = []
@@ -1487,6 +1564,11 @@ def parse_graph_node(
                 additional["raw_data"],
                 additional["dtype"],
             ) = extract_additional_data(node.input[2], False, model_onnx.graph, verbose)
+                                                
+            if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                additional["raw_data"], additional["dims"] = \
+                    transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                    
             myGraph[node.input[2]] = {}
             myGraph[node.input[2]]["op_type"] = OPTYPE.Const
             myGraph[node.input[2]]["inputs"] = []
@@ -1514,6 +1596,11 @@ def parse_graph_node(
                 additional["raw_data"],
                 additional["dtype"],
             ) = extract_additional_data(n1name, False, model_onnx.graph, verbose)
+                                                
+            if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                additional["raw_data"], additional["dims"] = \
+                    transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                    
             myGraph[n1name] = {}
             myGraph[n1name]["op_type"] = OPTYPE.Const
             myGraph[n1name]["inputs"] = []
@@ -1636,6 +1723,11 @@ def parse_graph_node(
                 additional["raw_data"],
                 additional["dtype"],
             ) = extract_additional_data(node.input[2], False, model_onnx.graph, verbose)
+                                                
+            if force_transpose_constant_tensor_dim4 and len(additional["dims"]) == 4: # nchw -> nhwc
+                additional["raw_data"], additional["dims"] = \
+                    transpose_constant_tensor_dim4(additional["raw_data"], additional["dims"], [0, 2, 3, 1])
+                    
             myGraph[node.input[2]] = {}
             myGraph[node.input[2]]["op_type"] = OPTYPE.Const
             myGraph[node.input[2]]["inputs"] = []
@@ -1661,7 +1753,7 @@ def parse_graph_node(
         n0name = add_transpose_to_output(node, myGraph, map_onnx_to_myGraph)
 
 
-def parse_onnx(model_onnx, node_annotation, input_default_value, verbose=False):
+def parse_onnx(model_onnx, node_annotation, input_default_value, verbose=False, force_transpose_constant_tensor_dim4=False):
     myGraph, map_onnx_to_myGraph = OrderedDict(), {}
 
     # Inputs
@@ -1690,7 +1782,7 @@ def parse_onnx(model_onnx, node_annotation, input_default_value, verbose=False):
             map_onnx_to_myGraph[node.output[0]] = curr_key
         else:
             parse_graph_node(
-                node, model_onnx, myGraph, node_annotation, map_onnx_to_myGraph, verbose
+                node, model_onnx, myGraph, node_annotation, map_onnx_to_myGraph, verbose, force_transpose_constant_tensor_dim4
             )
 
     myInputs = []
@@ -2383,6 +2475,7 @@ def dumpModel(
     verbose,
     user_annotation,
     input_default_value,
+    force_transpose_constant_tensor_dim4
 ):
     """Writes the neural network model in the \"sadl\" format to binary file.
 
@@ -2438,7 +2531,7 @@ def dumpModel(
             + "}"
         )  # print("[INFO] node annotations:", node_annotation)
     my_graph, my_inputs, my_outputs = parse_onnx(
-        model_onnx_copy, node_annotation, input_default_value, verbose=verbose
+        model_onnx_copy, node_annotation, input_default_value, verbose=verbose, force_transpose_constant_tensor_dim4=force_transpose_constant_tensor_dim4
     )
     dump_onnx(my_graph, my_inputs, my_outputs, output_filename, verbose=verbose)
     if data_layout == "nchw":
@@ -2490,6 +2583,11 @@ if __name__ == "__main__":
         default=[],
         help="specify a node where add transpose after will be disable",
     )
+    parser.add_argument(
+        "--force_transpose_constant_tensor_dim4",
+        action="store_true",
+        help="If set, force transpose on 4D constant tensors (e.g., NCHW to NHWC). Default is False."
+    )
 
     args = parser.parse_args()
     if args.input_onnx is None:
@@ -2535,4 +2633,5 @@ if __name__ == "__main__":
         args.verbose,
         user_annotation,
         args.input_default_value,
+        args.force_transpose_constant_tensor_dim4
     )
