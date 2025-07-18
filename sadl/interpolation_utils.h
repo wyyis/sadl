@@ -87,7 +87,7 @@ void bilinear_in_channels_wo_simd(const Tensor<T> &data, const T2 coeffs[], cons
 
 #if __AVX2__
 template<typename T, typename T2>
-void bilinear_in_channels_simd256(const Tensor<T> &data, const T2 coeffs[], const int pos[], const int shift, const int im_i, const int im_j, Tensor<T> &out);
+void bilinear_in_channels_simd256(const Tensor<T> &data, const T2 coeffs[], const int pos[], const int shift, const int im_i, const int im_j, Tensor<T> &out, const int mod_r);
 #endif
 
 #if __AVX512F__ || __AVX512BW__
@@ -96,17 +96,16 @@ void bilinear_in_channels_simd512(const Tensor<T> &data, const T2 coeffs[], cons
 #endif
 
 template<typename T, typename T2>
-void bilinear_in_channels(const Tensor<T> &data, const T2 coeffs[], const int pos[], const int shift, const int im_i, const int im_j, Tensor<T> &out)
+void bilinear_in_channels(const Tensor<T> &data, const T2 coeffs[], const int pos[], const int shift, const int im_i, const int im_j, Tensor<T> &out, const int mod_r)
 {
 #if __AVX2__
-  int in_D = data.dims()[3];
 #if __AVX512F__ || __AVX512BW__
-  if (in_D % 16 == 0)   // same for float and int16
+  if (mod_r == 16)   // same for float and int16
     bilinear_in_channels_simd512(data, coeffs, pos, shift, im_i, im_j, out);
   else
 #endif
-  if (in_D % 8 == 0)    // same for float and int16
-    bilinear_in_channels_simd256(data, coeffs, pos, shift, im_i, im_j, out);
+  if (mod_r > 0)    // same for float and int16
+    bilinear_in_channels_simd256(data, coeffs, pos, shift, im_i, im_j, out, mod_r);
   else
     bilinear_in_channels_wo_simd(data, coeffs, pos, shift, im_i, im_j, out);
 #else
@@ -149,11 +148,11 @@ void bilinear_in_channels_wo_simd(const Tensor<T> &data, const T2 coeffs[], cons
 #if __AVX2__
 template<>
 inline void bilinear_in_channels_simd256(const Tensor<float> &data, const float coeffs[], const int pos[], const int shift, const int im_i, const int im_j,
-                                    Tensor<float> &out)
+                                    Tensor<float> &out, const int mod_r)
 {
   constexpr int im_nb = 0;
   int           in_D  = data.dims()[3];
-  assert(in_D % 8 == 0);   // Should be used with mod8 data.
+  assert(mod_r > 0);   // Should be used with mod8 data.
   const int &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
   const int  pos_table[4][2] = { {y_ori_top, x_ori_left}, {y_ori_top, x_ori_right}, {y_ori_bottom, x_ori_left}, {y_ori_bottom, x_ori_right} };
 
@@ -186,18 +185,19 @@ inline void bilinear_in_channels_simd256(const Tensor<float> &data, const float 
 
 template<>
 inline void bilinear_in_channels_simd256(const Tensor<int16_t> &data, const int32_t coeffs[], const int pos[], const int shift, const int im_i, const int im_j,
-                                    Tensor<int16_t> &out)
+                                    Tensor<int16_t> &out, const int mod_r)
 {
   constexpr int im_nb = 0;
   int           in_D  = data.dims()[3];
-  assert(in_D % 8 == 0);   // Should be used with mod8 data.
-//#if DEBUG_COUNTERS || SATURATE_RESULT
-//  using T = int16_t;
-//#endif
+  assert(mod_r > 0);   // Should be used with mod8 or mod16 data.
+#if DEBUG_COUNTERS || SATURATE_RESULT
+  using T = int16_t;
+#endif
   const int &x_ori_left = pos[0], &y_ori_top = pos[1], &x_ori_right = pos[2], &y_ori_bottom = pos[3];
   const int  pos_table[4][2] = { {y_ori_top, x_ori_left}, {y_ori_top, x_ori_right}, {y_ori_bottom, x_ori_left}, {y_ori_bottom, x_ori_right} };
- 
 
+  if (mod_r == 16)
+  {
     for (int im_c = 0; im_c < in_D; im_c += 16)
     {
       __m256i s_l = _mm256_setzero_si256();
@@ -207,32 +207,53 @@ inline void bilinear_in_channels_simd256(const Tensor<int16_t> &data, const int3
       {
         int16_t coeff16= (int16_t) coeffs[coeff_i];
         const __m256i  c0   = _mm256_set1_epi16(coeff16);
-        const __m256i *dptr = (const __m256i *) data.addr(im_nb, pos_table[coeff_i][0], pos_table[coeff_i][1], im_c);
-
-   
+        const __m256i *dptr = (const __m256i *) data.addr(im_nb, pos_table[coeff_i][0], pos_table[coeff_i][1], im_c);   
         const __m256i  d0   = _mm256_load_si256(dptr);
-
         const __m256i mul0_hi = _mm256_mulhi_epi16(c0, d0); 
-        const __m256i mul0_lo = _mm256_mullo_epi16(c0, d0); 
-            
+        const __m256i mul0_lo = _mm256_mullo_epi16(c0, d0);
         const __m256i mul0_up_lo = _mm256_unpacklo_epi16(mul0_lo, mul0_hi);
         const __m256i mul0_up_hi = _mm256_unpackhi_epi16(mul0_lo, mul0_hi);
         s_l                  = _mm256_add_epi32(s_l, mul0_up_lo);
         s_h                 = _mm256_add_epi32(s_h, mul0_up_hi);
-
       }
         const __m256i sf_l= _mm256_srai_epi32(s_l, shift);
         const __m256i sf_h= _mm256_srai_epi32(s_h, shift);
-
         const  __m256i sf16= _mm256_packs_epi32(sf_l, sf_h); 
 
         _mm256_storeu_si256((__m256i *)(out.addr(im_nb, im_i, im_j, im_c)), sf16);
     }
- 
+  }
+  else
+  {
+    static std::vector<int32_t> temp_buffer;
+    temp_buffer.resize(in_D);
+    std::fill(temp_buffer.begin(),temp_buffer.end(),0);
+
+    for (int coeff_i = 0; coeff_i < 4; coeff_i++)
+    {
+      const __m256i  c0   = _mm256_set1_epi32(coeffs[coeff_i]);
+      const int16_t *dptr = data.addr(im_nb, pos_table[coeff_i][0], pos_table[coeff_i][1], 0);
+      const int32_t *bptr = &temp_buffer[0];
+      for (int im_c = 0; im_c < in_D; im_c += 8)
+      {
+        const __m256i d0 = _mm256_cvtepi16_epi32(_mm_loadu_si128((__m128i *) (dptr + im_c)));
+        const __m256i b0 = _mm256_loadu_si256((__m256i *) (bptr + im_c));
+        const __m256i s  = _mm256_add_epi32(_mm256_mullo_epi32(c0, d0), b0);   // res in int32
+        _mm256_storeu_si256((__m256i *) (bptr + im_c), s);
+      }
+    }
+    for (int im_c = 0; im_c < in_D; im_c++)
+    {
+      int32_t num = temp_buffer[im_c];
+      ComputationType<int16_t>::quantize(num, shift);
+      SATURATE(num);
+      out(im_nb, im_i, im_j, im_c) = num;
+    }
+  }
 }
 
 template<typename T, typename T2>
-void bilinear_in_channels_simd256(const Tensor<T> &data, const T2 coeffs[], const int pos[], const int shift, const int im_i, const int im_j, Tensor<T> &out)
+void bilinear_in_channels_simd256(const Tensor<T> &data, const T2 coeffs[], const int pos[], const int shift, const int im_i, const int im_j, Tensor<T> &out, const int mod_r)
 {
   std::cerr << "TODO " << std::endl;
   exit(-1);

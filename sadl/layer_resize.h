@@ -235,6 +235,17 @@ template<typename T> bool Resize<T>::interpolate_bilinear(std::vector<Tensor<T> 
   int           shift = m_quantizer;
   int           H_out = m_out.dims()[1];
   int           W_out = m_out.dims()[2];
+  int           in_D  = data.dims()[3];
+  int           mod_r  = 0;
+  
+  if (in_D % 8 ==0) // to avoid mod operation per pixel in the spatial domain
+  {
+    mod_r = 8;
+    if (in_D % 16 ==0)
+    {
+      mod_r = 16;
+    }
+  }
 
   for (int im_i = 0; im_i < H_out; im_i++)
   {
@@ -252,7 +263,7 @@ template<typename T> bool Resize<T>::interpolate_bilinear(std::vector<Tensor<T> 
       get_bilinear_coeffs(y_ori, x_ori, coeffs);
 
       BILINEAR_COUNTERS(data, coeffs);
-      bilinear_in_channels(data, coeffs, pos, shift, im_i, im_j, m_out);
+      bilinear_in_channels(data, coeffs, pos, shift, im_i, im_j, m_out, mod_r);
     }
   }
   return true;
