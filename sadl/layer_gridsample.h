@@ -183,6 +183,17 @@ template<typename T> bool GridSample<T>::gridsample_bilinear(std::vector<Tensor<
   int           W_in  = data.dims()[2];
   int           H_out = grid.dims()[3];
   int           W_out = grid.dims()[1];
+  int           in_D  = data.dims()[3];
+  int           mod_r  = 0;
+  
+  if (in_D % 8 ==0)  // to avoid mod operation per pixel in the spatial domain
+  {
+    mod_r = 8;
+    if (in_D % 16 ==0)
+    {
+      mod_r = 16;
+    }
+  }
 
   for (int im_j = 0; im_j < W_out; im_j++)
   {
@@ -206,7 +217,7 @@ template<typename T> bool GridSample<T>::gridsample_bilinear(std::vector<Tensor<
       pixel_addr_at_grid(H_in, W_in, y_ori_bottom, x_ori_right);
 
       BILINEAR_COUNTERS(data, coeffs);
-      bilinear_in_channels(data, coeffs, pos, shift, im_i, im_j, m_out);
+      bilinear_in_channels(data, coeffs, pos, shift, im_i, im_j, m_out, mod_r);
     }
   }
   return true;
