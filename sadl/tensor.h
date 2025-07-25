@@ -874,7 +874,6 @@ template<typename T> std::ostream &operator<<(std::ostream &out, const Tensor<T>
       if (t.isSparse())
       {
         out << "data_sparse = ";
-        int i = 0;
         for (const auto& nb_nonzero : t.getNbNonzerosCol())
         {
           out << " [";
@@ -886,7 +885,6 @@ template<typename T> std::ostream &operator<<(std::ostream &out, const Tensor<T>
               out << j + p << ": " << t.getDataSparse()[offset_data + p] << ", ";
             }
           }
-          i++;
           out << " ]\n";
         }
       }
